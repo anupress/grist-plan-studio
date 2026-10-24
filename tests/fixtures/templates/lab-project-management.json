@@ -1,0 +1,117 @@
+{
+ "name": "lab-project-management",
+ "source": "https://templates.getgrist.com/2wxXx96myxJWtKCxfkh5Sb",
+ "fetched": "2026-10-24",
+ "tables": [
+  {
+   "id": "Tasks",
+   "columns": [
+    {
+     "id": "Task",
+     "label": "Task",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Priority",
+     "label": "Priority",
+     "type": "Choice",
+     "isFormula": false,
+     "choices": [
+      "High",
+      "Medium",
+      "Low"
+     ]
+    },
+    {
+     "id": "Project",
+     "label": "Project",
+     "type": "Ref:Projects",
+     "isFormula": false
+    },
+    {
+     "id": "Assigned_To",
+     "label": "Assigned To",
+     "type": "Ref:People",
+     "isFormula": false
+    },
+    {
+     "id": "Due_Date",
+     "label": "Due Date",
+     "type": "Date",
+     "isFormula": false
+    },
+    {
+     "id": "Status",
+     "label": "Status",
+     "type": "Choice",
+     "isFormula": false,
+     "choices": [
+      "Not Started",
+      "In Progress",
+      "Completed",
+      "Pending"
+     ]
+    },
+    {
+     "id": "Outcome",
+     "label": "Outcome",
+     "type": "Text",
+     "isFormula": false
+    }
+   ]
+  },
+  {
+   "id": "Projects",
+   "columns": [
+    {
+     "id": "Project_Name",
+     "label": "Project Name",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Project_Description",
+     "label": "Project Description",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Project_Lead",
+     "label": "Project Lead",
+     "type": "Ref:People",
+     "isFormula": false
+    }
+   ]
+  },
+  {
+   "id": "People",
+   "columns": [
+    {
+     "id": "Name",
+     "label": "Name",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Title",
+     "label": "Title",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Email",
+     "label": "Email",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Phone",
+     "label": "Phone",
+     "type": "Text",
+     "isFormula": false
+    }
+   ]
+  }
+ ]
+}

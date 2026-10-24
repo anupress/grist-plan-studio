@@ -1,0 +1,99 @@
+/* The printout (print/render.js). Paper is always light, whatever the screen's theme; colours print
+   as they show; a row never splits across a page edge; each page repeats its title and header. */
+
+#ps-print { display: none; }
+@media print {
+  html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+  #app { display: none !important; }
+  #ps-print { display: block; }
+}
+
+.pp-root {
+  --pp-ink: #14202b; --pp-muted: #5b6b7e; --pp-line: #d5dde6; --pp-line-strong: #b7c3d0; --pp-crit: #c62f37;
+  --pp-ok: #16704a; --pp-free: #e3f2e9; --pp-ground: #f3f6f9;
+  color: var(--pp-ink); background: #fff;
+  font: 10.5px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.pp-break { break-before: page; }
+
+.pp-sheet { border-collapse: collapse; table-layout: fixed; }
+.pp-sheet thead { display: table-header-group; }
+.pp-row { break-inside: avoid; }
+.pp-title { text-align: left; padding: 0 0 3mm; font-weight: 400; }
+.pp-board .pp-title { display: block; }
+.pp-title__main { font-size: 14px; font-weight: 700; margin-right: 10px; }
+.pp-title__sub { color: var(--pp-muted); font-size: 10.5px; }
+
+.pp-name {
+  text-align: left; vertical-align: middle; padding: 0 6px; border-bottom: 1px solid var(--pp-line); border-right: 1px solid var(--pp-line-strong);
+  overflow: hidden; white-space: nowrap;
+}
+.pp-name--head { vertical-align: bottom; padding-bottom: 4px; font-size: 10px; font-weight: 600; color: var(--pp-muted); border-bottom: 1px solid var(--pp-line-strong); }
+.pp-name__label { display: block; overflow: hidden; text-overflow: ellipsis; }
+.pp-name__sub { display: block; color: var(--pp-muted); font-size: 9px; }
+.pp-name__clash { display: block; color: var(--pp-crit); font-size: 9px; font-weight: 600; }
+.pp-row--group .pp-name, .pp-row--lane .pp-name { font-weight: 650; }
+.pp-row--group { background: var(--pp-ground); }
+
+.pp-scale { position: relative; padding: 0; border-bottom: 1px solid var(--pp-line-strong); vertical-align: bottom; }
+.pp-scale__row { position: relative; height: 16px; }
+.pp-scale__row + .pp-scale__row { border-top: 1px solid var(--pp-line); }
+.pp-scale__cell {
+  position: absolute; top: 0; height: 100%; box-sizing: border-box; border-left: 1px solid var(--pp-line);
+  padding: 2px 3px 0; font-size: 9px; font-weight: 500; color: var(--pp-muted); white-space: nowrap; overflow: hidden;
+}
+.pp-scale__row:first-child:not(:last-child) .pp-scale__cell { color: var(--pp-ink); font-weight: 650; }
+
+.pp-chart { padding: 0; border-bottom: 1px solid var(--pp-line); }
+.pp-strip { position: relative; overflow: hidden; }
+.pp-gridline { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid var(--pp-line); }
+.pp-today { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1.5px solid #e5484d; }
+.pp-bar {
+  position: absolute; box-sizing: border-box; border-radius: 3px; overflow: hidden; white-space: nowrap;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.2);
+}
+.pp-bar__label { position: relative; display: block; padding: 0 4px; font-size: 9px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; }
+.pp-bar__progress { position: absolute; left: 0; bottom: 0; height: 2px; background: rgba(0, 0, 0, 0.35); }
+.pp-bar.is-critical, .pp-ms.is-critical { box-shadow: 0 0 0 1.5px var(--pp-crit); }
+.pp-bar.is-clash, .pp-ms.is-clash { box-shadow: 0 0 0 1.5px var(--pp-crit); }
+.pp-ms { position: absolute; transform: rotate(45deg) scale(0.75); background: var(--fill); border-radius: 1px; }
+.pp-sum {
+  position: absolute; height: 6px; background: var(--pp-ink); opacity: 0.8;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, calc(100% - 5px) 55%, 5px 55%, 0 100%);
+}
+.pp-sum.is-critical { background: var(--pp-crit); opacity: 1; }
+.pp-out { position: absolute; font-size: 9px; white-space: nowrap; color: var(--pp-ink); }
+
+/* board */
+.pp-board td.pp-lane { vertical-align: top; padding: 0 2mm 0 0; }
+.pp-board th.pp-lane__head { text-align: left; }
+.pp-board .pp-lane__head { margin-right: 2mm; }
+.pp-lane__head {
+  border-top: 2.5px solid; padding: 3px 1px 4px; font-weight: 650; font-size: 11px; border-right: 2mm solid #fff;
+}
+.pp-lane__head.is-over { color: var(--pp-crit); }
+.pp-lane__count { float: right; color: var(--pp-muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.pp-card {
+  border: 1px solid var(--pp-line-strong); border-left: 3px solid var(--pp-line-strong); border-radius: 3px;
+  padding: 4px 6px; margin-top: 2mm; break-inside: avoid;
+}
+.pp-card.is-done { color: var(--pp-muted); }
+.pp-card__title { font-weight: 550; }
+.pp-card__fields, .pp-card__meta { color: var(--pp-muted); font-size: 9px; margin-top: 2px; }
+.pp-card__meta { display: flex; justify-content: space-between; gap: 6px; }
+.pp-card__meta .is-late { color: var(--pp-crit); font-weight: 600; }
+
+/* booking grid */
+.pp-grid td, .pp-grid th { border: 1px solid var(--pp-line); }
+.pp-grid .pp-titlerow th { border: 0; }
+.pp-period { text-align: left; vertical-align: bottom; padding: 3px 5px; font-weight: 400; border-bottom: 1px solid var(--pp-line-strong) !important; }
+.pp-period__label { display: block; font-weight: 650; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-period__sub { display: block; color: var(--pp-muted); font-size: 9px; }
+.pp-period__free { display: block; color: var(--pp-ok); font-size: 9px; font-weight: 650; }
+.pp-period__free.is-full { color: var(--pp-muted); font-weight: 500; }
+.pp-grid .pp-row td { height: 6mm; }
+.pp-booked { padding: 0 5px; font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-booked.is-clash { color: var(--pp-crit); background: #fbecec; font-weight: 600; }
+.pp-free { background: var(--pp-free); }
+.pp-flag { font-weight: 600; }

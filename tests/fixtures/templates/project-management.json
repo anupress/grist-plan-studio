@@ -1,0 +1,114 @@
+{
+ "name": "project-management",
+ "source": "https://templates.getgrist.com/hifkng53AxyQfocgB67uQK",
+ "fetched": "2026-10-24",
+ "tables": [
+  {
+   "id": "Projects",
+   "columns": [
+    {
+     "id": "Project",
+     "label": "Project",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Department",
+     "label": "Department",
+     "type": "Ref:Department",
+     "isFormula": false
+    },
+    {
+     "id": "Lead",
+     "label": "Lead",
+     "type": "Ref:People",
+     "isFormula": false
+    },
+    {
+     "id": "Archive_",
+     "label": "Archive?",
+     "type": "Bool",
+     "isFormula": false
+    }
+   ]
+  },
+  {
+   "id": "All_Tasks",
+   "columns": [
+    {
+     "id": "Assignee",
+     "label": "Assignee",
+     "type": "Ref:People",
+     "isFormula": false
+    },
+    {
+     "id": "Due_Date",
+     "label": "Due Date",
+     "type": "Date",
+     "isFormula": false
+    },
+    {
+     "id": "Status",
+     "label": "Status",
+     "type": "Choice",
+     "isFormula": false,
+     "choices": [
+      "Not yet started",
+      "Working on it",
+      "Needs Review",
+      "Stuck",
+      "Completed"
+     ]
+    },
+    {
+     "id": "Project",
+     "label": "Project",
+     "type": "Ref:Projects",
+     "isFormula": false
+    },
+    {
+     "id": "Notes",
+     "label": "Notes",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Attachments",
+     "label": "Attachments",
+     "type": "Attachments",
+     "isFormula": false
+    },
+    {
+     "id": "Description",
+     "label": "Description",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Created_At",
+     "label": "Created At",
+     "type": "DateTime:America/New_York",
+     "isFormula": false
+    },
+    {
+     "id": "Last_Update",
+     "label": "Last Update",
+     "type": "Date",
+     "isFormula": false
+    },
+    {
+     "id": "Department",
+     "label": "Department",
+     "type": "Text",
+     "isFormula": true
+    },
+    {
+     "id": "Missed_Deadline_",
+     "label": "Missed Deadline?",
+     "type": "Bool",
+     "isFormula": true
+    }
+   ]
+  }
+ ]
+}

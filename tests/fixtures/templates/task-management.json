@@ -1,0 +1,99 @@
+{
+ "name": "task-management",
+ "source": "https://templates.getgrist.com/6D8E2h2DQNwSbZPwhqRi6e",
+ "fetched": "2026-10-24",
+ "tables": [
+  {
+   "id": "People",
+   "columns": [
+    {
+     "id": "Name",
+     "label": "Name",
+     "type": "Text",
+     "isFormula": false
+    }
+   ]
+  },
+  {
+   "id": "Weekly_Check_Ins",
+   "columns": [
+    {
+     "id": "Date",
+     "label": "Date",
+     "type": "Date",
+     "isFormula": false
+    }
+   ]
+  },
+  {
+   "id": "Tasks",
+   "columns": [
+    {
+     "id": "CheckIn",
+     "label": "CheckIn",
+     "type": "Ref:Weekly_Check_Ins",
+     "isFormula": false
+    },
+    {
+     "id": "Person",
+     "label": "Person",
+     "type": "Ref:People",
+     "isFormula": false
+    },
+    {
+     "id": "IsDone",
+     "label": "IsDone",
+     "type": "Bool",
+     "isFormula": false
+    },
+    {
+     "id": "Outcome",
+     "label": "Outcome",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Priority",
+     "label": "Priority",
+     "type": "Numeric",
+     "isFormula": false
+    },
+    {
+     "id": "Description",
+     "label": "Description",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Attachments",
+     "label": "Attachments",
+     "type": "Attachments",
+     "isFormula": false
+    },
+    {
+     "id": "Project",
+     "label": "Project",
+     "type": "Ref:Projects",
+     "isFormula": false
+    },
+    {
+     "id": "Last_Updated",
+     "label": "Last Updated",
+     "type": "Text",
+     "isFormula": false
+    }
+   ]
+  },
+  {
+   "id": "Projects",
+   "columns": [
+    {
+     "id": "Project",
+     "label": "Project",
+     "type": "Text",
+     "isFormula": false
+    }
+   ]
+  }
+ ]
+}

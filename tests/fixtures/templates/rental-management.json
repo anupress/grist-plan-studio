@@ -1,0 +1,492 @@
+{
+ "name": "rental-management",
+ "source": "https://templates.getgrist.com/5iMYwmESm33JpEECSqdZk2",
+ "fetched": "2026-10-24",
+ "tables": [
+  {
+   "id": "Leases",
+   "columns": [
+    {
+     "id": "Lease_Start_Date",
+     "label": "Lease Start Date",
+     "type": "Date",
+     "isFormula": false
+    },
+    {
+     "id": "Lease_Term",
+     "label": "Lease Term",
+     "type": "Int",
+     "isFormula": false
+    },
+    {
+     "id": "Original_Lease_Amount",
+     "label": "Original Lease Amount",
+     "type": "Numeric",
+     "isFormula": false
+    },
+    {
+     "id": "Percent_Increase",
+     "label": "Percent Increase",
+     "type": "Numeric",
+     "isFormula": false
+    },
+    {
+     "id": "Security_Deposit",
+     "label": "Security Deposit",
+     "type": "Numeric",
+     "isFormula": true
+    },
+    {
+     "id": "Total_Monthly_Rent",
+     "label": "Total Monthly Rent",
+     "type": "Numeric",
+     "isFormula": true
+    },
+    {
+     "id": "Additional_Security_Deposit",
+     "label": "Additional Security Deposit",
+     "type": "Numeric",
+     "isFormula": true
+    },
+    {
+     "id": "Amount_Increase",
+     "label": "Amount Increase",
+     "type": "Numeric",
+     "isFormula": true
+    },
+    {
+     "id": "Lease_End_Date",
+     "label": "Lease End Date",
+     "type": "Date",
+     "isFormula": true
+    },
+    {
+     "id": "Bedrooms",
+     "label": "Bedrooms",
+     "type": "Int",
+     "isFormula": true
+    },
+    {
+     "id": "Apartment",
+     "label": "Apartment",
+     "type": "Ref:Apartments",
+     "isFormula": false
+    },
+    {
+     "id": "Actual_End_Date",
+     "label": "Actual End Date",
+     "type": "Date",
+     "isFormula": false
+    },
+    {
+     "id": "Signer",
+     "label": "Signer",
+     "type": "Ref:People",
+     "isFormula": true
+    },
+    {
+     "id": "Number_of_Tenants",
+     "label": "Number of Tenants",
+     "type": "Int",
+     "isFormula": true
+    },
+    {
+     "id": "Signing_Status",
+     "label": "Signing Status",
+     "type": "Choice",
+     "isFormula": true,
+     "choices": [
+      "New",
+      "Renew"
+     ]
+    },
+    {
+     "id": "Current_Status",
+     "label": "Current Status",
+     "type": "Choice",
+     "isFormula": true,
+     "choices": [
+      "Active",
+      "Ended"
+     ]
+    },
+    {
+     "id": "Lease_ID",
+     "label": "Lease ID",
+     "type": "Text",
+     "isFormula": true
+    }
+   ]
+  },
+  {
+   "id": "Tenancies",
+   "columns": [
+    {
+     "id": "Apartment",
+     "label": "Apartment",
+     "type": "Ref:Apartments",
+     "isFormula": true
+    },
+    {
+     "id": "DOB",
+     "label": "DOB",
+     "type": "Date",
+     "isFormula": true
+    },
+    {
+     "id": "Age",
+     "label": "Age",
+     "type": "Int",
+     "isFormula": true
+    },
+    {
+     "id": "Senior",
+     "label": "Senior",
+     "type": "Bool",
+     "isFormula": true
+    },
+    {
+     "id": "Minor",
+     "label": "Minor",
+     "type": "Bool",
+     "isFormula": true
+    },
+    {
+     "id": "Signer",
+     "label": "Signer",
+     "type": "Bool",
+     "isFormula": false
+    },
+    {
+     "id": "Move_In_Date",
+     "label": "Move-In Date",
+     "type": "Date",
+     "isFormula": false
+    },
+    {
+     "id": "Move_Out_Date",
+     "label": "Move-Out Date",
+     "type": "Date",
+     "isFormula": false
+    },
+    {
+     "id": "Lease_Start_Date",
+     "label": "Lease Start Date",
+     "type": "Date",
+     "isFormula": true
+    },
+    {
+     "id": "Tenant",
+     "label": "Tenant",
+     "type": "Ref:People",
+     "isFormula": false
+    },
+    {
+     "id": "Lease_End_Date",
+     "label": "Lease End Date",
+     "type": "Date",
+     "isFormula": true
+    },
+    {
+     "id": "Lease_Status",
+     "label": "Lease Status",
+     "type": "Choice",
+     "isFormula": true,
+     "choices": [
+      "Active",
+      "Ended"
+     ]
+    },
+    {
+     "id": "Lease",
+     "label": "Lease",
+     "type": "Ref:Leases",
+     "isFormula": false
+    },
+    {
+     "id": "Num_Tenants",
+     "label": "Num Tenants",
+     "type": "Any",
+     "isFormula": true
+    },
+    {
+     "id": "Signing_Status",
+     "label": "Signing Status",
+     "type": "Choice",
+     "isFormula": true,
+     "choices": [
+      "New",
+      "Renew"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "Apartments",
+   "columns": [
+    {
+     "id": "Apartment",
+     "label": "Apartment",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Bedrooms",
+     "label": "Bedrooms",
+     "type": "Int",
+     "isFormula": false
+    },
+    {
+     "id": "Area",
+     "label": "Area",
+     "type": "Numeric",
+     "isFormula": false
+    },
+    {
+     "id": "Bathrooms",
+     "label": "Bathrooms",
+     "type": "Numeric",
+     "isFormula": false
+    },
+    {
+     "id": "Additional",
+     "label": "Additional",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Description",
+     "label": "Description",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Picture",
+     "label": "Picture",
+     "type": "Attachments",
+     "isFormula": false
+    },
+    {
+     "id": "Lease_Start",
+     "label": "Lease Start",
+     "type": "Any",
+     "isFormula": true
+    },
+    {
+     "id": "Lease_End",
+     "label": "Lease End",
+     "type": "Date",
+     "isFormula": true
+    },
+    {
+     "id": "Current_Lease",
+     "label": "Current Lease",
+     "type": "Ref:Leases",
+     "isFormula": true
+    },
+    {
+     "id": "Lease_Term",
+     "label": "Lease Term",
+     "type": "Any",
+     "isFormula": true
+    },
+    {
+     "id": "Num_Tenants",
+     "label": "Num Tenants",
+     "type": "Int",
+     "isFormula": true
+    },
+    {
+     "id": "Signer",
+     "label": "Signer",
+     "type": "Ref:People",
+     "isFormula": true
+    },
+    {
+     "id": "Age",
+     "label": "Age",
+     "type": "Any",
+     "isFormula": true
+    },
+    {
+     "id": "Have_Picture",
+     "label": "Have Picture",
+     "type": "Any",
+     "isFormula": true
+    }
+   ]
+  },
+  {
+   "id": "Income_and_Expenses",
+   "columns": [
+    {
+     "id": "Category",
+     "label": "Category",
+     "type": "Choice",
+     "isFormula": false,
+     "choices": [
+      "Repairs",
+      "Bills",
+      "Misc.",
+      "Rent",
+      "Deposit"
+     ]
+    },
+    {
+     "id": "Description",
+     "label": "Description",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Expense",
+     "label": "Expense",
+     "type": "Numeric",
+     "isFormula": false
+    },
+    {
+     "id": "Date",
+     "label": "Date",
+     "type": "Date",
+     "isFormula": false
+    },
+    {
+     "id": "Apartment",
+     "label": "Apartment",
+     "type": "Ref:Apartments",
+     "isFormula": false
+    },
+    {
+     "id": "Income",
+     "label": "Income",
+     "type": "Numeric",
+     "isFormula": false
+    },
+    {
+     "id": "Month",
+     "label": "Month",
+     "type": "Text",
+     "isFormula": true
+    }
+   ]
+  },
+  {
+   "id": "People",
+   "columns": [
+    {
+     "id": "Name",
+     "label": "Name",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "DOB",
+     "label": "DOB",
+     "type": "Date",
+     "isFormula": false
+    },
+    {
+     "id": "Age",
+     "label": "Age",
+     "type": "Numeric",
+     "isFormula": true
+    },
+    {
+     "id": "Senior",
+     "label": "Senior",
+     "type": "Bool",
+     "isFormula": true
+    },
+    {
+     "id": "Minor",
+     "label": "Minor",
+     "type": "Bool",
+     "isFormula": true
+    },
+    {
+     "id": "Apartment",
+     "label": "Apartment",
+     "type": "Ref:Apartments",
+     "isFormula": false
+    },
+    {
+     "id": "Status",
+     "label": "Status",
+     "type": "Ref:Tenancies",
+     "isFormula": true
+    }
+   ]
+  },
+  {
+   "id": "Current_Signers",
+   "columns": [
+    {
+     "id": "Apartment",
+     "label": "Apartment",
+     "type": "Ref:Apartments",
+     "isFormula": false
+    },
+    {
+     "id": "Lease_Start_Date",
+     "label": "Lease Start Date",
+     "type": "Any",
+     "isFormula": true
+    },
+    {
+     "id": "Lease_End_Date",
+     "label": "Lease End Date",
+     "type": "Any",
+     "isFormula": true
+    },
+    {
+     "id": "Signer",
+     "label": "Signer",
+     "type": "Any",
+     "isFormula": true
+    },
+    {
+     "id": "Lease_Term",
+     "label": "Lease Term",
+     "type": "Int",
+     "isFormula": true
+    },
+    {
+     "id": "DOB",
+     "label": "DOB",
+     "type": "Date",
+     "isFormula": true
+    },
+    {
+     "id": "Bedrooms",
+     "label": "Bedrooms",
+     "type": "Int",
+     "isFormula": true
+    },
+    {
+     "id": "Age",
+     "label": "Age",
+     "type": "Int",
+     "isFormula": true
+    },
+    {
+     "id": "Senior",
+     "label": "Senior",
+     "type": "Bool",
+     "isFormula": true
+    },
+    {
+     "id": "Minor",
+     "label": "Minor",
+     "type": "Bool",
+     "isFormula": true
+    },
+    {
+     "id": "Number_of_Tenants",
+     "label": "Number of Tenants",
+     "type": "Int",
+     "isFormula": true
+    }
+   ]
+  }
+ ]
+}

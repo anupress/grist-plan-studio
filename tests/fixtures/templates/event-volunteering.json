@@ -1,0 +1,137 @@
+{
+ "name": "event-volunteering",
+ "source": "https://templates.getgrist.com/9x8X3naCQmX8ptnQybFQ3G",
+ "fetched": "2026-10-24",
+ "tables": [
+  {
+   "id": "Events",
+   "columns": [
+    {
+     "id": "Event",
+     "label": "Event",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Date",
+     "label": "Date",
+     "type": "Date",
+     "isFormula": false
+    },
+    {
+     "id": "Type",
+     "label": "Type",
+     "type": "Choice",
+     "isFormula": false,
+     "choices": [
+      "100m dash",
+      "5k",
+      "10k",
+      "Phone Bank",
+      "Virtual Hang",
+      "Flea Market"
+     ]
+    },
+    {
+     "id": "Description",
+     "label": "Description",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Location",
+     "label": "Location",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Remaining_Volunteer_Slots",
+     "label": "Remaining Volunteer Slots",
+     "type": "Any",
+     "isFormula": true
+    },
+    {
+     "id": "Event_Coordinator",
+     "label": "Event Coordinator",
+     "type": "Ref:Coordinators",
+     "isFormula": false
+    },
+    {
+     "id": "Email",
+     "label": "Email",
+     "type": "Any",
+     "isFormula": true
+    },
+    {
+     "id": "Flyer",
+     "label": "Flyer",
+     "type": "Text",
+     "isFormula": false
+    }
+   ]
+  },
+  {
+   "id": "Volunteer_Events_List",
+   "columns": [
+    {
+     "id": "Volunteer",
+     "label": "Volunteer",
+     "type": "Ref:Volunteers",
+     "isFormula": false
+    },
+    {
+     "id": "Events",
+     "label": "Events",
+     "type": "Ref:Events",
+     "isFormula": false
+    },
+    {
+     "id": "UUID",
+     "label": "UUID",
+     "type": "Text",
+     "isFormula": true
+    },
+    {
+     "id": "Date",
+     "label": "Date",
+     "type": "Any",
+     "isFormula": true
+    },
+    {
+     "id": "All_Events",
+     "label": "All Events",
+     "type": "RefList:Events",
+     "isFormula": true
+    }
+   ]
+  },
+  {
+   "id": "Coordinators",
+   "columns": [
+    {
+     "id": "Name",
+     "label": "Name",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Email",
+     "label": "Email",
+     "type": "Text",
+     "isFormula": false
+    }
+   ]
+  },
+  {
+   "id": "Webinar",
+   "columns": [
+    {
+     "id": "Link",
+     "label": "Link",
+     "type": "Text",
+     "isFormula": false
+    }
+   ]
+  }
+ ]
+}

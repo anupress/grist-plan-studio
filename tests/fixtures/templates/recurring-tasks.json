@@ -1,0 +1,90 @@
+{
+ "name": "recurring-tasks",
+ "source": "https://templates.getgrist.com/qkMHNeA1xSsBuNJvG6Y9Ho",
+ "fetched": "2026-10-24",
+ "tables": [
+  {
+   "id": "Tasks",
+   "columns": [
+    {
+     "id": "Task",
+     "label": "Task",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Repeats",
+     "label": "Repeats",
+     "type": "Choice",
+     "isFormula": false,
+     "choices": [
+      "Daily",
+      "Weekdays",
+      "Every Other Day",
+      "Weekly",
+      "Bi-Weekly",
+      "Monthly",
+      "Quarterly",
+      "Yearly",
+      "Does not repeat"
+     ]
+    },
+    {
+     "id": "Due_Date",
+     "label": "Due Date",
+     "type": "Date",
+     "isFormula": false
+    },
+    {
+     "id": "Completed_",
+     "label": "Completed?",
+     "type": "Bool",
+     "isFormula": false
+    },
+    {
+     "id": "Dates_Completed",
+     "label": "Dates Completed",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Type",
+     "label": "Type",
+     "type": "Choice",
+     "isFormula": false,
+     "choices": [
+      "🧽 Cleaning",
+      "👶 Baby",
+      "🌱 Lawn & Garden",
+      "💻 Work",
+      "🔧 Maintenance",
+      "General"
+     ]
+    },
+    {
+     "id": "Details",
+     "label": "Details",
+     "type": "Text",
+     "isFormula": false
+    }
+   ]
+  },
+  {
+   "id": "Miscellaneous_Data",
+   "columns": [
+    {
+     "id": "Progress_Bar",
+     "label": "",
+     "type": "Text",
+     "isFormula": true
+    },
+    {
+     "id": "Action_Button",
+     "label": "Action Button",
+     "type": "Any",
+     "isFormula": true
+    }
+   ]
+  }
+ ]
+}

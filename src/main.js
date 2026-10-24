@@ -1,0 +1,1490 @@
+// Plan Studio entry point: connect, work out the roles, build tasks, arrange them, draw them as a Gantt
+// chart, a timeline, a board or a booking grid, and write edits back.
+//
+// Two sources feed the same code: a real Grist (rows pushed by onRecords, everything else read with
+// full access) or the demo (src/demo/sample.js), used whenever no Grist answers. In the demo every
+// edit stays in memory and has its own undo; in Grist an edit is one action, undone by Grist.
+
+import { el, clear } from './core/util.js';
+import { VERSION } from './version.js';
+import {
+  start, accessLevel, selectedTableId, gristCulture, getOptions, setOptions, moveCursor, apply, linkingInfo,
+  openRecordCard, undo as gristUndo, redo as gristRedo,
+} from './grist/connect.js';
+import { loadColumns, loadForeignMapping, loadLabels, loadOwnSection, loadHolidayDays, listDatedTables, loadTable, listTables, columnRefs, forgetMeta } from './data/live.js';
+import { templates, structureActions, dataActions, columnForRole } from './model/templates.js';
+import { detectRoles, ganttReady, fromStored, toStored } from './model/roles.js';
+import { buildTasks, spanOf } from './model/tasks.js';
+import { arrange } from './model/tree.js';
+import { linksOf, isLate, pushPlan, criticalPath, wouldLoop } from './model/schedule.js';
+import { makeCalendar, holidaysBetween } from './model/calendar.js';
+import { todayDay, dateFromDay, plain } from './model/values.js';
+import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink } from './model/edits.js';
+import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, VIEWS } from './model/settings.js';
+import { buildBoard, planCardMove, newCardFields, cellText, LANE_KINDS, FIELD_KINDS } from './model/board.js';
+import { LANE_KINDS as TL_KINDS, planLaneChange } from './model/lanes.js';
+import { buildTimeline } from './model/timeline.js';
+import { buildBooking, calendarPeriods, tablePeriods, columnPeriods, bookingRange, suggestUnit, planBookingMove, newBookingFields, PERIOD_UNITS } from './model/booking.js';
+import { ZOOM_ORDER, ZOOMS, fitZoom, isoWeek } from './views/gantt/layout.js';
+import { renderTimePrint, renderBoardPrint, renderBookingPrint, subtitleFor } from './print/render.js';
+import { pageRule } from './print/layout.js';
+import { openPrint } from './ui/printpanel.js';
+import { openKeys } from './ui/keys.js';
+import { createGantt } from './views/gantt/view.js';
+import { createBoard } from './views/board/view.js';
+import { createTimeline } from './views/timeline/view.js';
+import { createBooking } from './views/booking/view.js';
+import { renderToolbar } from './ui/toolbar.js';
+import { openMapping } from './ui/mapping.js';
+import { openQuickEdit } from './ui/quickedit.js';
+import { confirmBox, numberBox } from './ui/dialog.js';
+import { t, tn, setLanguage, storedLanguage, dateLocale, weekStartOf } from './i18n/index.js';
+import { SAMPLE_COLUMNS, SAMPLE_LABELS, SAMPLE_TABLE, sampleRows } from './demo/sample.js';
+import { STORES_COLUMNS, STORES_LABELS, STORES_TABLE, STORES_RESOURCES, storesRows } from './demo/stores.js';
+import { SPEED_COLUMNS, SPEED_LABELS, SPEED_TABLE, speedRows } from './demo/speed.js';
+
+const S = {
+  live: false, demo: false, ready: false,
+  tableId: null, columns: [], roles: {}, source: { kind: 'names' },
+  options: null, gantt: { ...GANTT_DEFAULTS }, board: { ...BOARD_DEFAULTS, wip: {} }, booking: { ...BOOKING_DEFAULTS },
+  periodTable: null, resourceTable: null,   // the booking grid's periods table and resources table, {columns, rows}
+  opensAs: 'auto', mode: 'gantt',   // the view the widget opens in (saved), and the one shown now
+  rows: [], labels: {}, holidayDays: new Map(), built: null, signature: '',
+  zoom: null, fitNext: false, selectedId: null, firstDraw: true,
+  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null },   // this browser's view of this table
+  example: 'plan',     // the demo's data: 'plan' (a website relaunch) or 'stores' (pop-up stores × weekends)
+  pendingEdit: null,   // {id, note}: open quick edit once Grist sends this new row
+};
+const demoHistory = { undo: [], redo: [] };
+
+// ---- the page --------------------------------------------------------------------------------------
+const app = document.getElementById('app');
+const toolbar = el('div', { class: 'ps-toolbar' });
+const stage = el('div', { class: 'ps-stage' });
+const toastBox = el('div', { class: 'ps-toast', role: 'status', 'aria-live': 'polite', hidden: true });
+// What a screen reader says when the selection moves: the views draw a ring, this says which task.
+const srBox = el('div', { class: 'ps-sr', role: 'status', 'aria-live': 'polite' });
+const shell = el('div', { class: 'ps-app', dataset: { version: VERSION } }, [toolbar, stage, toastBox, srBox]);
+function announce(text) {
+  srBox.textContent = '';
+  setTimeout(() => { srBox.textContent = text; }, 30);   // emptied first, so the same words are said again
+}
+clear(app).appendChild(shell);
+
+let toastTimer = 0;
+function toast(msg, action = null) {
+  clear(toastBox).append(el('span', { text: msg }));
+  if (action) toastBox.append(el('button', { type: 'button', class: 'ps-toast__btn', text: action.label, onclick: () => { toastBox.hidden = true; action.run(); } }));
+  toastBox.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastBox.hidden = true; }, action ? 7000 : 4500);
+}
+const errText = (e) => String(e?.message || e || '').replace(/^Error:\s*/, '').slice(0, 180);
+
+let view = null;        // the Gantt chart, when it is the view shown
+let boardView = null;   // the board, when it is
+let timelineView = null;
+let bookingView = null;
+const current = () => view || boardView || timelineView || bookingView;
+/** Take down every view but `keep` ('gantt', 'board', 'timeline', 'booking'; null for all). */
+function dropOthers(keep) {
+  if (keep !== 'gantt') dropView();
+  if (keep !== 'board') dropBoard();
+  if (keep !== 'timeline' && timelineView) { timelineView.destroy(); timelineView = null; S.signature = ''; S.firstDraw = true; }
+  if (keep !== 'booking' && bookingView) { bookingView.destroy(); bookingView = null; S.signature = ''; S.firstDraw = true; }
+}
+function ensureView() {
+  if (view) return view;
+  dropOthers('gantt');
+  clear(stage);
+  view = createGantt(stage, {
+    onSelect: (id) => select(id, { tellGrist: true }),
+    onOpen: (id) => openCard(id),
+    onQuickEdit: (id) => openQuick(id),
+    onEdit: (e) => editDates(e),
+    onLink: (l) => addLink(l),
+    onArrow: (l) => removeLink(l),
+    onToggle: (key) => toggleFold(key),
+    onZoomStep: (dir) => setZoom(ZOOM_ORDER[Math.max(0, Math.min(ZOOM_ORDER.length - 1, ZOOM_ORDER.indexOf(S.zoom) + dir))]),
+    onToday: () => view.scrollToToday(),
+    onUndo: () => undo(),
+    onRedo: () => redo(),
+  });
+  return view;
+}
+function dropView() { if (view) { view.destroy(); view = null; S.signature = ''; S.firstDraw = true; } }
+function ensureBoard() {
+  if (boardView) return boardView;
+  dropOthers('board');
+  clear(stage);
+  boardView = createBoard(stage, {
+    onSelect: (id) => select(id, { tellGrist: true }),
+    onOpen: (id) => openCard(id),
+    onQuickEdit: (id) => openQuick(id),
+    onMove: (m) => moveCard(m),
+    onAdd: (a) => addCard(a),
+    onLimit: (key) => setLimit(key),
+    onUndo: () => undo(),
+    onRedo: () => redo(),
+  });
+  return boardView;
+}
+function dropBoard() { if (boardView) { boardView.destroy(); boardView = null; S.signature = ''; } }
+function ensureTimeline() {
+  if (timelineView) return timelineView;
+  dropOthers('timeline');
+  clear(stage);
+  timelineView = createTimeline(stage, {
+    onSelect: (id) => select(id, { tellGrist: true }),
+    onOpen: (id) => openCard(id),
+    onQuickEdit: (id) => openQuick(id),
+    onEdit: (e) => editTimeline(e),
+    onUndo: () => undo(),
+    onRedo: () => redo(),
+  });
+  return timelineView;
+}
+function ensureBooking() {
+  if (bookingView) return bookingView;
+  dropOthers('booking');
+  clear(stage);
+  bookingView = createBooking(stage, {
+    onSelect: (id) => select(id, { tellGrist: true }),
+    onOpen: (id) => openCard(id),
+    onQuickEdit: (id) => openQuick(id),
+    onMove: (m) => moveBooking(m),
+    onBook: (b) => bookCell(b),
+    onAnnounce: (text) => announce(text),
+    onUndo: () => undo(),
+    onRedo: () => redo(),
+  });
+  return bookingView;
+}
+
+/** A message in place of the view; `actions` are [label, run] buttons, the first one the main one. */
+function emptyState(title, body, actions = [[t('Choose columns'), openColumns]]) {
+  dropOthers(null);
+  clear(stage).appendChild(el('div', { class: 'ps-empty' }, [
+    el('h2', { text: title }),
+    el('p', { text: body }),
+    actions.length ? el('div', { class: 'ps-empty__actions' }, actions.map(([label, run], i) =>
+      el('button', { type: 'button', class: 'ps-btn' + (i ? '' : ' ps-btn--primary'), text: label, onclick: run }))) : null,
+  ]));
+}
+
+// ---- who may write -----------------------------------------------------------------------------------
+function readOnlyWhy() {
+  if (S.demo) return null;
+  if (!S.live) return t('Not connected to Grist.');
+  try { if (new URLSearchParams(location.search).get('readonly') === 'true') return t('You can view this document but not edit it.'); } catch { /* no URL */ }
+  if (accessLevel() !== 'full') return t('This widget needs full document access to edit. Set it in the widget panel on the right.');
+  return null;
+}
+const canEdit = () => readOnlyWhy() == null;
+
+// ---- the calendar -----------------------------------------------------------------------------------
+// Public holidays for ten years around today, plus the days of a Holidays table. Ten years of rules is
+// about 150 days: cheap, and no task in a real plan reaches outside it.
+let calendarCache = { key: '', cal: makeCalendar() };
+function calendar() {
+  const g = S.gantt;
+  const key = [g.durationUnit, g.holidays, S.holidayDays.size, [...S.holidayDays.keys()].slice(0, 3).join(',')].join('|');
+  if (key === calendarCache.key) return calendarCache.cal;
+  const today = todayDay();
+  const holidays = (g.holidays || S.holidayDays.size) ? holidaysBetween(g.holidays, today - 365 * 5, today + 365 * 5, S.holidayDays) : new Map();
+  calendarCache = { key, cal: makeCalendar({ workdays: g.durationUnit === 'workdays', holidays }) };
+  return calendarCache.cal;
+}
+const ctx = () => ({ roles: S.roles, columns: S.columns, settings: S.gantt, editable: canEdit(), calendar: calendar() });
+
+// ---- drawing ------------------------------------------------------------------------------------------
+const weekStart = () => (S.gantt.weekStart === 'auto' ? weekStartOf(dateLocale(gristCulture())) : S.gantt.weekStart);
+// Date formatters are costly to make (a board of 5,000 cards spent most of its time on them), so one
+// is made per locale and shape and kept.
+const formats = new Map();
+const dateFormat = (withYear) => {
+  const key = dateLocale(gristCulture()) + (withYear ? '|y' : '');
+  if (!formats.has(key)) formats.set(key, new Intl.DateTimeFormat(dateLocale(gristCulture()), { timeZone: 'UTC', day: 'numeric', month: 'short', ...(withYear ? { year: 'numeric' } : {}) }));
+  return formats.get(key);
+};
+const dayFormat = () => dateFormat(true);
+const fmtDay = (d) => dayFormat().format(dateFromDay(d));
+/** "15–26 Oct 2026" where the browser can shorten a range, "15 Oct 2026 – 26 Oct 2026" where not. */
+const fmtRange = (a, b) => {
+  if (a === b) return fmtDay(a);
+  const f = dayFormat();
+  return typeof f.formatRange === 'function' ? f.formatRange(dateFromDay(a), dateFromDay(b)) : `${fmtDay(a)} – ${fmtDay(b)}`;
+};
+// The board's shorter dates: no year for this year's days.
+const shortFormat = (withYear) => dateFormat(withYear);
+const thisYear = (d) => dateFromDay(d).getUTCFullYear() === new Date().getFullYear();
+const fmtShort = (d) => shortFormat(!thisYear(d)).format(dateFromDay(d));
+const fmtShortRange = (a, b) => {
+  if (a === b) return fmtShort(a);
+  const f = shortFormat(!thisYear(a) || !thisYear(b));
+  return typeof f.formatRange === 'function' ? f.formatRange(dateFromDay(a), dateFromDay(b)) : `${fmtShort(a)} – ${fmtShort(b)}`;
+};
+const colourByCol = () => (S.gantt.colourBy ? S.columns.find((c) => c.ref === S.gantt.colourBy.ref) || S.columns.find((c) => c.id === S.gantt.colourBy.id) || null : null);
+const GROUP_KINDS = ['Choice', 'ChoiceList', 'Ref', 'RefList', 'Text', 'Bool'];
+const groupable = (c) => GROUP_KINDS.includes(c.kind) && c.refTable !== S.tableId && c.id !== S.roles.title;
+const groupCol = () => (S.view.groupBy ? S.columns.find((c) => c.id === S.view.groupBy && groupable(c)) || null : null);
+
+// ---- the board's columns ----------------------------------------------------------------------------
+const colById = (id) => (id ? S.columns.find((c) => c.id === id) || null : null);
+const laneable = (c) => LANE_KINDS.includes(c.kind) && c.refTable !== S.tableId && c.id !== S.roles.title;
+/** The lane column: this browser's choice, else the Status column, else the first choice column. */
+function laneCol() {
+  const picked = colById(S.view.laneBy);
+  if (picked && laneable(picked)) return picked;
+  const status = colById(S.roles.status);
+  if (status && laneable(status)) return status;
+  return S.columns.find((c) => c.kind === 'Choice' && laneable(c)) || null;
+}
+const orderCol = () => { const c = colById(S.roles.order); return c && (c.kind === 'Numeric' || c.kind === 'Int') ? c : null; };
+/** The columns a card shows besides its name, dates and people: picked in Columns, or the project. */
+function fieldCols(lane = laneCol()) {
+  if (Array.isArray(S.board.fields)) {
+    return S.board.fields.map((f) => S.columns.find((c) => c.ref === f.ref) || colById(f.id)).filter((c) => c && FIELD_KINDS.includes(c.kind) && c.id !== lane?.id);
+  }
+  const project = colById(S.roles.project);
+  return project && project.id !== lane?.id ? [project] : [];
+}
+// ---- the timeline's and the booking grid's columns ------------------------------------------------------
+const tlLaneable = (c) => TL_KINDS.includes(c.kind) && c.refTable !== S.tableId && c.id !== S.roles.title;
+/** The timeline's lanes: this browser's choice, else rooms (a booking table), people, projects or the status. */
+function tlLaneCol() {
+  const picked = colById(S.view.tlLaneBy);
+  if (picked && tlLaneable(picked)) return picked;
+  for (const role of ['resource', 'assignee', 'project', 'status']) { const c = colById(S.roles[role]); if (c && tlLaneable(c)) return c; }
+  return S.columns.find((c) => (c.kind === 'Choice' || c.kind === 'Ref') && tlLaneable(c)) || null;
+}
+const ROW_KINDS = ['Ref', 'RefList', 'Choice', 'Text'];
+const rowable = (c) => ROW_KINDS.includes(c.kind) && c.refTable !== S.tableId && c.id !== S.roles.title;
+/** The booking grid's rows: this browser's choice, else the resource, else people or projects. */
+function bookResCol() {
+  const picked = colById(S.view.bookRows);
+  if (picked && rowable(picked)) return picked;
+  for (const role of ['resource', 'assignee', 'project']) { const c = colById(S.roles[role]); if (c && rowable(c)) return c; }
+  return S.columns.find((c) => c.kind === 'Ref' && rowable(c)) || null;
+}
+const periodable = (c, res = bookResCol()) => ['Ref', 'Choice', 'Text'].includes(c.kind) && c.refTable !== S.tableId && c.id !== S.roles.title && c.id !== res?.id;
+const datedTasks = () => (S.built?.tasks || []).filter((x) => x.start != null);
+/**
+ * The grid's columns: 'day' | 'week' | 'month' | 'col:<column id>' | 'table:<table id>'. This browser's
+ * choice, else the period column (a Weekend column), else the periods table, else the unit that fits the
+ * bookings' lengths.
+ */
+function bookPeriodsBy() {
+  const v = S.view.bookPeriods;
+  const res = bookResCol();
+  if (PERIOD_UNITS.includes(v)) return v;
+  if (v?.startsWith('col:')) { const c = colById(v.slice(4)); if (c && periodable(c, res)) return v; }
+  if (v?.startsWith('table:') && v.slice(6) === S.booking.periodTable) return v;
+  const p = colById(S.roles.period);
+  if (p && periodable(p, res)) return 'col:' + p.id;
+  if (S.booking.periodTable) return 'table:' + S.booking.periodTable;
+  return suggestUnit(datedTasks());
+}
+const bookLabelCol = () => (S.booking.labelBy ? S.columns.find((c) => c.ref === S.booking.labelBy.ref) || colById(S.booking.labelBy.id) : null);
+/** The resources table's rows the filter keeps, as lane keys; null = all. */
+function bookKeep() {
+  const f = S.view.bookFilter;
+  const res = bookResCol();
+  if (!f || !res?.refTable || !S.resourceTable) return null;
+  const i = f.indexOf('=');
+  const colId = f.slice(0, i), value = f.slice(i + 1);
+  if (!S.resourceTable.columns.some((c) => c.id === colId)) return null;
+  return new Set(S.resourceTable.rows.filter((r) => String(plain(r[colId]) ?? '') === value).map((r) => 'r:' + r.id));
+}
+/** The filter's choices: every value of the resources table's choice, text and yes/no columns, when there are few. */
+function bookFilterOptions() {
+  if (!S.resourceTable || !bookResCol()?.refTable) return [];
+  const out = [];
+  for (const c of S.resourceTable.columns.filter((x) => ['Choice', 'Text', 'Bool', 'Int'].includes(x.kind))) {
+    const values = [...new Set(S.resourceTable.rows.map((r) => plain(r[c.id])).filter((v) => v != null && v !== ''))].sort((a, b) => (a > b ? 1 : a < b ? -1 : 0));
+    if (values.length < 2 || values.length > 12 || values.length >= S.resourceTable.rows.length) continue;
+    // a Type or a number of Bedrooms, not a description or an area: short text only, whole numbers only when few
+    if (c.kind === 'Text' && values.some((v) => String(v).length > 24)) continue;
+    if (c.kind === 'Int' && values.length > 8) continue;
+    for (const v of values) out.push({ id: `${c.id}=${v}`, label: `${c.label}: ${typeof v === 'boolean' ? (v ? '✓' : '✗') : v}` });
+  }
+  return out;
+}
+
+/** Every column whose References need labels: the roles' and those of the view on show. */
+function labelRoles() {
+  const lane = laneCol();
+  const extra = { ...(lane ? { _lane: lane.id } : {}), ...Object.fromEntries(fieldCols(lane).map((c, i) => ['_f' + i, c.id])) };
+  const tl = tlLaneCol(), res = bookResCol(), lab = bookLabelCol();
+  const per = bookPeriodsBy();
+  if (tl) extra._tl = tl.id;
+  if (res) extra._res = res.id;
+  if (lab) extra._lab = lab.id;
+  if (per.startsWith('col:')) extra._per = per.slice(4);
+  return { ...S.roles, ...extra };
+}
+/** The lane limits for one lane column, by lane key. */
+function wipFor(col) {
+  const out = {};
+  const prefix = col.ref + '|';
+  for (const [k, n] of Object.entries(S.board.wip || {})) if (k.startsWith(prefix)) out[k.slice(prefix.length)] = n;
+  return out;
+}
+const boardPossible = () => !!(S.roles.title && laneCol());
+
+/** The view to open in: what this browser last switched to, else the widget's setting, else whatever fits the table. */
+function resolveMode() {
+  const stored = storedMode(S.tableId, S.opensAs);
+  if (stored) return stored;
+  if (VIEWS.includes(S.opensAs)) return S.opensAs;
+  if (ganttReady(S.roles)) return 'gantt';
+  // No dates: bookings by a period column (stores × weekends) open as the grid, the rest as a board.
+  const res = colById(S.roles.resource), per = colById(S.roles.period);
+  if (res && per && rowable(res) && periodable(per, res)) return 'booking';
+  return boardPossible() ? 'board' : 'gantt';
+}
+function setMode(mode) {
+  if (mode === S.mode) return;
+  S.mode = mode;
+  rememberMode(S.tableId, S.opensAs, mode);
+  S.signature = '';
+  reload('labels');
+}
+
+const EXAMPLE_LABELS = { plan: 'Website relaunch', stores: 'Pop-up stores' };
+const PERIOD_LABELS = { day: 'Days', week: 'Weeks', month: 'Months' };
+
+function drawToolbar(model = null, level = 'full') {
+  const b = S.built;
+  const gantt = S.mode === 'gantt';
+  const bm = S.mode === 'booking' ? S.bookModel : null;
+  const res = bookResCol();
+  const asOptions = (cols) => cols.map((c) => ({ id: c.id, label: c.label }));
+  renderToolbar(toolbar, {
+    level, mode: S.mode, zoom: S.zoom, demo: S.demo, editable: canEdit(), readOnlyWhy: readOnlyWhy(),
+    canAdd: canEdit() && ganttReady(S.roles),
+    // A parent without dates of its own still has a bar (its children's span): only tasks with neither count as undated.
+    // The timeline draws the children rather than the parent, but counts the same way, so both views give one number.
+    counts: {
+      tasks: b ? b.tasks.length + b.unscheduled.length : 0,
+      cards: b ? b.tasks.length + b.unscheduled.length : 0,
+      unscheduled: gantt && model ? model.entries.filter((e) => e.kind === 'task' && e.undated).length
+        : S.mode === 'timeline' && b ? arrange([...b.tasks, ...b.unscheduled]).entries.filter((e) => e.undated).length : 0,
+      flagged: b ? b.flagged : 0,
+      bookings: b ? b.tasks.length + b.unscheduled.length : 0, clashes: bm ? bm.clashes.size : 0, outside: bm ? bm.outside : 0,
+    },
+    groupOptions: asOptions(S.columns.filter(groupable)),
+    groupBy: groupCol()?.id || null,
+    hasLinks: !!(model && gantt && model.links.length), critical: S.view.critical,
+    laneOptions: asOptions(S.columns.filter(laneable)), laneBy: laneCol()?.id || null,
+    tlLaneOptions: asOptions(S.columns.filter(tlLaneable)), tlLaneBy: tlLaneCol()?.id || null,
+    rowOptions: asOptions(S.columns.filter(rowable)), rowsBy: res?.id || null,
+    periodOptions: [
+      ...PERIOD_UNITS.map((u) => ({ id: u, label: t(PERIOD_LABELS[u]) })),
+      ...S.columns.filter((c) => periodable(c, res) && (c.kind === 'Choice' || c.id === S.roles.period)).map((c) => ({ id: 'col:' + c.id, label: c.label })),
+      ...(S.booking.periodTable ? [{ id: 'table:' + S.booking.periodTable, label: S.booking.periodTable }] : []),
+    ],
+    periodsBy: bookPeriodsBy(),
+    filterOptions: bookFilterOptions(), filterBy: S.view.bookFilter,
+    examples: Object.entries(EXAMPLE_LABELS).map(([id, label]) => ({ id, label: t(label) })), example: S.example,
+  }, {
+    onMode: setMode,
+    onZoom: (z) => setZoom(z), onFit: fit, onToday: () => current()?.scrollToToday?.(), onColumns: openColumns,
+    onNew: newTask, onUndated: () => view?.scrollToUndated(),
+    onGroup: (id) => { S.view.groupBy = id || null; saveView(); S.signature = ''; recompute(); },
+    onCritical: () => { S.view.critical = !S.view.critical; saveView(); S.signature = ''; recompute(); },
+    onLanes: (id) => { S.view.laneBy = id || null; saveView(); S.signature = ''; reload('labels'); },
+    onTlLanes: (id) => { S.view.tlLaneBy = id || null; saveView(); S.signature = ''; reload('labels'); },
+    onRows: (id) => { S.view.bookRows = id || null; S.view.bookFilter = null; saveView(); S.signature = ''; reload('tables'); },
+    onPeriods: (id) => { S.view.bookPeriods = id || null; saveView(); S.signature = ''; S.firstDraw = true; reload('tables'); },
+    onFilter: (id) => { S.view.bookFilter = id || null; saveView(); S.signature = ''; recompute(); },
+    onClash: () => { const id = [...(S.bookModel?.clashes || [])][0]; if (id != null) select(id, { tellGrist: true }); },
+    onExample: (id) => bootDemo(id),
+    onPrint: () => startPrint(),
+    onKeys: () => openKeys(shell, S.mode),
+  });
+}
+const saveView = () => rememberView(S.tableId, {
+  groupBy: S.view.groupBy, critical: S.view.critical, collapsed: [...S.view.collapsed], laneBy: S.view.laneBy,
+  tlLaneBy: S.view.tlLaneBy, bookRows: S.view.bookRows, bookPeriods: S.view.bookPeriods, bookFilter: S.view.bookFilter,
+});
+
+/** Everything the chart needs, from the rows. */
+function buildModel() {
+  const cal = calendar();
+  const gc = groupCol();
+  S.built = buildTasks(S.rows, {
+    roles: S.roles, columns: S.columns, labels: S.labels, calendar: cal,
+    settings: { ...S.gantt, colourBy: colourByCol()?.id || null, groupBy: gc?.id || null },
+  });
+  const all = [...S.built.tasks, ...S.built.unscheduled];
+  const group = gc ? {
+    key: (task) => task.group,
+    label: (k) => k || t('(none)'),
+    order: gc.kind === 'Choice' || gc.kind === 'ChoiceList' ? gc.choices : null,
+  } : null;
+  const { entries, summaries } = arrange(all, { group, collapsed: S.view.collapsed });
+  // Links between dated tasks; a parent counts with the span of its children.
+  const dated = all.map((x) => (summaries.has(x.id) ? { ...x, start: summaries.get(x.id).start, end: summaries.get(x.id).end, summary: true } : x)).filter((x) => x.start != null);
+  const byId = new Map(dated.map((x) => [x.id, x]));
+  const links = linksOf(dated).map((l) => ({ ...l, late: isLate(l, byId, cal) }));
+  const crit = S.view.critical ? criticalPath(dated.filter((x) => !x.summary), links, cal) : { tasks: new Set(), links: new Set() };
+  return { entries, summaries, dated, links, crit, cal, span: spanOf(dated) };
+}
+
+function recompute() {
+  if (!S.ready) return;
+  showDueHint(false);
+  // A new, empty table (Grist's Table1 with A, B, C): offer to set it up.
+  if (S.live && canEdit() && !S.rows.length && !S.columns.some((c) => !(c.type === 'Any' && !c.isFormula && /^[A-Z]$/.test(c.id)))) { starterState(); return; }
+  if (S.mode === 'board') { recomputeBoard(); return; }
+  if (S.mode === 'timeline') { recomputeTimeline(); return; }
+  if (S.mode === 'booking') { recomputeBooking(); return; }
+  if (!ganttReady(S.roles)) {
+    S.built = null;
+    drawToolbar(null, 'switch');
+    const hasDates = S.columns.some((c) => c.kind === 'Date' || c.kind === 'DateTime');
+    const toBoard = boardPossible() ? [[t('Show the board'), () => setMode('board')]] : [];
+    emptyState(t('Which columns hold the dates?'), hasDates
+      ? t('Plan Studio draws each task from a name and a date. Pick the columns in Columns.')
+      : t('This table has no Date column yet. Add one (a start date, an end or a due date), or show another table in this widget.')
+        + (toBoard.length ? ' ' + t('The board needs no dates.') : ''),
+    hasDates ? [[t('Choose columns'), openColumns], ...toBoard] : toBoard);
+    return;
+  }
+  const m = buildModel();
+  S.model = m;
+  if (!S.built.tasks.length && !S.built.unscheduled.length) {
+    drawToolbar(m);
+    emptyState(t('No tasks to show'), t('The table is empty, or Grist’s filters or a linked widget’s selection leave nothing to show.'), []);
+    return;
+  }
+  const v = ensureView();
+  // Grist's own task templates have a due date and no start: their tasks are
+  // milestones until there is a start date to draw a bar from.
+  showDueHint(!!(S.roles.due && !S.roles.start && S.live && canEdit()));
+  let fitNow = S.fitNext;
+  // No zoom chosen in this browser yet: the one at which the whole plan fits.
+  if (S.zoom == null) { S.zoom = fitZoom(m.span, v.chartWidth() || 800); fitNow = true; }
+  S.fitNext = false;
+  drawToolbar(m);
+  const editable = canEdit();
+  const titleCol = S.columns.find((c) => c.id === S.roles.title);
+  const sig = [S.zoom, weekStart(), S.selectedId, titleCol?.label, editable, S.view.critical, S.gantt.holidays, S.gantt.durationUnit,
+    [...S.view.collapsed].join(','), groupCol()?.id,
+    ...m.entries.map((e) => (e.kind === 'group' ? 'g' + e.key + e.collapsed : e.task.id + '\u0002' + e.task.hash + (e.summary ? `${e.summary.start}-${e.summary.end}` : ''))),
+    ...m.links.map((l) => `${l.from}>${l.to}${l.late ? '!' : ''}`), ...m.crit.tasks].join('\n');
+  if (sig === S.signature && !fitNow) return;
+  S.signature = sig;
+  const c = ctx();
+  v.update({
+    entries: m.entries, span: m.span, links: m.links, critical: m.crit.tasks, criticalLinks: m.crit.links,
+    holidays: m.cal.holidays, length: m.cal.length, workdays: m.cal.workdays,
+    caps: (task) => capabilities(task, c), linkable: canLink(c), editable, showCritical: S.view.critical,
+    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), selectedId: S.selectedId,
+    titleLabel: titleCol ? titleCol.label : t('Task'),
+  }, { first: S.firstDraw, fit: fitNow });
+  S.firstDraw = false;
+}
+
+/** The board's lanes and cards, from the rows. Cards need no dates. */
+function buildBoardModel() {
+  const lane = laneCol();
+  // With lanes by status, a stripe in the status colour would only repeat the lane: the stripe then
+  // shows the project, unless a colour column or "Colour the bars by" says otherwise.
+  const status = colById(S.roles.status);
+  const stripeBy = colourByCol()?.id || (!S.roles.colour && lane && status && lane.id === status.id ? colById(S.roles.project)?.id || null : null);
+  S.built = buildTasks(S.rows, {
+    roles: S.roles, columns: S.columns, labels: S.labels, calendar: calendar(),
+    settings: { ...S.gantt, colourBy: stripeBy, groupBy: null },
+  });
+  const tasks = [...S.built.tasks, ...S.built.unscheduled].sort((a, b) => a.index - b.index);
+  return buildBoard(tasks, S.rows, {
+    laneCol: lane, orderCol: orderCol(), labels: S.labels, fields: fieldCols(lane), hideEmpty: S.board.hideEmpty,
+    wip: wipFor(lane), today: todayDay(), cellText: (row, col) => cellText(row, col, S.labels, fmtShort),
+  });
+}
+
+function recomputeBoard() {
+  const lane = laneCol();
+  if (!S.roles.title || !lane) {
+    S.built = null;
+    drawToolbar(null, 'switch');
+    emptyState(t('Which column makes the lanes?'),
+      t('The board puts each row in a lane by the value of a Choice, Reference or Text column, such as Status. Pick it in Columns, or add a Status column to the table.'));
+    return;
+  }
+  const b = buildBoardModel();
+  S.boardModel = b;
+  drawToolbar();
+  const editable = canEdit();
+  const order = orderCol();
+  const sig = ['b', lane.id, S.selectedId, editable, order?.id, S.board.hideEmpty, todayDay(),
+    ...b.lanes.map((l) => `${l.key}|${l.label}|${l.colour}|${l.limit}|${l.over}|` + l.cards.map((c) => c.id + '\u0002' + c.hash).join('\u0003'))].join('\n');
+  const v = ensureBoard();
+  if (sig === S.signature) return;
+  S.signature = sig;
+  v.update({
+    lanes: b.lanes, editable, laneLocked: lane.isFormula, canAdd: editable && !!colById(S.roles.title) && !colById(S.roles.title).isFormula,
+    canLimit: editable || S.demo, selectedId: S.selectedId, laneLabel: lane.label, today: todayDay(), fmtDay: fmtShort, fmtRange: fmtShortRange,
+  });
+}
+
+// ---- the timeline -----------------------------------------------------------------------------------------
+function recomputeTimeline() {
+  const lane = tlLaneCol();
+  if (!ganttReady(S.roles) || !lane) {
+    S.built = null;
+    drawToolbar(null, 'switch');
+    if (!lane) emptyState(t('Which column makes the lanes?'), t('The timeline draws a band for each person, room or project: a Reference, Choice or Text column. Pick it in Columns.'));
+    else emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Pick the columns in Columns.'));
+    return;
+  }
+  const cal = calendar();
+  S.built = buildTasks(S.rows, { roles: S.roles, columns: S.columns, labels: S.labels, calendar: cal, settings: { ...S.gantt, colourBy: colourByCol()?.id || null } });
+  // A room or a desk cannot be in two places at once; a person can be on two tasks.
+  const tl = buildTimeline(S.built.tasks, S.rows, { laneCol: lane, labels: S.labels, clashes: lane.id === S.roles.resource });
+  S.tlModel = tl;
+  const span = spanOf(S.built.tasks);
+  const v = ensureTimeline();
+  let fitNow = S.fitNext;
+  if (S.zoom == null) { S.zoom = fitZoom(span, v.chartWidth() || 800); fitNow = true; }
+  S.fitNext = false;
+  drawToolbar();
+  const editable = canEdit();
+  const sig = ['t', lane.id, S.zoom, weekStart(), S.selectedId, editable, S.gantt.holidays, todayDay(),
+    ...tl.lanes.map((l) => `${l.key}|${l.label}|${l.tracks}|` + l.bars.map((b) => b.task.id + '@' + b.track + (b.clash ? '!' : '') + '\u0002' + b.task.hash).join('\u0003'))].join('\n');
+  if (sig === S.signature && !fitNow) return;
+  S.signature = sig;
+  const c = ctx();
+  v.update({
+    lanes: tl.lanes, tracks: tl.tracks, span, holidays: cal.holidays, length: cal.length, workdays: cal.workdays,
+    caps: (task) => capabilities(task, c), editable, laneMovable: editable && !lane.isFormula,
+    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), selectedId: S.selectedId,
+    laneLabel: lane.label, noneLabel: t('No {col}', { col: lane.label }),
+  }, { first: S.firstDraw, fit: fitNow });
+  S.firstDraw = false;
+}
+
+/** A bar dragged in the timeline: new dates, another lane, or both, as one row and one undo step. */
+async function editTimeline({ id, mode, start, end, from, to }) {
+  const task = taskById(id), row = rowById(id);
+  const lane = tlLaneCol();
+  if (!task || !row || !lane || !S.tlModel) return;
+  const out = { fields: {}, patch: {} };
+  const dated = start !== task.start || end !== task.end;
+  if (dated) {
+    const p = planDates(task, row, ctx(), mode, start, end);
+    if (p.error) { toast(p.error === 'endBeforeStart' ? t('The end can’t be before the start.') : t('These dates come from formulas, so they can’t be changed here.')); S.signature = ''; recompute(); return; }
+    Object.assign(out.fields, p.fields); Object.assign(out.patch, p.patch);
+  }
+  const toLane = S.tlModel.lanes.find((l) => l.key === to);
+  if (from !== to && toLane) {
+    const p = planLaneChange(row, lane, S.tlModel.lanes.find((l) => l.key === from), toLane);
+    if (p.error) { toast(t('“{col}” is a formula, so tasks can’t change lanes here.', { col: lane.label })); S.signature = ''; recompute(); return; }
+    Object.assign(out.fields, p.fields); Object.assign(out.patch, p.patch);
+  }
+  if (!Object.keys(out.fields).length) return;
+  if (id !== S.selectedId) { S.selectedId = id; if (S.live) moveCursor(id).catch(() => {}); }
+  const name = task.title || t('(no name)');
+  const laneText = toLane ? (toLane.none ? t('No {col}', { col: lane.label }) : String(toLane.label)) : '';
+  const when = mode === 'start' ? fmtDay(start) : mode === 'end' ? fmtDay(end) : fmtRange(start, end);
+  const parts = [from !== to && toLane && dated && mode === 'move' ? t('Moved “{name}” to {lane}, {when}.', { name, lane: laneText, when })
+    : from !== to && toLane ? t('Moved “{name}” to {lane}.', { name, lane: laneText }) : t(EDIT_MESSAGES[mode], { name, when })];
+  // Successors move along as in the Gantt chart, asked once.
+  let extra = [];
+  if (dated) { S.model = buildModel(); extra = await pushedAlong({ id, start, end }); }
+  writeMany([{ id, plan: out }, ...extra], parts.join(' ') + (extra.length ? ' ' + tn(extra.length, '{n} task moved along.', '{n} tasks moved along.') : ''));
+}
+
+// ---- the booking grid --------------------------------------------------------------------------------------
+/** The grid's columns, and the period column when they come from one. */
+function bookPeriods() {
+  const by = bookPeriodsBy();
+  if (by.startsWith('col:')) { const col = colById(by.slice(4)); return { periods: columnPeriods(col, S.rows, S.labels), periodCol: col, unit: 'column' }; }
+  if (by.startsWith('table:')) return { periods: S.periodTable ? tablePeriods(S.periodTable.rows, S.periodTable.columns) : [], periodCol: null, unit: 'table' };
+  const r = bookingRange(datedTasks(), by, todayDay());
+  return { periods: calendarPeriods(by, r.from, r.to, weekStart()), periodCol: null, unit: by };
+}
+
+function recomputeBooking() {
+  const res = bookResCol();
+  S.built = buildTasks(S.rows, { roles: S.roles, columns: S.columns, labels: S.labels, calendar: calendar(), settings: { ...S.gantt, colourBy: colourByCol()?.id || null, autoColour: false } });
+  const { periods, periodCol, unit } = res ? bookPeriods() : { periods: [] };
+  if (!res || !S.roles.title || (!periodCol && !ganttReady(S.roles))) {
+    S.built = null;
+    drawToolbar(null, 'switch');
+    emptyState(!res ? t('Which column holds the resource?') : t('Which column says when?'), !res
+      ? t('The booking grid has a row for each room, store, flat or person: a Reference, Choice or Text column such as Room. Pick it in Columns.')
+      : t('Each booking needs dates, or a column naming its period (a Weekend column with Weekend 1, 2, 3). Pick them in Columns.'));
+    return;
+  }
+  const all = [...S.built.tasks, ...S.built.unscheduled];
+  // People on a plan overlap all the time; a room, a store or a flat cannot be let twice.
+  const g = buildBooking(all, S.rows, { resourceCol: res, periods, periodCol, labels: S.labels, keep: bookKeep(), clashes: res.id !== S.roles.assignee });
+  S.bookModel = { ...g, periods, periodCol, unit };
+  drawToolbar();
+  const v = ensureBooking();
+  const editable = canEdit();
+  const lab = bookLabelCol();
+  const labelOf = (task) => (lab ? cellText(rowById(task.id) || {}, lab, S.labels, fmtShort) : task.title) || '';
+  const sig = ['k', res.id, unit, periods.length && periods[0].key, periods.length, S.selectedId, editable, lab?.id, todayDay(), S.view.bookFilter,
+    g.free.join(','), ...g.resources.map((r) => `${r.key}|${r.label}|${r.tracks}|` + r.items.map((it) => `${it.task.id}@${it.first}-${it.last}/${it.track}${it.clash ? '!' : ''}\u0002${it.task.hash}`).join('\u0003'))].join('\n');
+  if (sig === S.signature) return;
+  S.signature = sig;
+  v.update({
+    resources: g.resources, periods, free: g.free, unit, mode: periodCol ? 'column' : 'dates', today: todayDay(),
+    editable: editable && !res.isFormula, canBook: editable && !res.isFormula && (periodCol ? !periodCol.isFormula : true),
+    selectedId: S.selectedId, resourceLabel: res.label, noneLabel: t('No {col}', { col: res.label }), locale: dateLocale(gristCulture()), labelOf,
+  }, { first: S.firstDraw, startAt: startPeriod(g, periods) });
+  S.firstDraw = false;
+}
+
+/**
+ * The column the grid opens at: today's, when bookings lie near it; otherwise the start of the latest
+ * booking (an archive of leases that ended years ago opens where they are, not on empty months).
+ */
+function startPeriod(g, periods) {
+  const today = todayDay();
+  const ti = periods.findIndex((p) => p.start != null && today >= p.start && today <= p.end);
+  const firsts = g.resources.flatMap((r) => r.items.map((it) => it.first));
+  if (!firsts.length) return Math.max(0, ti);
+  if (ti >= 0 && g.resources.some((r) => r.items.some((it) => it.last >= ti - 6 && it.first <= ti + 6))) return ti;
+  return ti >= 0 ? Math.max(...firsts) : 0;
+}
+
+/** A booking dragged to another cell. */
+function moveBooking({ id, from, to, first, period }) {
+  const m = S.bookModel;
+  const task = taskById(id), row = rowById(id);
+  if (!m || !task || !row || !canEdit()) return;
+  const fromRes = m.resources.find((r) => r.key === from), toRes = m.resources.find((r) => r.key === to);
+  const item = fromRes?.items.find((it) => it.task.id === id && it.first === first);
+  if (!item || !toRes) return;
+  const plan = planBookingMove(task, row, { item, from: fromRes, to: toRes, period }, { resourceCol: bookResCol(), periods: m.periods, periodCol: m.periodCol, edit: ctx() });
+  if (plan.error) {
+    S.signature = '';
+    recompute();
+    toast(plan.error === 'datesFormula' ? t('These dates come from formulas, so they can’t be changed here.') : t('That column is a formula, so the booking can’t be moved there.'));
+    return;
+  }
+  if (!Object.keys(plan.fields).length) return;
+  if (id !== S.selectedId) { S.selectedId = id; if (S.live) moveCursor(id).catch(() => {}); }
+  const p = m.periods[period];
+  const where = m.periodCol ? String(p.label) : fmtRange(p.start, p.end);
+  writeMany([{ id, plan }], t('Moved “{name}” to {res}, {period}.', { name: task.title || t('(no name)'), res: toRes.none ? t('No {col}', { col: bookResCol().label }) : String(toRes.label), period: where }));
+}
+
+/** A free cell clicked: a new booking there, then its quick edit to fill in who. */
+async function bookCell({ resource, period }) {
+  const m = S.bookModel;
+  const res = m?.resources.find((r) => r.key === resource);
+  const p = m?.periods[period];
+  if (!res || !p || !canEdit()) return;
+  const link = await linkForNewTask();
+  const plan = newBookingFields(res, p, {
+    resourceCol: bookResCol(), periodCol: m.periodCol, edit: ctx(), titleCol: colById(S.roles.title), title: t('New booking'),
+    link: link && !link.unknown ? link : null,
+  });
+  const note = link?.unknown ? t('This task will show here once its {col} matches the row selected in the linked widget.', { col: link.unknown.label }) : null;
+  if (S.demo) {
+    const id = Math.max(0, ...S.rows.map((r) => r.id)) + 1;
+    S.rows = [...S.rows, { id, ...Object.fromEntries(S.columns.map((c) => [c.id, null])), ...plan.patch }];
+    S.signature = '';
+    S.selectedId = id;
+    recompute();
+    openQuick(id, note);
+    return;
+  }
+  try {
+    const r = await apply([['AddRecord', S.tableId, null, plan.fields]]);
+    const id = r?.retValues?.[0];
+    if (!id) return;
+    S.selectedId = id;
+    S.pendingEdit = { id, note };
+    moveCursor(id).catch(() => {});
+    if (rowById(id)) openPending();
+  } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
+}
+
+let pending = 0;
+const schedule = () => { if (!pending) pending = requestAnimationFrame(() => { pending = 0; recompute(); }); };
+
+// ---- selection, zoom, folding --------------------------------------------------------------------------
+function select(id, { tellGrist = false, reveal = true } = {}) {
+  if (id === S.selectedId) { if (reveal) current()?.reveal(id); return; }
+  S.selectedId = id;
+  recompute();
+  if (reveal) current()?.reveal(id);
+  if (tellGrist && S.live) moveCursor(id).catch(() => {});
+  announce(describeTask(id));
+}
+
+/** "Copywriting, 6 – 21 Oct, Doing, Chloé": what a screen reader hears for a selected task. */
+function describeTask(id) {
+  const x = taskById(id);
+  if (!x) return '';
+  const when = x.start == null ? t('No dates') : x.start === x.end ? fmtShort(x.start) : fmtShortRange(x.start, x.end);
+  return [x.title || t('(no name)'), when, x.status, x.people?.join(', '), x.done ? t('done') : null].filter(Boolean).join(', ');
+}
+
+function setZoom(z, { fit: fitAfter = false } = {}) {
+  if (!z) return;
+  if (z === S.zoom && !fitAfter) return;
+  S.zoom = z;
+  S.fitNext = fitAfter;
+  rememberZoom(S.tableId, z);
+  recompute();
+}
+function fit() {
+  if (S.mode === 'timeline' && timelineView && S.built?.tasks.length) { setZoom(fitZoom(spanOf(S.built.tasks), timelineView.chartWidth()), { fit: true }); return; }
+  if (!S.model?.span || !view) return;
+  setZoom(fitZoom(S.model.span, view.chartWidth()), { fit: true });
+}
+function toggleFold(key) {
+  if (S.view.collapsed.has(key)) S.view.collapsed.delete(key); else S.view.collapsed.add(key);
+  saveView();
+  S.signature = '';
+  recompute();
+}
+
+// ---- writing -----------------------------------------------------------------------------------------------
+const rowById = (id) => S.rows.find((r) => r.id === id) || null;
+const taskById = (id) => S.built?.tasks.find((x) => x.id === id) || S.built?.unscheduled.find((x) => x.id === id) || null;
+function replaceRow(id, next) { S.rows = S.rows.map((r) => (r.id === id ? next : r)); S.signature = ''; }
+
+/**
+ * Write changes to one or more rows as ONE action, so Grist undoes them together. The bars move at
+ * once (the rows are patched here) and Grist's own rows replace the patch about 300 ms later; if
+ * Grist refuses, every row goes back and the reason is shown.
+ * @param items [{id, plan: {fields, patch}}]
+ */
+async function writeMany(items, message) {
+  const steps = [];
+  for (const { id, plan } of items) {
+    const row = rowById(id);
+    if (!row || !Object.keys(plan.fields).length) continue;
+    steps.push({ id, fields: plan.fields, before: Object.fromEntries(Object.keys(plan.patch).map((k) => [k, row[k] ?? null])), after: plan.patch });
+    replaceRow(id, { ...row, ...plan.patch });
+  }
+  if (!steps.length) return;
+  recompute();
+  if (S.demo) {
+    demoHistory.undo.push(steps);
+    demoHistory.redo.length = 0;
+    toast(message, { label: t('Undo'), run: undo });
+    return;
+  }
+  try {
+    await apply(steps.map((s) => ['UpdateRecord', S.tableId, s.id, s.fields]));
+    toast(message, { label: t('Undo'), run: undo });
+  } catch (e) {
+    for (const s of steps) { const now = rowById(s.id); if (now) replaceRow(s.id, { ...now, ...s.before }); }
+    recompute();
+    toast(t('Grist did not accept the change: {msg}', { msg: errText(e) }));
+  }
+}
+const write = (id, plan, message) => writeMany([{ id, plan }], message);
+
+/**
+ * The successors a change pushes along (M3): every task that would now start before a task it
+ * depends on ends. Asked once, then written with the change itself as one action.
+ * @returns {Promise<Array<{id, plan}>>} the extra writes ([] when nothing has to move or the answer is no)
+ */
+async function pushedAlong(changed, extraLinks = []) {
+  const m = S.model;
+  if (!m || (!m.links.length && !extraLinks.length)) return [];
+  const links = [...m.links, ...extraLinks];
+  const tasks = m.dated.filter((x) => !x.summary);
+  const push = pushPlan(tasks, links, changed, m.cal);
+  if (!push.length) return [];
+  const c = ctx();
+  const items = [], stuck = [];
+  for (const p of push) {
+    const task = taskById(p.id), row = rowById(p.id);
+    const plan = task && row ? planDates(task, row, c, 'move', p.start, p.end) : { error: 'gone' };
+    if (plan.error) stuck.push(task?.title || p.id); else items.push({ id: p.id, plan });
+  }
+  const name = taskById(changed.id)?.title || t('(no name)');
+  const yes = await confirmBox(shell, {
+    title: tn(push.length, 'Move the task that depends on “{name}”?', 'Move the {n} tasks that depend on “{name}”?').replace('{name}', name),
+    body: (push.length === 1 ? t('It would start before “{name}” ends. Moving it keeps its length.', { name })
+      : t('They would start before the work they wait for ends. Moving them keeps their lengths.'))
+      + (stuck.length ? ' ' + t('Not movable (their dates are formulas): {list}.', { list: stuck.join(', ') }) : ''),
+    ok: push.length === 1 ? t('Move it too') : t('Move them too'),
+    cancel: t('Only this one'),
+  });
+  return yes ? items : [];
+}
+
+const EDIT_MESSAGES = {
+  move: 'Moved “{name}” to {when}.',
+  start: '“{name}” now starts {when}.',
+  end: '“{name}” now ends {when}.',
+  draw: '“{name}” now runs {when}.',
+};
+async function editDates({ id, mode, start, end }) {
+  const task = taskById(id);
+  const row = rowById(id);
+  if (!task || !row) return;
+  const plan = planDates(task, row, ctx(), mode, start, end);
+  if (plan.error) { toast(plan.error === 'endBeforeStart' ? t('The end can’t be before the start.') : t('These dates come from formulas, so they can’t be changed here.')); S.signature = ''; recompute(); return; }
+  const when = mode === 'start' ? fmtDay(start) : mode === 'end' ? fmtDay(end) : fmtRange(start, end);
+  // The task just edited becomes the selected one, in Grist too: Grist re-sends its own cursor row
+  // after every change, and an old cursor would take the selection back (found in M2).
+  if (id !== S.selectedId) { S.selectedId = id; if (S.live) moveCursor(id).catch(() => {}); }
+  const extra = mode === 'draw' ? [] : await pushedAlong({ id, start, end });
+  const message = t(EDIT_MESSAGES[mode], { name: task.title || t('(no name)'), when })
+    + (extra.length ? ' ' + tn(extra.length, '{n} task moved along.', '{n} tasks moved along.') : '');
+  writeMany([{ id, plan }, ...extra], message);
+}
+
+/** A link drawn from one bar to another: `to` starts after `from` ends. */
+async function addLink({ from, to }) {
+  const m = S.model;
+  const a = taskById(from), b = taskById(to);
+  if (!a || !b) return;
+  if (wouldLoop(m.links, from, to)) { toast(t('That link would make a loop: “{a}” already waits for “{b}”.', { a: a.title, b: b.title })); return; }
+  const plan = planLink(rowById(to), ctx(), from);
+  if (plan.error === 'already') { toast(t('“{b}” already waits for “{a}”.', { a: a.title, b: b.title })); return; }
+  if (plan.error) { toast(t('The “Depends on” column can’t be written here.')); return; }
+  const span = (x) => { const s = m.summaries.get(x.id); return s ? { start: s.start, end: s.end } : { start: x.start, end: x.end }; };
+  const extra = await pushedAlong({ id: from, ...span(a) }, [{ from, to }]);
+  const message = t('“{b}” now starts after “{a}” ends.', { a: a.title, b: b.title })
+    + (extra.length ? ' ' + tn(extra.length, '{n} task moved along.', '{n} tasks moved along.') : '');
+  writeMany([{ id: to, plan }, ...extra], message);
+}
+
+async function removeLink({ from, to }) {
+  const a = taskById(from), b = taskById(to);
+  if (!a || !b || !canEdit()) return;
+  const yes = await confirmBox(shell, {
+    title: t('Remove this link?'), body: t('“{b}” will no longer wait for “{a}”. No dates change.', { a: a.title, b: b.title }), ok: t('Remove link'),
+  });
+  if (!yes) return;
+  const plan = planUnlink(rowById(to), ctx(), from);
+  if (plan.error) { toast(t('The “Depends on” column can’t be written here.')); return; }
+  write(to, plan, t('“{b}” no longer waits for “{a}”.', { a: a.title, b: b.title }));
+}
+
+// ---- the board's gestures -------------------------------------------------------------------------------
+const laneName = (lane) => (lane.none ? t('No {col}', { col: laneCol()?.label || '' }) : String(lane.label));
+let orderHintShown = false;
+
+/** A card dropped at `index` in the lane `toKey` (or moved there with Alt + arrows). */
+function moveCard({ id, toKey, index }) {
+  const b = S.boardModel;
+  const lane = laneCol();
+  if (!b || !lane || !canEdit()) { S.signature = ''; recompute(); return; }
+  const plan = planCardMove(b, { id, toKey, index }, { laneCol: lane, orderCol: orderCol(), rows: S.rows });
+  if (plan.error) {
+    S.signature = '';
+    recompute();
+    if (plan.error === 'noOrder') {
+      if (!orderHintShown) toast(t('Cards keep the table’s order. To sort them by hand, choose a number column as “Order in a lane” in Columns.'), { label: t('Columns'), run: openColumns });
+      orderHintShown = true;
+    } else if (plan.error === 'orderFormula') toast(t('The order column is a formula, so cards can’t be moved up or down here.'));
+    else if (plan.error === 'laneFormula') toast(t('“{col}” is a formula, so cards can’t change lanes here.', { col: lane.label }));
+    return;
+  }
+  if (!plan.items.length) return;
+  if (id !== S.selectedId) { S.selectedId = id; if (S.live) moveCursor(id).catch(() => {}); }
+  const name = taskById(id)?.title || t('(no name)');
+  const to = b.lanes.find((l) => l.key === toKey);
+  const message = plan.sameLane ? t('Moved “{name}” within {lane}.', { name, lane: laneName(to) })
+    : t('Moved “{name}” to {lane}.', { name, lane: laneName(to) })
+      + (plan.items.length > 1 ? ' ' + tn(plan.items.length - 1, 'The lane’s order was renumbered ({n} card).', 'The lane’s order was renumbered ({n} cards).') : '');
+  writeMany(plan.items, message);
+}
+
+/** A card typed into the box at the bottom of a lane. */
+async function addCard({ laneKey, title }) {
+  const b = S.boardModel;
+  const lane = b?.lanes.find((l) => l.key === laneKey);
+  if (!lane || !canEdit()) return;
+  const link = await linkForNewTask();
+  const plan = newCardFields(lane, title, { laneCol: laneCol(), orderCol: orderCol(), titleCol: colById(S.roles.title), link: link && !link.unknown ? link : null });
+  if (link?.unknown) toast(t('This task will show here once its {col} matches the row selected in the linked widget.', { col: link.unknown.label }));
+  if (S.demo) {
+    const id = Math.max(0, ...S.rows.map((r) => r.id)) + 1;
+    S.rows = [...S.rows, { id, ...Object.fromEntries(S.columns.map((c) => [c.id, null])), ...plan.patch }];
+    S.signature = '';
+    recompute();
+    return;
+  }
+  try { await apply([['AddRecord', S.tableId, null, plan.fields]]); }
+  catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
+}
+
+/** The most open cards a lane should hold. Saved with the widget, for everyone. */
+async function setLimit(laneKey) {
+  const lane = S.boardModel?.lanes.find((l) => l.key === laneKey);
+  const col = laneCol();
+  if (!lane || !col) return;
+  const v = await numberBox(shell, {
+    title: t('Limit for {lane}', { lane: laneName(lane) }),
+    body: t('When more open cards than this sit in the lane, it says so. Leave the box empty for no limit.'),
+    label: t('open cards at most'), value: lane.limit,
+  });
+  if (v === null) return;
+  const wip = { ...S.board.wip };
+  const k = col.ref + '|' + laneKey;
+  if (v === '') delete wip[k]; else wip[k] = v;
+  S.board = { ...S.board, wip };
+  S.signature = '';
+  recompute();
+  if (S.live && canEdit()) {
+    const next = writeOptions(S.options, { board: S.board });
+    try { await setOptions(next); S.options = next; } catch (e) { toast(t('Could not save: {msg}', { msg: errText(e) })); }
+  }
+}
+
+async function undo() {
+  if (S.demo) {
+    const steps = demoHistory.undo.pop();
+    if (!steps) return;
+    for (const s of steps) { const row = rowById(s.id); if (row) replaceRow(s.id, { ...row, ...s.before }); }
+    demoHistory.redo.push(steps);
+    recompute();
+    return;
+  }
+  if (S.live) await gristUndo().catch((e) => toast(errText(e)));
+}
+async function redo() {
+  if (S.demo) {
+    const steps = demoHistory.redo.pop();
+    if (!steps) return;
+    for (const s of steps) { const row = rowById(s.id); if (row) replaceRow(s.id, { ...row, ...s.after }); }
+    demoHistory.undo.push(steps);
+    recompute();
+    return;
+  }
+  if (S.live) await gristRedo().catch((e) => toast(errText(e)));
+}
+
+// ---- starter templates and the add-column assistant --------------------------------------------------------
+function starterState() {
+  S.built = null;
+  drawToolbar(null, 'bare');
+  dropOthers(null);
+  const list = templates(t);
+  const hints = { plan: t('Tasks with dates, owners and dependencies: the Gantt chart.'), events: t('Stores by weekend for a market: the booking grid.'), rooms: t('Rooms by day: the booking grid.') };
+  clear(stage).appendChild(el('div', { class: 'ps-empty ps-starter' }, [
+    el('h2', { text: t('Start a plan') }),
+    el('p', { text: t('This table is empty. Plan Studio can set it up as one of these, with a few sample rows you can change or delete.') }),
+    el('div', { class: 'ps-starter__list' }, list.map((tpl) => el('button', { type: 'button', class: 'ps-starter__item', onclick: () => applyTemplate(tpl) }, [
+      el('span', { class: 'ps-starter__name', text: tpl.label }), el('span', { class: 'ps-starter__hint', text: hints[tpl.id] }),
+    ]))),
+    el('p', { class: 'ps-starter__or' }, [el('button', { type: 'button', class: 'ps-link', text: t('Or choose the columns yourself'), onclick: openColumns })]),
+  ]));
+}
+
+async function applyTemplate(tpl) {
+  if (!canEdit()) return;
+  const tables = await listTables().catch(() => []);
+  const { actions, names } = structureActions(tpl, { tableId: S.tableId, columns: S.columns, tables });
+  const yes = await confirmBox(shell, {
+    title: t('Set up “{name}”?', { name: tpl.label }),
+    body: t('This adds {n} columns to {table} and the tables {list}, with a few sample rows. Grist’s Undo takes it back in two steps.',
+      { n: tpl.columns.length, table: S.tableId, list: Object.values(names).join(', ') }),
+    ok: t('Set it up'),
+  });
+  if (!yes) return;
+  try {
+    await apply(actions);
+    const colRef = await columnRefs();
+    const today = todayDay();
+    await apply(dataActions(tpl, { tableId: S.tableId }, names, { colRef }, (n) => (today + n) * 86400));
+    // The view it opens in is remembered in this browser, not saved in the widget: saving would be a
+    // third undo step, and the confirmation said two.
+    S.mode = tpl.opensAs;
+    rememberMode(S.tableId, S.opensAs, tpl.opensAs);
+    toast(t('“{name}” is set up. Change the sample rows or delete them.', { name: tpl.label }));
+    reload('schema');
+  } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
+}
+
+/** The Columns panel's "Add a column for it": one column of the right type, mapped to the role at once. */
+async function addColumnFor(role) {
+  const col = columnForRole(role, t, S.tableId);
+  if (!col || !canEdit()) return;
+  const yes = await confirmBox(shell, {
+    title: t('Add the column “{col}”?', { col: col.label }), body: t('Plan Studio adds it to {table} and uses it as {role}. Existing rows stay as they are.', { table: S.tableId, role: col.label }),
+    ok: t('Add column'),
+  });
+  if (!yes) return;
+  try {
+    const res = await apply([['AddColumn', S.tableId, col.id, { type: col.type, label: col.label, ...(col.widgetOptions ? { widgetOptions: col.widgetOptions } : {}) }]]);
+    const made = res?.retValues?.[0] || {};
+    const roles = { ...S.roles, [role]: made.colId || col.id };
+    const stored = { ...toStored(S.roles, S.columns), [role]: { ref: made.colRef || 0, id: made.colId || col.id } };
+    const next = writeOptions(S.options, { storedRoles: stored, gantt: S.gantt });
+    await setOptions(next).catch(() => {});
+    S.options = next;
+    S.roles = roles;
+    S.source = { kind: 'saved' };
+    toast(t('Added the column “{col}”.', { col: col.label }));
+    reload('schema');
+  } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
+}
+
+// The due-date note above the Gantt chart, dismissed per table in this browser.
+const hintKey = () => 'planStudio.dueHint.' + (S.tableId || 'demo');
+function showDueHint(on) {
+  let bar = stage.querySelector(':scope > .ps-banner');
+  let off = false;
+  try { off = localStorage.getItem(hintKey()) === 'off'; } catch { /* private window */ }
+  if (!on || off) { bar?.remove(); stage.classList.remove('has-banner'); return; }
+  if (bar) return;
+  bar = el('div', { class: 'ps-banner', role: 'note' }, [
+    el('span', { text: t('These tasks have only a due date, so they show as milestones. With a start date they become bars.') }),
+    el('button', { type: 'button', class: 'ps-btn ps-btn--sm', text: t('Add a Start column'), onclick: () => addColumnFor('start') }),
+    el('button', { type: 'button', class: 'ps-icon-btn ps-banner__close', 'aria-label': t('Close'), text: '×', onclick: () => { try { localStorage.setItem(hintKey(), 'off'); } catch { /* fine */ } showDueHint(false); } }),
+  ]);
+  stage.prepend(bar);
+  stage.classList.add('has-banner');
+}
+
+// ---- print -----------------------------------------------------------------------------------------------
+// The printout is built from the model on screen, for paper (print/render.js), into #ps-print, which
+// only shows when printing. In a Grist iframe, print() prints this widget alone.
+const VIEW_NAMES = { gantt: 'Gantt chart', timeline: 'Timeline', board: 'Board', booking: 'Booking grid' };
+let printing = false;
+function startPrint() {
+  if (printing || !S.ready) return;
+  printing = true;
+  openPrint(shell, { canPages: S.mode === 'gantt' || S.mode === 'timeline' }, {
+    onClose: () => { printing = false; },
+    onPrint: (o) => printNow(o),
+  });
+}
+
+const printTitle = () => String(S.tableId || '').replace(/_/g, ' ');
+
+/** The printout of the view on show, or null. */
+function printNode({ paper, fit }) {
+  const locale = dateLocale(gristCulture());
+  const today = todayDay();
+  const view = t(VIEW_NAMES[S.mode]);
+  const count = (one, many) => tn(S.built.tasks.length + S.built.unscheduled.length, one, many);
+  if (S.mode === 'gantt' && S.model) {
+    const m = S.model;
+    const rows = m.entries.map((e) => {
+      if (e.kind === 'group') return { label: e.label || t('(none)'), kind: 'group', bars: Number.isFinite(e.start) ? [{ kind: 'summary', start: e.start, end: e.end, title: '' }] : [] };
+      const x = e.task;
+      const span = e.summary || x;
+      const bars = e.undated ? [] : [{
+        kind: e.summary ? 'summary' : x.kind, start: span.start, end: span.end, colour: x.colour, title: x.title || t('(no name)'),
+        progress: x.progress, critical: S.view.critical && m.crit.tasks.has(x.id),
+      }];
+      return { label: x.title || t('(no name)'), depth: e.depth, kind: 'task', sub: e.undated ? t('No dates') : fmtShortRange(span.start, span.end), bars };
+    });
+    return renderTimePrint({
+      title: printTitle(), subtitle: subtitleFor(view, count('{n} task', '{n} tasks'), locale, today),
+      nameHeader: colById(S.roles.title)?.label || t('Task'), paper, mode: fit, zoomPx: ZOOMS[S.zoom || 'week'].px, weekStart: weekStart(), locale, today,
+      span: m.span || { from: today, to: today + 7 }, rows,
+    });
+  }
+  if (S.mode === 'timeline' && S.tlModel) {
+    const lane = tlLaneCol();
+    const rows = S.tlModel.lanes.map((l) => ({
+      label: l.none ? t('No {col}', { col: lane.label }) : String(l.label ?? ''), kind: 'lane', tracks: l.tracks, sub: String(l.bars.length),
+      bars: l.bars.map((b) => ({ kind: b.task.kind === 'milestone' ? 'milestone' : 'bar', start: b.task.start, end: b.task.end, colour: b.task.colour,
+        title: b.task.title || t('(no name)'), track: b.track, progress: b.task.progress, clash: b.clash })),
+    }));
+    return renderTimePrint({
+      title: printTitle(), subtitle: subtitleFor(view, tn(S.built.tasks.length, '{n} task', '{n} tasks'), locale, today),
+      nameHeader: lane.label, paper, mode: fit, zoomPx: ZOOMS[S.zoom || 'week'].px, weekStart: weekStart(), locale, today,
+      span: spanOf(S.built.tasks) || { from: today, to: today + 7 }, rows, labelsInside: true,
+    });
+  }
+  if (S.mode === 'board' && S.boardModel) {
+    const lane = laneCol();
+    return renderBoardPrint({
+      title: printTitle(), subtitle: subtitleFor(view, count('{n} card', '{n} cards'), locale, today), paper,
+      lanes: S.boardModel.lanes.map((l) => ({
+        name: l.none ? t('No {col}', { col: lane.label }) : String(l.label), colour: l.colour, over: l.over,
+        count: l.limit != null ? `${l.open}/${l.limit}` : String(l.cards.length),
+        cards: l.cards.map((c) => ({
+          title: c.title || t('(no name)'), done: c.done, colour: c.colour, fields: c.fields, people: c.people.join(', '), late: c.late > 0,
+          when: [c.due != null ? t('Due {date}', { date: fmtShort(c.due) }) : c.span ? fmtShortRange(c.span[0], c.span[1]) : null,
+            c.late > 0 ? tn(c.late, '{n} day late', '{n} days late') : null].filter(Boolean).join(' · '),
+        })),
+      })),
+    });
+  }
+  if (S.mode === 'booking' && S.bookModel) {
+    const b = S.bookModel;
+    const res = bookResCol();
+    const lab = bookLabelCol();
+    const labelOf = (task) => (lab ? cellText(rowById(task.id) || {}, lab, S.labels, fmtShort) : task.title) || t('(no name)');
+    const fmt = (o) => new Intl.DateTimeFormat(locale, { timeZone: 'UTC', ...o });
+    const periodText = (p) => {
+      if (b.unit === 'column') return { label: String(p.label) };
+      if (b.unit === 'table') return { label: p.label || fmtShortRange(p.start, p.end), sub: p.label ? fmtShortRange(p.start, p.end) : null };
+      const d = dateFromDay(p.start);
+      if (b.unit === 'day') return { label: fmt({ weekday: 'short', day: 'numeric' }).format(d), sub: fmt({ month: 'short' }).format(d) };
+      if (b.unit === 'week') return { label: t('W{n}', { n: isoWeek(p.start).week }), sub: fmt({ day: 'numeric', month: 'short' }).format(d) };
+      return { label: fmt({ month: 'short', year: 'numeric' }).format(d) };
+    };
+    // Days, weeks and months print the booked stretch and one period either side, not the screen's
+    // run-up of empty future weeks; a period column or table prints whole.
+    const used = b.resources.flatMap((r) => r.items);
+    const calendarUnit = b.unit !== 'column' && b.unit !== 'table';
+    const lo = calendarUnit && used.length ? Math.max(0, Math.min(...used.map((it) => it.first)) - 1) : 0;
+    const hi = calendarUnit && used.length ? Math.min(b.periods.length - 1, Math.max(...used.map((it) => it.last)) + 1) : b.periods.length - 1;
+    return renderBookingPrint({
+      title: printTitle(), subtitle: subtitleFor(view, count('{n} booking', '{n} bookings'), locale, today), paper,
+      resourceHeader: res.label, periods: b.periods.slice(lo, hi + 1).map(periodText), free: b.free.slice(lo, hi + 1),
+      resources: b.resources.map((r) => ({
+        name: r.none ? t('No {col}', { col: res.label }) : String(r.label), tracks: r.tracks, clashes: r.items.filter((it) => it.clash).length,
+        items: r.items.filter((it) => it.last >= lo && it.first <= hi)
+          .map((it) => ({ first: Math.max(it.first, lo) - lo, last: Math.min(it.last, hi) - lo, track: it.track, label: labelOf(it.task), clash: it.clash })),
+      })),
+    });
+  }
+  return null;
+}
+
+function printNow(o) {
+  printing = false;
+  const node = printNode(o);
+  if (!node) return;
+  let root = document.getElementById('ps-print');
+  if (!root) { root = el('div', { id: 'ps-print' }); document.body.appendChild(root); }
+  let page = document.getElementById('ps-page');
+  if (!page) { page = el('style', { id: 'ps-page' }); document.head.appendChild(page); }
+  page.textContent = pageRule(o.paper);
+  clear(root).appendChild(node);
+  // The printout stays (hidden on screen) until the dialog closes; the next print replaces it.
+  window.addEventListener('afterprint', () => clear(root), { once: true });
+  setTimeout(() => window.print(), 60);
+}
+// Ctrl+P in the widget opens this panel: the browser's own would print the screen, cut off and dark.
+// ? lists the keys, from anywhere but a text box.
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startPrint(); return; }
+  if (e.key === '?' && !e.ctrlKey && !e.metaKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '') && !shell.querySelector('.ps-dialog, .ps-drawer')) {
+    e.preventDefault();
+    openKeys(shell, S.mode);
+  }
+});
+
+// ---- quick edit, record card, new tasks ---------------------------------------------------------------------
+let dialogOpen = false;
+function openQuick(id, note = null) {
+  const row = rowById(id);
+  if (!row || dialogOpen) return;
+  dialogOpen = true;
+  select(id, { tellGrist: true });
+  // Parent and "Depends on" point at this same table: list the other tasks by name.
+  const names = new Map([...(S.built?.tasks || []), ...(S.built?.unscheduled || [])].filter((x) => x.id !== id).map((x) => [x.id, x.title || t('(no name)')]));
+  const labels = { ...S.labels };
+  for (const role of ['parent', 'dependsOn']) if (S.roles[role]) labels[S.roles[role]] = names;
+  openQuickEdit(shell, {
+    row, roles: S.roles, columns: S.columns, labels, editable: canEdit(), canOpenCard: S.live, note, booking: S.mode === 'booking',
+  }, {
+    onClose: () => { dialogOpen = false; },   // focus goes back to what opened it (dialog.js trapFocus)
+    onOpenCard: () => openCard(id),
+    onSave: (plan) => {
+      // A rename is in the patch; the task in memory still has the old name.
+      const typed = S.roles.title ? plan.fields[S.roles.title] : null;
+      // a name that is a Reference (a Participant column) is a row id: say the name it shows
+      const shown = typeof typed === 'number' ? S.labels[S.roles.title]?.get(typed) : typed;
+      const name = (typeof shown === 'string' && shown) || taskById(id)?.title || t('(no name)');
+      write(id, plan, t('Saved “{name}”.', { name }));
+    },
+  });
+}
+
+/**
+ * Grist's own record card for a task (M0, question 6): it opens for the row under this widget's
+ * cursor, and only when the widget's section shows at least one field. A section with none gets the
+ * task's name column added to its fields first, once, after asking.
+ */
+async function openCard(id) {
+  if (!S.live) { openQuick(id); return; }
+  select(id, { tellGrist: false });
+  const own = await loadOwnSection(S.tableId, S.options);
+  if (!own) { openQuick(id); return; }
+  if (own.fieldCount === 0) {
+    const titleCol = S.columns.find((c) => c.id === S.roles.title);
+    if (!canEdit() || !titleCol) { openQuick(id); return; }
+    const yes = await confirmBox(shell, {
+      title: t('Open Grist’s record card?'),
+      body: t('Grist opens its card only for a widget that shows at least one column. Plan Studio will add “{col}” to this widget’s fields. Your data does not change.', { col: titleCol.label }),
+      ok: t('Add and open'),
+    });
+    if (!yes) return;
+    try { await apply([['AddRecord', '_grist_Views_section_field', null, { parentId: own.id, colRef: titleCol.ref }]]); }
+    catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); return; }
+  }
+  try { await moveCursor(id); await openRecordCard(); }
+  catch (e) { toast(t('Grist’s card did not open ({msg}). Here is the quick edit instead.', { msg: errText(e) })); openQuick(id); }
+}
+
+/** The value a new task needs to show while this widget is filtered by a linked one (M0, question 4). */
+async function linkForNewTask() {
+  if (!S.live || !/^Filter:/.test(linkingInfo().asTarget || '')) return null;
+  const own = await loadOwnSection(S.tableId, S.options);
+  const col = own?.linkTargetColId ? S.columns.find((c) => c.id === own.linkTargetColId) : null;
+  if (!col) return null;
+  return linkValue(S.rows, col) || { unknown: col };
+}
+
+async function newTask() {
+  if (!canEdit()) return;
+  const link = await linkForNewTask();
+  const plan = newTaskFields(ctx(), { day: todayDay(), title: t('New task'), link: link && !link.unknown ? link : null });
+  const note = link?.unknown ? t('This task will show here once its {col} matches the row selected in the linked widget.', { col: link.unknown.label }) : null;
+  if (S.demo) {
+    const id = Math.max(0, ...S.rows.map((r) => r.id)) + 1;
+    S.rows = [...S.rows, { id, ...Object.fromEntries(S.columns.map((c) => [c.id, null])), ...plan.patch }];
+    S.signature = '';
+    S.selectedId = id;
+    recompute();
+    current()?.reveal(id);
+    openQuick(id, note);
+    return;
+  }
+  try {
+    const res = await apply([['AddRecord', S.tableId, null, plan.fields]]);
+    const id = res?.retValues?.[0];
+    if (!id) return;
+    S.selectedId = id;
+    S.pendingEdit = { id, note };
+    moveCursor(id).catch(() => {});
+    if (rowById(id)) openPending();
+  } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
+}
+function openPending() {
+  const p = S.pendingEdit;
+  if (!p) return;
+  S.pendingEdit = null;
+  current()?.reveal(p.id);
+  openQuick(p.id, p.note);
+}
+
+// ---- Columns panel --------------------------------------------------------------------------------------
+let mappingOpen = null;
+async function openColumns() {
+  if (mappingOpen) return;
+  mappingOpen = true;
+  const datedTables = S.live ? await listDatedTables().catch(() => []) : [];
+  mappingOpen = openMapping(shell, {
+    tableId: S.tableId, columns: S.columns, roles: S.roles, source: S.source, gantt: S.gantt, canEdit: canEdit() || S.demo,
+    board: S.board, booking: S.booking, opensAs: S.opensAs, cardFields: fieldCols(null).map((c) => c.id),
+    canAddColumns: S.live && canEdit(),
+    datedTables: datedTables.filter((x) => x !== S.tableId),
+  }, {
+    onClose: () => { mappingOpen = null; },
+    onAddColumn: (role) => addColumnFor(role),
+    onSave: async ({ roles, gantt, board, booking, opensAs, language }) => {
+      setLanguage(language);
+      S.roles = roles;
+      S.gantt = gantt;
+      S.board = board;
+      S.booking = booking;
+      if (opensAs !== S.opensAs) { S.opensAs = opensAs; S.mode = resolveMode(); }
+      S.source = { kind: 'saved' };
+      if (S.live) {
+        S.labels = await loadLabels(S.columns, labelRoles()).catch(() => S.labels);
+        S.holidayDays = await loadHolidayDays(gantt.holidayTable).catch(() => new Map());
+        await loadBookingTables();
+        if (canEdit()) {
+          const next = writeOptions(S.options, { storedRoles: toStored(roles, S.columns), gantt, board, booking, view: opensAs });
+          try { await setOptions(next); S.options = next; toast(t('Saved for this widget.')); }
+          catch (e) { toast(t('Could not save: {msg}', { msg: errText(e) })); }
+        }
+      }
+      S.signature = '';
+      recompute();
+    },
+  });
+}
+
+// ---- loading from Grist ---------------------------------------------------------------------------------
+async function loadDocState() {
+  S.columns = await loadColumns(S.tableId);
+  const opts = readOptions(S.options);
+  S.gantt = opts.gantt;
+  S.board = opts.board;
+  S.booking = opts.booking;
+  S.opensAs = opts.view;
+  const saved = opts.roles ? fromStored(opts.roles, S.columns, S.tableId) : {};
+  if (Object.keys(saved).length) {
+    S.roles = saved;
+    S.source = { kind: 'saved' };
+  } else {
+    const d = detectRoles(S.columns, { tableId: S.tableId, foreignMapping: await loadForeignMapping(S.tableId) });
+    S.roles = d.roles;
+    S.source = d.source;
+  }
+  S.labels = await loadLabels(S.columns, labelRoles()).catch(() => ({}));
+  S.holidayDays = await loadHolidayDays(S.gantt.holidayTable).catch(() => new Map());
+  await loadBookingTables();
+}
+
+/** The booking grid's periods table and the table its rows come from (for the filter), when it is on show. */
+async function loadBookingTables() {
+  if (S.demo || S.mode !== 'booking') return;
+  const res = bookResCol();
+  S.resourceTable = res?.refTable ? await loadTable(res.refTable).catch(() => null) : null;
+  S.periodTable = S.booking.periodTable && bookPeriodsBy().startsWith('table:') ? await loadTable(S.booking.periodTable).catch(() => null) : null;
+}
+
+// A column added, removed or renamed shows up as a different set of keys in the rows.
+function schemaChanged(rows) {
+  if (!rows.length || !S.columns.length) return false;
+  const known = new Set(S.columns.map((c) => c.id));
+  const keys = Object.keys(rows[0]).filter((k) => k !== 'id');
+  return keys.length !== known.size || keys.some((k) => !known.has(k));
+}
+
+// A Reference to a row the labels do not have yet (a person added a minute ago): read them again.
+function labelsMissing(rows) {
+  for (const id of Object.values(labelRoles())) {
+    const col = S.columns.find((c) => c.id === id);
+    if (!col || !col.refTable || col.refTable === S.tableId) continue;
+    const map = S.labels[col.id];
+    if (!map) return true;
+    for (const r of rows) {
+      const v = r[col.id];
+      const ids = Array.isArray(v) ? (v[0] === 'L' ? v.slice(1) : v[0] === 'R' ? [v[2]] : []) : [];
+      if (ids.some((x) => x && !map.has(x))) return true;
+    }
+  }
+  return false;
+}
+
+let reloading = null;
+let reloadNext = null;   // asked for while one was running: run once more after it, schema first
+function reload(what) {
+  // The demo has its labels in memory and no document to read them from.
+  if (S.demo) { S.signature = ''; recompute(); return Promise.resolve(); }
+  if (reloading) {
+    // A template's second step (which column each Reference shows) lands while the first step's
+    // reload still runs; dropping this one would leave the labels as "Rooms[1]".
+    reloadNext = reloadNext === 'schema' || what === 'schema' ? 'schema' : 'labels';
+    return reloading.then(() => (reloadNext ? reload(reloadNext) : null));
+  }
+  reloadNext = null;
+  reloading = (async () => {
+    try {
+      // A table reshaped under the widget (columns added, renamed): the view that fits may have changed too.
+      if (what === 'schema') { forgetMeta(); S.tableId = (await selectedTableId()) || S.tableId; await loadDocState(); S.mode = resolveMode(); await loadBookingTables(); }
+      else {
+        S.labels = await loadLabels(S.columns, labelRoles()).catch(() => S.labels);
+        if (S.gantt.holidayTable) S.holidayDays = await loadHolidayDays(S.gantt.holidayTable).catch(() => S.holidayDays);
+        await loadBookingTables();
+      }
+      S.signature = '';
+      recompute();
+    } finally { reloading = null; }
+  })();
+  return reloading;
+}
+
+function onRows(rows) {
+  S.rows = rows;
+  if (!S.ready) return;
+  // An empty table says nothing about its columns (no row, no keys), and an undo that takes a
+  // template back empties it and removes its columns at once: read the columns from Grist then.
+  if (schemaChanged(rows) || (!rows.length && S.live)) { reload('schema'); return; }
+  if (labelsMissing(rows)) reload('labels');
+  schedule();
+  if (S.pendingEdit && rows.some((r) => r.id === S.pendingEdit.id)) requestAnimationFrame(openPending);
+}
+
+let lastAccess = null;
+function onOptions(options) {
+  const before = JSON.stringify(S.options || null);
+  S.options = options;
+  // Grist says which access it granted in this same message, often after the widget has drawn once
+  // with none: a widget drawn read-only would stay so until the next change of data.
+  const access = accessLevel() + '|' + (linkingInfo().asTarget || '');
+  if (S.ready && access !== lastAccess) { S.signature = ''; schedule(); }
+  lastAccess = access;
+  if (!S.ready || JSON.stringify(options || null) === before) return;
+  // Someone saved the Columns panel (here or in another browser): use what they saved.
+  const o = readOptions(options);
+  S.gantt = o.gantt;
+  S.board = o.board;
+  S.booking = o.booking;
+  if (o.view !== S.opensAs) { S.opensAs = o.view; S.mode = resolveMode(); }
+  if (o.roles) { S.roles = fromStored(o.roles, S.columns, S.tableId); S.source = { kind: 'saved' }; }
+  reload('labels');
+}
+
+function onCursor(id) {
+  if (id == null || id === S.selectedId || !S.ready) return;
+  if (taskById(id)) select(id, { tellGrist: false });
+}
+
+function loadViewState() {
+  const v = storedView(S.tableId);
+  S.view = { ...v, collapsed: new Set(v.collapsed) };
+  S.zoom = storedZoom(S.tableId, null);
+}
+
+async function boot() {
+  setLanguage(storedLanguage(), { remember: false });
+  const live = await start({ onRows, onOptions, onCursor });
+  if (!live) return bootDemo();
+  S.live = true;
+  // Anything less than full access (the person picked "Read selected table", or declined): Grist
+  // then sends only the columns shown in the widget's own fields and no column types (M2 check), so
+  // there is nothing to plan with. Say so, and where to change it; Grist reloads the widget when
+  // the access level changes, so this page goes away by itself.
+  if (accessLevel() !== 'full') {
+    drawToolbar(null, 'bare');
+    emptyState(t('Plan Studio needs full access to this document'),
+      t('It reads your column types and writes your changes back. In the widget panel on the right, set Access level to “Full document access”.'), []);
+    return;
+  }
+  S.tableId = await selectedTableId();
+  if (S.options == null) S.options = await getOptions().catch(() => null);
+  loadViewState();   // before the labels: the board's lane column may be this browser's choice
+  await loadDocState();
+  S.mode = resolveMode();
+  S.ready = true;
+  lastAccess = accessLevel() + '|' + (linkingInfo().asTarget || '');
+  recompute();
+  // Other tables send no change events (M0, question 7): labels are read again now and then.
+  setInterval(() => { if (document.visibilityState === 'visible') reload('labels'); }, 15000);
+  window.addEventListener('focus', () => reload('labels'));
+}
+
+/**
+ * The demo, when no Grist answers: a website relaunch (every view), or pop-up stores over weekends, which
+ * opens as the booking grid. ?example=stores picks the second.
+ */
+function bootDemo(example = null) {
+  S.demo = true;
+  if (!example) { try { example = new URLSearchParams(location.search).get('example'); } catch { /* no URL */ } }
+  S.example = example === 'stores' || example === 'speed' ? example : 'plan';
+  const stores = S.example === 'stores';
+  const speed = S.example === 'speed';   // 5,000 tasks, for the speed pass; not in the Example menu
+  // The website plan counts working days, so its weekends are not slack and the critical path runs through.
+  S.gantt = { ...GANTT_DEFAULTS, durationUnit: stores ? 'days' : 'workdays' };
+  S.tableId = stores ? STORES_TABLE : speed ? SPEED_TABLE : SAMPLE_TABLE;
+  S.columns = stores ? STORES_COLUMNS : speed ? SPEED_COLUMNS : SAMPLE_COLUMNS;
+  S.rows = stores ? storesRows() : speed ? speedRows() : sampleRows();
+  S.labels = stores ? STORES_LABELS : speed ? SPEED_LABELS : SAMPLE_LABELS;
+  S.resourceTable = stores ? STORES_RESOURCES : null;
+  S.opensAs = stores ? 'booking' : 'auto';
+  S.selectedId = null;
+  demoHistory.undo.length = 0;
+  demoHistory.redo.length = 0;
+  const d = detectRoles(S.columns, { tableId: S.tableId });
+  S.roles = d.roles;
+  S.source = d.source;
+  loadViewState();
+  S.mode = resolveMode();
+  S.signature = '';
+  S.firstDraw = true;
+  S.ready = true;
+  recompute();
+}
+
+boot();

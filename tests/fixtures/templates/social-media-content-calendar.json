@@ -1,0 +1,126 @@
+{
+ "name": "social-media-content-calendar",
+ "source": "https://templates.getgrist.com/iPKJA6u6j5urBRntphREqj",
+ "fetched": "2026-10-24",
+ "tables": [
+  {
+   "id": "Social_Media_Posts",
+   "columns": [
+    {
+     "id": "Reviewed_",
+     "label": "Reviewed?",
+     "type": "Bool",
+     "isFormula": false
+    },
+    {
+     "id": "Drafted",
+     "label": "Drafted",
+     "type": "Bool",
+     "isFormula": false
+    },
+    {
+     "id": "Published_",
+     "label": "Published?",
+     "type": "Bool",
+     "isFormula": false
+    },
+    {
+     "id": "Publication_Time",
+     "label": "Publication Time",
+     "type": "DateTime:America/New_York",
+     "isFormula": false
+    },
+    {
+     "id": "Topic_Name",
+     "label": "Topic/Name",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Platforms",
+     "label": "Platforms",
+     "type": "ChoiceList",
+     "isFormula": false,
+     "choices": [
+      "Twitter (X)",
+      "YouTube",
+      "Facebook",
+      "Instagram",
+      "TikTok"
+     ]
+    },
+    {
+     "id": "Post_Copy",
+     "label": "Post Copy",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Media",
+     "label": "Media",
+     "type": "Attachments",
+     "isFormula": false
+    },
+    {
+     "id": "Notes",
+     "label": "Notes",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "character_count",
+     "label": "character count",
+     "type": "Numeric",
+     "isFormula": true
+    },
+    {
+     "id": "Campaign",
+     "label": "Campaign",
+     "type": "Ref:Campaigns",
+     "isFormula": false
+    },
+    {
+     "id": "Reviewed_By",
+     "label": "Reviewed By",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Drafted_By",
+     "label": "Drafted By",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Published_By",
+     "label": "Published By",
+     "type": "Text",
+     "isFormula": false
+    }
+   ]
+  },
+  {
+   "id": "Campaigns",
+   "columns": [
+    {
+     "id": "Campaign",
+     "label": "Campaign",
+     "type": "Text",
+     "isFormula": false
+    },
+    {
+     "id": "Start",
+     "label": "Start",
+     "type": "Date",
+     "isFormula": false
+    },
+    {
+     "id": "End",
+     "label": "End",
+     "type": "Date",
+     "isFormula": false
+    }
+   ]
+  }
+ ]
+}
