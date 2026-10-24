@@ -5,12 +5,12 @@
    are what the eye finds first; every period says in words how many are free. */
 
 :root { --ps-free: #e3f2e9; --ps-free-hover: #cfe9da; --ps-today-col: rgba(20, 80, 155, 0.05); --ps-clash-soft: rgba(217, 54, 62, 0.07);
-  --ps-wl-track: #e1e7ee; --ps-wl-fill: #5b86bf; --ps-wl-high: #b7791f; }
+  --ps-wl-track: #e1e7ee; --ps-wl-fill: #5b86bf; }
 :root[data-grist-appearance="dark"] { --ps-free: rgba(98, 192, 141, 0.12); --ps-free-hover: rgba(98, 192, 141, 0.22); --ps-today-col: rgba(107, 165, 240, 0.07); --ps-clash-soft: rgba(255, 107, 111, 0.1);
-  --ps-wl-track: rgba(255, 255, 255, 0.09); --ps-wl-fill: #6ba5f0; --ps-wl-high: #d5a257; }
+  --ps-wl-track: rgba(255, 255, 255, 0.09); --ps-wl-fill: #6ba5f0; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-grist-appearance="light"]) { --ps-free: rgba(98, 192, 141, 0.12); --ps-free-hover: rgba(98, 192, 141, 0.22); --ps-today-col: rgba(107, 165, 240, 0.07); --ps-clash-soft: rgba(255, 107, 111, 0.1);
-    --ps-wl-track: rgba(255, 255, 255, 0.09); --ps-wl-fill: #6ba5f0; --ps-wl-high: #d5a257; }
+    --ps-wl-track: rgba(255, 255, 255, 0.09); --ps-wl-fill: #6ba5f0; }
 }
 
 /* ---- timeline ---- */
@@ -104,29 +104,33 @@
 /* ---- workload (M9) ----
    A resource sheet: each cell says the hours asked against the hours there are, over a thin meter
    whose track is the capacity. Past it the meter runs on in the warning colour, beyond a tick, and the
-   cell says how many hours over. A day with no capacity (a weekend, a holiday, a day off) is hatched. */
+   cell says how many hours over; a week that fits but has days that do not says so in words. Red is
+   the one warning colour, always with words. A day with no capacity (a weekend, a holiday, a day off) is hatched. */
 .ps-wl .ps-book__body { background-image: repeating-linear-gradient(to right, transparent 0 calc(var(--col-w) - 1px), var(--ps-line) calc(var(--col-w) - 1px) var(--col-w)); background-color: var(--ps-surface); }
 .ps-wl .ps-book__row.is-alt { background: var(--ps-stripe); }
 .ps-wl__team { font-size: 11px; color: var(--ps-muted); font-variant-numeric: tabular-nums; }
-.ps-wl__team.is-over { color: var(--ps-crit); font-weight: 650; }
-.ps-wl__cap { font-size: 11.5px; color: var(--ps-muted); font-variant-numeric: tabular-nums; }
+.ps-wl__team.is-over { color: var(--ps-crit); font-weight: 600; }
+.ps-wl__cap { font-size: 12px; line-height: 15px; color: var(--ps-muted); font-variant-numeric: tabular-nums; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .ps-wl__cap.is-over { color: var(--ps-crit); font-weight: 600; }
 .ps-wl__cell { position: absolute; box-sizing: border-box; cursor: pointer; border-right: 1px solid var(--ps-line); }
 .ps-wl__cell:hover { background: var(--ps-hover); }
-.ps-wl__num { position: absolute; left: 10px; top: 8px; font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ps-wl__num { position: absolute; left: 10px; top: 8px; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ps-wl__cell.is-free .ps-wl__num { font-weight: 500; color: var(--ps-muted); }
-.ps-wl__cell.is-over .ps-wl__num { color: var(--ps-crit); }
-.ps-wl__note { position: absolute; left: 10px; right: 6px; top: 26px; font-size: 11px; font-weight: 650; color: var(--ps-crit); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-wl__cell.is-over .ps-wl__num { color: var(--ps-crit); font-weight: 600; }
+.ps-wl__note { position: absolute; left: 10px; right: 6px; top: 26px; font-size: 11px; font-weight: 600; color: var(--ps-crit); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ps-wl__meter { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 5px; border-radius: 3px; background: var(--ps-wl-track); }
 .ps-wl__fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--ps-wl-fill); }
-.ps-wl__cell.is-high .ps-wl__fill { background: var(--ps-wl-high); }
 .ps-wl__cell.is-over .ps-wl__fill { background: var(--ps-wl-fill); border-radius: 3px 0 0 3px; }
 .ps-wl__spill { position: absolute; top: 0; bottom: 0; background: var(--ps-crit); border-radius: 0 3px 3px 0; }
 .ps-wl__meter.has-tick::after { content: ""; position: absolute; left: calc(100% / 1.5); top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ps-ink); border-radius: 1px; }
 .ps-wl__cell.is-off { cursor: default; background: repeating-linear-gradient(135deg, var(--ps-weekend) 0 5px, transparent 5px 10px); }
 .ps-wl__cell.is-off:hover { background: repeating-linear-gradient(135deg, var(--ps-weekend) 0 5px, transparent 5px 10px); }
 .ps-wl__cell.is-offday { background: var(--ps-clash-soft); }
-.ps-wl__offword { position: absolute; left: 0; right: 0; top: 21px; text-align: center; font-size: 10.5px; color: var(--ps-muted); }
+.ps-wl__offword { position: absolute; left: 0; right: 0; top: 21px; text-align: center; font-size: 11px; color: var(--ps-muted); }
+/* the past: same words, quieter ink and a grey meter, so the overloads still ahead are the loud ones */
+.ps-wl__cell.is-past .ps-wl__num, .ps-wl__cell.is-past .ps-wl__note { color: var(--ps-muted); }
+.ps-wl__cell.is-past .ps-wl__fill { background: var(--ps-line-strong); }
+.ps-wl__cell.is-past .ps-wl__spill { background: var(--ps-muted); }
 .ps-wl__pop {
   position: absolute; z-index: 12; width: min(330px, calc(100% - 16px)); box-sizing: border-box; padding: 10px 0 8px;
   background: var(--ps-surface); border: 1px solid var(--ps-line-strong); border-radius: 8px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
@@ -140,6 +144,6 @@
 .ps-wl__task:hover, .ps-wl__task:focus-visible { background: var(--ps-hover); outline: none; }
 .ps-wl__task:focus-visible { box-shadow: inset 2px 0 0 var(--ps-focus); }
 .ps-wl__task.is-selected { background: var(--ps-sel); }
-.ps-wl__tname { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.ps-wl__tname { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .ps-wl__th { flex: none; font-size: 12px; color: var(--ps-muted); font-variant-numeric: tabular-nums; }
 .ps-wl__pophint { margin: 0; padding: 6px 12px 0; font-size: 11px; color: var(--ps-muted); }

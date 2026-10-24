@@ -52,11 +52,12 @@ export function templates(t) {
       ],
       rows: (day) => ({
         [people]: [{ Name: 'Ann', [weekly]: 40 }, { Name: 'Ben', [weekly]: 40 }, { Name: 'Chloé', [weekly]: 30 }],
-        // Hours that fit their owners whatever weekday the plan starts on; milestones take no hours.
+        // Hours that fit their owners whatever weekday the plan is set up on (tests/templates.test.mjs tries all
+        // seven: eight days from a Sunday are only five working days); milestones take no hours.
         '@self': [
           [t('Kick-off'), 0, 0, t('Done'), 1, null, 1, true, []],
           [t('Gather requirements'), 1, 4, t('Done'), 2, 16, 1, false, [1]],
-          [t('Design'), 7, 14, t('Doing'), 3, 32, 0.4, false, [2]],
+          [t('Design'), 7, 14, t('Doing'), 3, 28, 0.4, false, [2]],
           [t('Build'), 15, 29, t('To do'), 2, 80, 0, false, [3]],
           [t('Test'), 30, 35, t('To do'), 1, 30, 0, false, [4]],
           [t('Launch'), 36, 36, t('To do'), 1, null, 0, true, [5]],

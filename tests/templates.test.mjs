@@ -76,5 +76,42 @@ eq('in French, a French name and a Grist-safe id', T.columnForRole('start', I.t,
 I.setLanguage('en', { remember: false });
 eq('roles a column cannot simply be made for (who, which room) are not offered', [T.columnForRole('assignee', I.t, 'T'), T.columnForRole('resource', I.t, 'T')], [null, null]);
 
+// The Project plan's sample hours fit their owners on whichever weekday it is set up (1.1.0 had Chloé
+// over on five days when set up on a Sunday: eight days from a Sunday are only five working days).
+{
+  const W = await imp('src/model/workload.js');
+  const { buildTasks } = await imp('src/model/tasks.js');
+  const { makeCalendar } = await imp('src/model/calendar.js');
+  const { dayFromISO } = await imp('src/model/values.js');
+  I.setLanguage('en', { remember: false });
+  const plan = T.templates(I.t).find((x) => x.id === 'plan');
+  const cols = columnsFromFixture(plan.columns.map((c) => ({ id: c.id, type: c.ref ? (c.ref === '@self' ? 'RefList:Table1' : 'Ref:People') : c.type })));
+  const roles = detectRoles(cols, { tableId: 'Table1' }).roles;
+  const ids = plan.columns.map((c) => c.id);
+  const labels = { [roles.assignee]: new Map([[1, 'Ann'], [2, 'Ben'], [3, 'Chloé']]) };
+  const over = [];
+  for (let wd = 0; wd < 7; wd++) {
+    const today = dayFromISO('2026-11-02') + wd;   // Monday, then each day after it
+    const sample = plan.rows((n) => (today + n) * 86400);
+    const rows = sample['@self'].map((r, i) => {
+      const v = Object.values(r);
+      const o = { id: i + 1 };
+      ids.forEach((id, k) => {
+        const c = cols.find((x) => x.id === id);
+        o[id] = c.kind === 'Date' ? ['d', v[k]] : c.kind === 'Ref' ? ['R', 'People', v[k]] : c.kind === 'RefList' ? (v[k].length ? ['L', ...v[k]] : null) : v[k];
+      });
+      return o;
+    });
+    const tasks = buildTasks(rows, { roles, columns: cols, labels }).tasks;
+    const people = sample[Object.keys(sample).find((k) => k !== '@self')];
+    const weekly = plan.tables[0].columns[1].id;
+    const capacity = new Map(people.map((p, i) => ['r:' + (i + 1), W.capacityPerDay(p[weekly], 'hours', 8)]));
+    const wl = W.buildWorkload(tasks, rows, { personCol: cols.find((c) => c.id === roles.assignee), labels, isWork: makeCalendar().isWork,
+      from: today, to: today + 40, effortCol: cols.find((c) => c.id === roles.effort), effortUnit: 'hours', capacity });
+    if (wl.overs.length) over.push(`weekday ${wd}: ${wl.overs.length} days over`);
+  }
+  eq('set up on any of the seven weekdays, nobody starts over capacity', over, []);
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.1
+
+- The Project plan starter no longer starts with someone over capacity. Set up on a Saturday or a
+  Sunday, its Design task asked Chloé for more hours than her five working days held. A test now
+  sets the starter up on each of the seven weekdays.
+- The workload reads more calmly. Numbers are regular weight and bold only when over; red is the one
+  warning colour and always comes with words (the amber "nearly full" meter is gone); weeks already
+  past are in quieter ink, since Level only moves what is still ahead.
+- On a phone the names column gives way, so three weeks show instead of one and a half, and a
+  person's "days over capacity" wraps instead of being cut off.
+- The workload's type sizes and weights follow the family's scale.
+
 ## 1.1.0
 
 The workload: who has too much on, when, and the moves that fix it.

@@ -20,7 +20,10 @@ import { t, tn } from '../../i18n/index.js';
 const HEAD_H = 50;
 const ROW_H = 58;
 const COL_W = { day: 64, week: 112, month: 124 };
-const resWidthFor = (w) => Math.round(Math.max(140, Math.min(230, w * 0.2)));
+// On a phone the names give way first, so three weeks still show rather than one and a half.
+const NARROW = 600;
+const COL_W_NARROW = { day: 56, week: 92, month: 104 };
+const resWidthFor = (w) => Math.round(w < NARROW ? Math.max(96, Math.min(130, w * 0.27)) : Math.max(140, Math.min(230, w * 0.2)));
 
 /** Hours as people write them in this language: 8, 7.5 (7,5 in German and French), at most one decimal. */
 const NUMBERS = new Map();
@@ -60,7 +63,7 @@ export function createWorkload(host, on = {}) {
 
   function size() {
     resW = resWidthFor(scroll.clientWidth || 900);
-    const base = COL_W[model.unit] || 112;
+    const base = ((scroll.clientWidth || 900) < NARROW ? COL_W_NARROW : COL_W)[model.unit] || 112;
     const n = Math.max(1, model.periods.length);
     colW = Math.round(Math.min(base * 1.8, Math.max(base, (Math.max(0, (scroll.clientWidth || 900) - resW) - 2) / n)));
     canvas.style.setProperty('--res-w', resW + 'px');
@@ -134,12 +137,14 @@ export function createWorkload(host, on = {}) {
     const day = model.unit === 'day';
     // A week can fit in total and still have days that do not: the cell says so.
     const overDays = !over && x.over > 0;
+    // What is past can no longer be levelled: it keeps its words, in quieter ink.
+    const past = model.periods[i].end < model.today;
     const text = x.cap == null ? hours(x.load) + ' h' : day ? `${hours(x.load)}/${hours(x.cap)}` : t('{load} of {cap} h', { load: hours(x.load), cap: hours(x.cap) });
     // The meter's track is the capacity (100 %); an overload runs past a tick at the end of it, up to half again.
     const fill = Math.min(1, ratio) * (over ? 100 / 1.5 : 100);
     const extra = over ? Math.min(0.5, ratio - 1) * (100 / 1.5) : 0;
     return el('div', {
-      ...base, class: 'ps-wl__cell' + (over ? ' is-over' : overDays || ratio > 0.85 ? ' is-high' : '') + (x.cap == null ? ' is-free' : '') + (x.off ? ' is-offday' : ''),
+      ...base, class: 'ps-wl__cell' + (over ? ' is-over' : overDays ? ' has-overdays' : '') + (x.cap == null ? ' is-free' : '') + (x.off ? ' is-offday' : '') + (past ? ' is-past' : ''),
       role: 'img', 'aria-label': `${name(p)}, ${periodLabel(model.periods[i], i)}: ${cellWords(p, x)}`,
     }, [
       el('span', { class: 'ps-wl__num', text }),
