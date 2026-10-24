@@ -29,6 +29,8 @@ const plan = (row, ctx, mode, a, b) => { const t = taskOf(row, ctx); return E.pl
   const row = { id: 1, T: 'a', S: D('2026-11-02'), E: D('2026-11-04') };
   eq('caps: everything', E.capabilities(taskOf(row, ctx), ctx), { move: true, start: true, end: true, draw: false });
   eq('move writes both, same length', plan(row, ctx, 'move', '2026-11-09', '2026-11-11').fields, { S: secs('2026-11-09'), E: secs('2026-11-11') });
+  // a push or a levelling in working days: Mon–Wed moved to Thursday keeps three working days, Thu–Mon
+  eq('move writes the end asked for, across a weekend', plan(row, ctx, 'move', '2026-11-05', '2026-11-09').fields, { S: secs('2026-11-05'), E: secs('2026-11-09') });
   eq('resize start', plan(row, ctx, 'start', '2026-11-01', '2026-11-04').fields, { S: secs('2026-11-01') });
   eq('resize end', plan(row, ctx, 'end', '2026-11-02', '2026-11-08').fields, { E: secs('2026-11-08') });
   eq('patch is the encoded cell', plan(row, ctx, 'end', '2026-11-02', '2026-11-08').patch, { E: ['d', secs('2026-11-08')] });
@@ -38,6 +40,7 @@ const plan = (row, ctx, mode, a, b) => { const t = taskOf(row, ctx); return E.pl
   eq('"end is the day after": the task still ends on the 4th', [iso(taskOf(rowX, excl).end)], ['2026-11-04']);
   eq('…and a resize writes the day after again', plan(rowX, excl, 'end', '2026-11-02', '2026-11-08').fields, { E: secs('2026-11-09') });
   eq('…a move shifts the stored day as it is', plan(rowX, excl, 'move', '2026-11-03', '2026-11-05').fields, { S: secs('2026-11-03'), E: secs('2026-11-06') });
+  eq('…and across a weekend stores the day after the end asked for', plan(rowX, excl, 'move', '2026-11-05', '2026-11-09').fields, { S: secs('2026-11-05'), E: secs('2026-11-10') });
   eq('read-only widget: nothing', E.capabilities(taskOf(row, ctx), { ...ctx, editable: false }), { move: false, start: false, end: false, draw: false });
   eq('…and a plan is refused', E.planDates(taskOf(row, ctx), row, { ...ctx, editable: false }, 'move', 1, 2), { error: 'notAllowed' });
 }

@@ -36,6 +36,11 @@ const BY_VIEW = {
     ['← → ↑ ↓', 'Move from cell to cell'],
     ['Enter', 'Book a free cell, or edit the booking'],
   ],
+  workload: [
+    ['← → ↑ ↓', 'Move from cell to cell'],
+    ['Enter', 'List the tasks behind the cell; Enter on one edits it'],
+    ['Esc', 'Close the list'],
+  ],
 };
 
 export function openKeys(host, view, on = {}) {

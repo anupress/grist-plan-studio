@@ -103,7 +103,7 @@ export async function loadLabels(columns, roles) {
 /**
  * Days off from a table: each row with a date is a day off, or a run of days when the row has a
  * second date column (an end). The first text column names it. Rows that name a person are skipped
- * here: personal absences belong to the workload view (M5), not to everyone's calendar.
+ * here: personal absences are that person's days off in the workload (loadDaysOff), not everyone's.
  * @returns {Promise<Map<number, string>>}
  */
 export async function loadHolidayDays(tableId) {
@@ -129,8 +129,39 @@ export async function loadHolidayDays(tableId) {
 }
 
 /**
- * A whole table with its columns: the booking grid's periods table, or the resources table its filter
- * reads (only rooms whose Type is Hall).
+ * The other half of a holidays table: the rows that DO name a person are that person's days off, for
+ * the workload. Keys are lane keys ('r:<id>' of the table the person column points at), so they match
+ * the workload's rows when its people come from the same table.
+ * @returns {Promise<{refTable: string|null, days: Map<string, Set<number>>}>}
+ */
+export async function loadDaysOff(tableId) {
+  const out = { refTable: null, days: new Map() };
+  if (!tableId) return out;
+  const m = await meta({ mustHave: tableId });
+  const cols = tableColumns(tableId, m.tables, m.columns);
+  const dates = cols.filter((c) => c.kind === 'Date' || c.kind === 'DateTime');
+  const personCol = cols.find((c) => c.kind === 'Ref' || c.kind === 'RefList');
+  if (!dates.length || !personCol) return out;
+  out.refTable = personCol.refTable;
+  const rows = await fetchRows(tableId);
+  for (const r of rows) {
+    const v = r[personCol.id];
+    const ids = Array.isArray(v) ? (v[0] === 'L' ? v.slice(1) : v[0] === 'R' ? [v[2]] : []) : typeof v === 'number' ? [v] : [];
+    const a = dayOf(r[dates[0].id], dates[0].type);
+    if (a == null) continue;
+    const b = dates[1] ? dayOf(r[dates[1].id], dates[1].type) : null;
+    for (const id of ids.filter((x) => typeof x === 'number' && x > 0)) {
+      const key = 'r:' + id;
+      if (!out.days.has(key)) out.days.set(key, new Set());
+      for (let d = a; d <= (b != null && b >= a ? Math.min(b, a + 366) : a); d++) out.days.get(key).add(d);
+    }
+  }
+  return out;
+}
+
+/**
+ * A whole table with its columns: the booking grid's periods table, the resources table its filter
+ * reads (only rooms whose Type is Hall), or the workload's people with their capacity.
  * @returns {Promise<{columns, rows} | null>}
  */
 export async function loadTable(tableId) {

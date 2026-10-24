@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.1.0
+
+The workload: who has too much on, when, and the moves that fix it.
+Tested in Grist 1.7.20 on docs.getgrist.com and in Grist Desktop 0.3.16 on Windows.
+
+### Workload
+
+- A fifth view: a row for each person (the Assigned to column, or any other), days, weeks or months
+  across, and in each cell the hours asked of that person against the hours they have, over a meter
+  that fills to capacity. Past it, the cell says how many hours over.
+- Hours come from an "Hours of work" column (found by name: Hours, Estimate, Aufwand, Charge…; read as
+  person-days when the name says days), spread over the task's working days and split between its
+  people. Without one, each task takes a full working day of each of its people, and the view says
+  that is what it assumes. Done tasks, parent tasks and milestones without hours ask for nothing.
+- Capacity is 8 hours on every working day (set in Columns), scaled by a column of the people table:
+  hours a week (40, 24) or a share (0.5, 50 %). Weekends, public holidays and the days of a holidays
+  table count as zero, and a row of that table that names a person is that person's day off.
+- A week that fits in total but has days that do not says "3 days over". The toolbar counts the
+  days over capacity from today on and jumps to the first.
+- Click a cell for the tasks behind it, with their hours; Enter on one edits it. The keyboard moves
+  from cell to cell, and a screen reader hears "Chloé, W45 · 2 Nov: 36 of 40 hours, but 3 days are
+  over capacity".
+- **Level** moves tasks later until nobody is over. Only tasks that take part in an overload move,
+  each inside its slack: it still ends before anything that waits for it, before its due date and
+  by the end of the plan, so no other task has to move. A task that has started, is done, is a
+  milestone or a parent, or has dates from formulas never moves. The moves are listed first and
+  written as one action, so one Undo takes them all back; what cannot be fixed that way is said.
+- Prints like the other views, on A4 or A3.
+
+### Also
+
+- "Add a column for it" can add an Hours column. The Project plan starter now has Hours on its tasks
+  and Hours per week on its People.
+- Fix: with working days on, a task pushed along by another's move kept its length in calendar days
+  and could end a day or two off across a weekend. A move now writes the end that keeps its working
+  days.
+- Week numbers in the booking grid follow the week's middle day: a week that starts on Sunday 25 Oct
+  is W44, not W43.
+
 ## 1.0.0
 
 First public release. Versions below 1.0.0 were development builds and were never published.

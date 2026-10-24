@@ -1,11 +1,11 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
-**board** or a **booking grid**, and writes every change straight back to that table. It maps onto
+**board**, a **booking grid** or a **workload**, and writes every change straight back to that table. It maps onto
 your own columns, follows Grist's filters and linking, prints to PDF, and runs entirely in the
 viewer's browser: there is no server, and nothing leaves your document.
 
@@ -26,7 +26,7 @@ Opened in a plain browser tab, the widget runs on sample data and saves nothing:
 - **[Pop-up stores over weekends](https://anupress.github.io/grist-plan-studio/?example=stores)**:
   the booking grid, with no dates at all
 
-## The four views
+## The five views
 
 | View | Rows are | What you do in it |
 |---|---|---|
@@ -34,12 +34,31 @@ Opened in a plain browser tab, the widget runs on sample data and saves nothing:
 | **Timeline** | a band per person, room or project | drag a bar to another band to reassign it, or along it to move its dates |
 | **Board** | cards in a lane per status, person or any other column | drag cards between and within lanes, add cards, set lane limits |
 | **Booking grid** | resources × days, weeks, months or your own periods | see free cells counted per period, click one to book it, spot double bookings |
+| **Workload** | people × days, weeks or months, hours against capacity | see who is over and when, list the tasks behind a cell, **Level** the plan |
 
 ![The same plan as a board, a lane per status](docs/images/board.png)
 
 ![Pop-up stores × weekends in the booking grid, free cells counted per weekend](docs/images/booking-grid.png)
 
 ![The timeline, a band per person](docs/images/timeline.png)
+
+![The workload: hours against capacity per person and week, with the days over capacity said in words](docs/images/workload.png)
+
+## Workload and levelling
+
+Each person gets a row, and each cell the hours asked of them against the hours they have. Hours come
+from an **Hours of work** column (or person-days, when its name says days), spread over the task's
+working days and split between its people; without one, each task takes a full working day of each of
+its people, and the view says it assumes so. Capacity is 8 hours on every working day (set in
+**Columns**), scaled by a column of the people table: hours a week (40, 24) or a share (0.5, 50 %).
+Weekends, public holidays and a holidays table count as days off; a row of that table that names a
+person is that person's day off.
+
+**Level** moves tasks later until nobody is over capacity. Only tasks that take part in an overload
+move, each inside its slack: it still ends before anything that waits for it, before its due date and
+by the end of the plan, so no other task has to move. Tasks that have started, are done, are milestones
+or parents, or have dates from formulas stay where they are. You see the moves before anything is
+written, and one Undo takes them all back.
 
 ## Use it in Grist
 
@@ -70,6 +89,8 @@ reason.
 **Linking works both ways.** Select by a People or Projects list and the widget narrows to it; new
 tasks, cards and bookings get the selected value so they stay in view. Picking a task moves Grist's
 cursor, so a linked card shows it.
+
+Plan Studio works the same in **Grist Desktop** (tested in 0.3.16 on Windows).
 
 **Self-hosted Grist** can offer Plan Studio, Advanced Charts and Invoice Studio in its Custom widget
 picker, with nothing to paste: start Grist with `GRIST_WIDGET_LIST_URL` set to
@@ -115,7 +136,7 @@ powershell -ExecutionPolicy Bypass -File scripts/serve.ps1 -Port 4181
 
 ```bash
 npm install
-npm test        # version check, shared-core check, 16 test suites, no framework
+npm test        # version check, shared-core check, 17 test suites, no framework
 npm run build   # esbuild + obfuscator into dist/, which CI deploys to Pages
 ```
 
@@ -142,8 +163,8 @@ npm run sync:list    # what is shared, and where each file lands
 src/core/       copied from Advanced Charts, read-only
 src/grist/      the connection to Grist: one ready(), rows in Grist's encoded form
 src/data/       the document's tables, columns and references
-src/model/      roles, tasks, edits, scheduling, lanes, board, booking, templates (pure, tested)
-src/views/      gantt/, timeline/, board/, booking/
+src/model/      roles, tasks, edits, scheduling, lanes, board, booking, workload, templates (pure, tested)
+src/views/      gantt/, timeline/, board/, booking/, workload/
 src/print/      page layout and the printed views
 src/ui/         toolbar, Columns panel, quick edit, dialogs, keys
 src/i18n/       English keys, German and French tables

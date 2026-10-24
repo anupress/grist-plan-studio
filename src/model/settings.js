@@ -2,14 +2,14 @@
 //
 // In the widget's options (saved in the document, shared by everyone who opens the page, written
 // only when someone presses Save in the Columns panel): the column mapping, how dates are read,
-// which view the widget opens in, what a board card shows and the lanes' limits, and the booking
-// grid's periods table and cell label.
+// which view the widget opens in, what a board card shows and the lanes' limits, the booking grid's
+// periods table and cell label, and the workload's working day and capacity column.
 // Writing options is a document action, so nothing that changes while someone merely looks around
 // (zoom, scroll position) goes there.
 //
 // In this browser (localStorage): per table, the zoom level, the grouping, whether the critical path
-// is shown, which parents and groups are folded, the board's lane column and the view last switched
-// to; and the interface language.
+// is shown, which parents and groups are folded, the board's lane column, the workload's rows and
+// periods, and the view last switched to; and the interface language.
 
 export const SETTINGS_VERSION = 1;
 
@@ -32,7 +32,12 @@ export const BOOKING_DEFAULTS = Object.freeze({
   periodTable: null,        // a table id whose dated rows are the grid's columns, or null
   labelBy: null,            // {ref, id} of the column a booking shows, or null (its name)
 });
-export const VIEWS = ['gantt', 'timeline', 'board', 'booking'];
+export const WORKLOAD_DEFAULTS = Object.freeze({
+  hoursPerDay: 8,           // a normal working day, in hours
+  capacity: null,           // {ref, id} of the people table's capacity column (hours a week or a share), or null (guessed)
+  effortUnit: 'auto',       // the Hours of work column counts 'hours' or 'days'; 'auto' reads its name
+});
+export const VIEWS = ['gantt', 'timeline', 'board', 'booking', 'workload'];
 const REGION = /^(DE(-[A-Z]{2})?|AT|CH|FR|UK-EW|US)$/;
 
 /** Widget options as Grist returns them (or null) -> {roles (stored form or null), gantt}. */
@@ -59,18 +64,24 @@ export function readOptions(options) {
   const booking = { ...BOOKING_DEFAULTS };
   if (typeof k.periodTable === 'string' && k.periodTable) booking.periodTable = k.periodTable;
   if (k.labelBy && typeof k.labelBy === 'object' && typeof k.labelBy.id === 'string') booking.labelBy = { ref: k.labelBy.ref, id: k.labelBy.id };
+  const w = o.workload && typeof o.workload === 'object' ? o.workload : {};
+  const workload = { ...WORKLOAD_DEFAULTS };
+  if (typeof w.hoursPerDay === 'number' && w.hoursPerDay > 0 && w.hoursPerDay <= 24) workload.hoursPerDay = w.hoursPerDay;
+  if (w.capacity && typeof w.capacity === 'object' && typeof w.capacity.id === 'string') workload.capacity = { ref: w.capacity.ref, id: w.capacity.id };
+  if (w.effortUnit === 'hours' || w.effortUnit === 'days' || w.effortUnit === 'auto') workload.effortUnit = w.effortUnit;
   const view = VIEWS.includes(o.view) ? o.view : 'auto';
-  return { roles: o.roles && typeof o.roles === 'object' ? o.roles : null, gantt, board, booking, view };
+  return { roles: o.roles && typeof o.roles === 'object' ? o.roles : null, gantt, board, booking, workload, view };
 }
 
 /** What Save writes. Other keys already in the options (from a later version) are kept. */
-export function writeOptions(previous, { storedRoles, gantt, board, booking, view }) {
+export function writeOptions(previous, { storedRoles, gantt, board, booking, workload, view }) {
   const prev = previous && typeof previous === 'object' ? previous : {};
   const out = { ...prev, v: SETTINGS_VERSION };
   if (storedRoles !== undefined) out.roles = storedRoles;
   if (gantt) out.gantt = { ...gantt };
   if (board) out.board = { ...board, wip: { ...board.wip } };
   if (booking) out.booking = { ...booking };
+  if (workload) out.workload = { ...workload };
   if (view !== undefined) out.view = view;
   return out;
 }
@@ -90,7 +101,8 @@ const viewKey = (tableId) => 'planStudio.view.' + (tableId || 'demo');
 
 /**
  * {groupBy, critical, collapsed, laneBy (board), tlLaneBy (timeline), bookRows, bookPeriods ('day' | 'week' |
- *  'month' | 'col:<colId>' | 'table:<tableId>'), bookFilter ('<colId>=<value>')}; the column ids are null when not chosen
+ *  'month' | 'col:<colId>' | 'table:<tableId>'), bookFilter ('<colId>=<value>'), wlRows, wlUnit ('day' | 'week' | 'month')};
+ *  the column ids are null when not chosen
  */
 export function storedView(tableId) {
   const v = local(viewKey(tableId), {});
@@ -103,6 +115,8 @@ export function storedView(tableId) {
     bookRows: typeof v.bookRows === 'string' ? v.bookRows : null,
     bookPeriods: typeof v.bookPeriods === 'string' ? v.bookPeriods : null,
     bookFilter: typeof v.bookFilter === 'string' ? v.bookFilter : null,
+    wlRows: typeof v.wlRows === 'string' ? v.wlRows : null,
+    wlUnit: ['day', 'week', 'month'].includes(v.wlUnit) ? v.wlUnit : null,
   };
 }
 export function rememberView(tableId, view) { keep(viewKey(tableId), view); }

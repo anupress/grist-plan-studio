@@ -79,7 +79,8 @@ export function createBooking(host, on = {}) {
     if (model.unit === 'table' || model.unit === 'column') return [p.label || shortRange(p), p.label && p.start != null ? shortRange(p) : null];
     const d = dateFromDay(p.start);
     if (model.unit === 'day') return [F.weekdayDay.format(d) + (i === 0 || d.getUTCDate() === 1 ? ' · ' + F.monthShort.format(d) : ''), null];
-    if (model.unit === 'week') return [t('W{n}', { n: isoWeek(p.start).week }) + ' · ' + F.dayMonth.format(d), null];
+    // numbered by its middle day: a week from Sunday 25 Oct is mostly ISO week 44, not 43
+    if (model.unit === 'week') return [t('W{n}', { n: isoWeek(p.start + 3).week }) + ' · ' + F.dayMonth.format(d), null];
     return [F.monthYearShort.format(d), null];
   }
   /** "6–21 Oct", with the year only when it is not this one */

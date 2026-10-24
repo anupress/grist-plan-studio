@@ -120,14 +120,16 @@ export function planDates(task, row, ctx, mode, start, end) {
   }
 
   if (mode === 'move') {
-    const delta = start - task.start;
     putDay(out, startCol, start, row[startCol.id]);
-    // The end moves with the start when it is a cell of its own; a duration or a formula follows by itself.
+    // The end moves to the end asked for when it is a cell of its own; a duration or a formula follows by
+    // itself. A drag asks for the same shift as the start; a push or a levelling in working days asks
+    // for the end that keeps the task's working days, which can be a different shift across a weekend.
+    const endDelta = end - task.end;
     for (const role of ['end', 'due']) {
       const col = writableCol(ctx, role);
       if (!col || (task.endFrom !== role && !(task.kind === 'milestone' && role === 'end'))) continue;
       const raw = dayOf(row[col.id], col.type);
-      if (raw != null) putDay(out, col, raw + delta, row[col.id]);
+      if (raw != null) putDay(out, col, raw + endDelta, row[col.id]);
     }
     return out;
   }

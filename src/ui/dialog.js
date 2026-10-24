@@ -31,14 +31,22 @@ export function trapFocus(container, onEscape) {
   };
 }
 
-export function confirmBox(host, { title, body, ok, cancel = t('Cancel') }) {
+/**
+ * A yes/no question. `items` ([main, detail] pairs) are listed under the body, such as the moves a
+ * levelling proposes; `note` is a last line in muted text.
+ */
+export function confirmBox(host, { title, body, ok, cancel = t('Cancel'), items = null, note = null }) {
   return new Promise((resolve) => {
     const done = (v) => { release(); scrim.remove(); box.remove(); resolve(v); };
     const scrim = el('div', { class: 'ps-scrim', onclick: () => done(false) });
     const okBtn = el('button', { type: 'button', class: 'ps-btn ps-btn--primary', text: ok, onclick: () => done(true) });
-    const box = el('div', { class: 'ps-dialog', role: 'alertdialog', 'aria-modal': 'true', 'aria-labelledby': 'ps-dlg-t', 'aria-describedby': 'ps-dlg-b' }, [
+    const box = el('div', { class: 'ps-dialog' + (items ? ' ps-dialog--list' : ''), role: 'alertdialog', 'aria-modal': 'true', 'aria-labelledby': 'ps-dlg-t', 'aria-describedby': 'ps-dlg-b' }, [
       el('h2', { id: 'ps-dlg-t', text: title }),
       el('p', { id: 'ps-dlg-b', text: body }),
+      items?.length ? el('ul', { class: 'ps-dialog__list' }, items.map(([main, detail]) => el('li', {}, [
+        el('span', { class: 'ps-dialog__item', text: main }), detail ? el('span', { class: 'ps-dialog__detail', text: detail }) : null,
+      ]))) : null,
+      note ? el('p', { class: 'ps-dialog__note', text: note }) : null,
       el('div', { class: 'ps-dialog__foot' }, [el('button', { type: 'button', class: 'ps-btn', text: cancel, onclick: () => done(false) }), okBtn]),
     ]);
     host.append(scrim, box);

@@ -161,5 +161,18 @@ eq('trailing underscore', norm('Completed_'), 'completed');
   eq('a rent increase in percent is not progress', detectRoles(columnsFromFixture(leases.columns), { tableId: 'Leases' }).roles.progress, undefined);
 }
 
+// ---- hours of work (M9) ------------------------------------------------------------------------------
+{
+  const roleOf = (cols) => detectRoles(columnsFromFixture([{ id: 'Task', type: 'Text' }, { id: 'Start', type: 'Date' }, ...cols]), { tableId: 'T' }).roles;
+  eq('Estimated hours is the effort', roleOf([{ id: 'Estimated_hours', type: 'Numeric' }]).effort, 'Estimated_hours');
+  eq('Aufwand (h) is the effort', roleOf([{ id: 'Aufwand', type: 'Numeric', label: 'Aufwand (h)' }]).effort, 'Aufwand');
+  eq('Charge estimée is the effort', roleOf([{ id: 'Charge_estimee', type: 'Numeric', label: 'Charge estimée' }]).effort, 'Charge_estimee');
+  eq('Person days is the effort, not the duration', roleOf([{ id: 'Person_days', type: 'Numeric' }]), { title: 'Task', start: 'Start', effort: 'Person_days' });
+  eq('hours already spent are not', roleOf([{ id: 'Actual_hours', type: 'Numeric' }]).effort, undefined);
+  eq('hours a week are not', roleOf([{ id: 'Hours_per_week', type: 'Numeric' }]).effort, undefined);
+  eq('Days stays the duration', roleOf([{ id: 'Days', type: 'Int' }]), { title: 'Task', start: 'Start', duration: 'Days' });
+  eq('a text column is never the effort', roleOf([{ id: 'Hours', type: 'Text' }]).effort, undefined);
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

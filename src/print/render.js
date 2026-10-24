@@ -203,6 +203,60 @@ export function renderBookingPrint(s) {
   return root;
 }
 
+/**
+ * The workload on paper: a person per row, a period per column, and in each cell the hours asked
+ * against the hours there are, "6 over" in words where it is too much. Columns share the pages as in
+ * the booking grid; a day with no capacity is grey.
+ * @param s {title, subtitle, paper, rowHeader, locale, periods: [{label, sub}],
+ *           people: [{name, perWeek (null for "not assigned"), overDays, cells: [{load, cap, over, off}]}]}
+ */
+export function renderWorkloadPrint(s) {
+  const page = pageArea(s.paper);
+  const nameW = Math.round(42 * MM);
+  const pages = periodPages(s.periods.length, page.w - nameW, 20 * MM);
+  const nf = new Intl.NumberFormat(s.locale, { maximumFractionDigits: 1 });
+  const h = (x) => nf.format(Math.round(x * 10) / 10);
+  const root = el('div', { class: 'pp-root' });
+  pages.forEach(([a, b], pi) => {
+    const n = b - a + 1;
+    const colW = Math.floor((page.w - nameW) / Math.max(1, pages[0][1] - pages[0][0] + 1));
+    const sub = pages.length > 1 ? `${s.subtitle} · ${t('page {n} of {m}', { n: pi + 1, m: pages.length })}` : s.subtitle;
+    const sheet = el('table', { class: 'pp-sheet pp-grid pp-wl' + (pi ? ' pp-break' : ''), style: { width: nameW + n * colW + 'px' } });
+    sheet.appendChild(el('colgroup', {}, [el('col', { style: { width: nameW + 'px' } }), ...s.periods.slice(a, b + 1).map(() => el('col', { style: { width: colW + 'px' } }))]));
+    sheet.appendChild(el('thead', {}, [
+      titleRow({ ...s, subtitle: sub }, n + 1),
+      el('tr', { class: 'pp-headrow' }, [
+        el('th', { class: 'pp-name pp-name--head', text: s.rowHeader || '' }),
+        ...s.periods.slice(a, b + 1).map((p) => el('th', { class: 'pp-period' }, [
+          el('span', { class: 'pp-period__label', text: p.label }), p.sub ? el('span', { class: 'pp-period__sub', text: p.sub }) : null,
+        ])),
+      ]),
+    ]));
+    const body = el('tbody');
+    for (const p of s.people) {
+      const cells = [el('td', { class: 'pp-name' }, [
+        el('span', { class: 'pp-name__label', text: p.name }),
+        p.overDays ? el('span', { class: 'pp-name__clash', text: tn(p.overDays, '{n} day over capacity', '{n} days over capacity') })
+          : p.perWeek != null ? el('span', { class: 'pp-name__sub', text: t('{h} h a week', { h: h(p.perWeek) }) }) : null,
+      ])];
+      for (const x of p.cells.slice(a, b + 1)) {
+        const over = x.cap != null && x.load > x.cap + 0.02;
+        if (x.load <= 0.02) { cells.push(el('td', { class: x.off ? 'pp-off' : 'pp-empty' })); continue; }
+        // a week can fit in total and still have days that do not, as on screen
+        const overDays = !over && x.over > 0;
+        cells.push(el('td', { class: 'pp-load' + (over ? ' is-over' : overDays ? ' has-overdays' : '') }, [
+          el('span', { text: x.cap == null ? h(x.load) + ' h' : t('{load} of {cap} h', { load: h(x.load), cap: h(x.cap) }) }),
+          over ? el('span', { class: 'pp-flag', text: ' · ' + t('{h} over', { h: h(x.load - x.cap) }) }) : overDays ? el('span', { class: 'pp-flag', text: ' · ' + tn(x.over, '{n} day over', '{n} days over') }) : null,
+        ]));
+      }
+      body.appendChild(el('tr', { class: 'pp-row pp-row--last' }, cells));
+    }
+    sheet.appendChild(body);
+    root.appendChild(sheet);
+  });
+  return root;
+}
+
 /** "Gantt chart · 21 tasks · printed 24 Oct 2026" */
 export function subtitleFor(view, count, locale, today) {
   const printed = new Intl.DateTimeFormat(locale, { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' }).format(dateFromDay(today));

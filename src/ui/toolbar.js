@@ -1,6 +1,7 @@
 // The strip above the views: which view, what is shown, and that view's own controls (zoom, Fit,
 // Today and New task for the Gantt chart; lanes and zoom for the timeline; the lane column for the
-// board; rows, periods and a filter for the booking grid), plus the Columns panel.
+// board; rows, periods and a filter for the booking grid; rows, periods and Level for the workload), plus
+// the Columns panel.
 
 import { el, clear } from '../core/util.js';
 import { ZOOM_ORDER } from '../views/gantt/layout.js';
@@ -9,7 +10,8 @@ import { ANUPRESS_LOGO } from '../core/assets/brand-logo.js';
 import { VERSION } from '../version.js';
 
 const ZOOM_LABELS = { day: 'Days', week: 'Weeks', month: 'Months', quarter: 'Quarters', year: 'Years' };
-const VIEW_LABELS = { gantt: 'Gantt', timeline: 'Timeline', board: 'Board', booking: 'Bookings' };
+const VIEW_LABELS = { gantt: 'Gantt', timeline: 'Timeline', board: 'Board', booking: 'Bookings', workload: 'Workload' };
+const WL_UNIT_LABELS = { day: 'Days', week: 'Weeks', month: 'Months' };
 
 const seg = (label, items, current, onPick) => el('div', { class: 'ps-seg', role: 'group', 'aria-label': label }, items.map(([id, text]) => el('button', {
   type: 'button', class: 'ps-seg__btn' + (id === current ? ' is-on' : ''), 'aria-pressed': id === current ? 'true' : 'false',
@@ -28,11 +30,12 @@ const button = (text, title, onclick, cls = '') => el('button', { type: 'button'
 /**
  *   level: 'full' (default); 'switch' when the view shows a message instead (only the view switch and Columns);
  *   'bare' before the widget can work at all (the brand and the mode only)
- * @param {{level, mode, zoom, counts: {tasks, unscheduled, flagged, cards, bookings, clashes, outside}, demo, editable,
+ * @param {{level, mode, zoom, counts: {tasks, unscheduled, flagged, cards, bookings, clashes, outside, overloads, noHours}, demo, editable,
  *          readOnlyWhy, canAdd, groupOptions, groupBy, hasLinks, critical, laneOptions, laneBy, tlLaneOptions, tlLaneBy,
- *          rowOptions, rowsBy, periodOptions, periodsBy, filterOptions, filterBy, examples, example}} s
+ *          rowOptions, rowsBy, periodOptions, periodsBy, filterOptions, filterBy, wlRowOptions, wlRowsBy, wlUnit, canLevel,
+ *          examples, example}} s
  * @param {{onMode, onZoom, onFit, onToday, onColumns, onNew, onUndated, onGroup, onCritical, onLanes, onTlLanes,
- *          onRows, onPeriods, onFilter, onClash, onExample, onPrint, onKeys}} on
+ *          onRows, onPeriods, onFilter, onClash, onWlRows, onWlUnit, onLevel, onOverload, onExample, onPrint, onKeys}} on
  */
 export function renderToolbar(host, s, on) {
   const view = s.mode;
@@ -44,6 +47,12 @@ export function renderToolbar(host, s, on) {
     counts.push(el('span', { text: tn(c.bookings, '{n} booking', '{n} bookings') }));
     if (c.clashes) counts.push(el('button', { type: 'button', class: 'ps-link ps-warn', text: tn(c.clashes, '{n} double booked', '{n} double booked'), title: t('Show the first one'), onclick: on.onClash }));
     if (c.outside) counts.push(el('span', { text: tn(c.outside, '{n} not in these columns', '{n} not in these columns'), title: t('Bookings outside these periods, or with no value in the period column') }));
+  } else if (view === 'workload') {
+    counts.push(el('span', { text: tn(c.tasks, '{n} task', '{n} tasks') }));
+    counts.push(c.overloads
+      ? el('button', { type: 'button', class: 'ps-link ps-warn', text: tn(c.overloads, '{n} day over capacity', '{n} days over capacity'), title: t('From today on. Show the first one.'), onclick: on.onOverload })
+      : el('span', { class: 'ps-ok', text: t('nobody over capacity') }));
+    if (c.noHours) counts.push(el('span', { text: tn(c.noHours, '{n} without hours', '{n} without hours'), title: t('Tasks whose Hours of work cell is empty count for nothing here.') }));
   } else {
     counts.push(el('span', { text: tn(c.tasks, '{n} task', '{n} tasks') }));
     if (c.unscheduled) {
@@ -84,6 +93,13 @@ export function renderToolbar(host, s, on) {
         s.periodOptions?.length ? picker(t('Columns are'), t('A column for each'), s.periodOptions, s.periodsBy, on.onPeriods) : null,
         // Weekend 1, 2, 3 have no dates, so there is no today to scroll to.
         s.periodsBy?.startsWith('col:') ? null : button(t('Today'), t('Scroll to today'), on.onToday),
+      ];
+    } else if (view === 'workload') {
+      tools = [
+        s.canLevel ? button(t('Level'), t('Move tasks later, inside their slack, until nobody is over capacity. You see the moves first.'), on.onLevel, ' ps-btn--primary') : null,
+        s.wlRowOptions?.length ? picker(t('Rows'), t('A row for each'), s.wlRowOptions, s.wlRowsBy, on.onWlRows) : null,
+        seg(t('Periods'), Object.entries(WL_UNIT_LABELS).map(([u, label]) => [u, t(label)]), s.wlUnit, on.onWlUnit),
+        button(t('Today'), t('Scroll to today'), on.onToday),
       ];
     }
   }

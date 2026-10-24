@@ -1,5 +1,5 @@
 // Plan Studio entry point: connect, work out the roles, build tasks, arrange them, draw them as a Gantt
-// chart, a timeline, a board or a booking grid, and write edits back.
+// chart, a timeline, a board, a booking grid or a workload, and write edits back.
 //
 // Two sources feed the same code: a real Grist (rows pushed by onRecords, everything else read with
 // full access) or the demo (src/demo/sample.js), used whenever no Grist answers. In the demo every
@@ -11,22 +11,23 @@ import {
   start, accessLevel, selectedTableId, gristCulture, getOptions, setOptions, moveCursor, apply, linkingInfo,
   openRecordCard, undo as gristUndo, redo as gristRedo,
 } from './grist/connect.js';
-import { loadColumns, loadForeignMapping, loadLabels, loadOwnSection, loadHolidayDays, listDatedTables, loadTable, listTables, columnRefs, forgetMeta } from './data/live.js';
+import { loadColumns, loadForeignMapping, loadLabels, loadOwnSection, loadHolidayDays, loadDaysOff, listDatedTables, loadTable, listTables, columnRefs, forgetMeta } from './data/live.js';
 import { templates, structureActions, dataActions, columnForRole } from './model/templates.js';
 import { detectRoles, ganttReady, fromStored, toStored } from './model/roles.js';
 import { buildTasks, spanOf } from './model/tasks.js';
 import { arrange } from './model/tree.js';
 import { linksOf, isLate, pushPlan, criticalPath, wouldLoop } from './model/schedule.js';
 import { makeCalendar, holidaysBetween } from './model/calendar.js';
-import { todayDay, dateFromDay, plain } from './model/values.js';
+import { todayDay, dateFromDay, plain, dayOf } from './model/values.js';
 import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink } from './model/edits.js';
-import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, VIEWS } from './model/settings.js';
+import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, VIEWS } from './model/settings.js';
 import { buildBoard, planCardMove, newCardFields, cellText, LANE_KINDS, FIELD_KINDS } from './model/board.js';
 import { LANE_KINDS as TL_KINDS, planLaneChange } from './model/lanes.js';
 import { buildTimeline } from './model/timeline.js';
 import { buildBooking, calendarPeriods, tablePeriods, columnPeriods, bookingRange, suggestUnit, planBookingMove, newBookingFields, PERIOD_UNITS } from './model/booking.js';
+import { buildWorkload, periodTotals, teamTotals, tasksIn, levelPlan, effortUnitOf, detectCapacity, capacityMode, capacityPerDay, WL_UNITS } from './model/workload.js';
 import { ZOOM_ORDER, ZOOMS, fitZoom, isoWeek } from './views/gantt/layout.js';
-import { renderTimePrint, renderBoardPrint, renderBookingPrint, subtitleFor } from './print/render.js';
+import { renderTimePrint, renderBoardPrint, renderBookingPrint, renderWorkloadPrint, subtitleFor } from './print/render.js';
 import { pageRule } from './print/layout.js';
 import { openPrint } from './ui/printpanel.js';
 import { openKeys } from './ui/keys.js';
@@ -34,24 +35,27 @@ import { createGantt } from './views/gantt/view.js';
 import { createBoard } from './views/board/view.js';
 import { createTimeline } from './views/timeline/view.js';
 import { createBooking } from './views/booking/view.js';
+import { createWorkload } from './views/workload/view.js';
 import { renderToolbar } from './ui/toolbar.js';
 import { openMapping } from './ui/mapping.js';
 import { openQuickEdit } from './ui/quickedit.js';
 import { confirmBox, numberBox } from './ui/dialog.js';
 import { t, tn, setLanguage, storedLanguage, dateLocale, weekStartOf } from './i18n/index.js';
-import { SAMPLE_COLUMNS, SAMPLE_LABELS, SAMPLE_TABLE, sampleRows } from './demo/sample.js';
+import { SAMPLE_COLUMNS, SAMPLE_LABELS, SAMPLE_TABLE, SAMPLE_PEOPLE, sampleRows, sampleDaysOff } from './demo/sample.js';
 import { STORES_COLUMNS, STORES_LABELS, STORES_TABLE, STORES_RESOURCES, storesRows } from './demo/stores.js';
 import { SPEED_COLUMNS, SPEED_LABELS, SPEED_TABLE, speedRows } from './demo/speed.js';
 
 const S = {
   live: false, demo: false, ready: false,
   tableId: null, columns: [], roles: {}, source: { kind: 'names' },
-  options: null, gantt: { ...GANTT_DEFAULTS }, board: { ...BOARD_DEFAULTS, wip: {} }, booking: { ...BOOKING_DEFAULTS },
+  options: null, gantt: { ...GANTT_DEFAULTS }, board: { ...BOARD_DEFAULTS, wip: {} }, booking: { ...BOOKING_DEFAULTS }, workload: { ...WORKLOAD_DEFAULTS },
   periodTable: null, resourceTable: null,   // the booking grid's periods table and resources table, {columns, rows}
+  peopleTable: null,                        // the workload's people with their capacity, {columns, rows}
+  daysOff: { refTable: null, days: new Map() },   // people's own days off, from the holidays table
   opensAs: 'auto', mode: 'gantt',   // the view the widget opens in (saved), and the one shown now
   rows: [], labels: {}, holidayDays: new Map(), built: null, signature: '',
   zoom: null, fitNext: false, selectedId: null, firstDraw: true,
-  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null },   // this browser's view of this table
+  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null },   // this browser's view of this table
   example: 'plan',     // the demo's data: 'plan' (a website relaunch) or 'stores' (pop-up stores × weekends)
   pendingEdit: null,   // {id, note}: open quick edit once Grist sends this new row
 };
@@ -85,13 +89,15 @@ let view = null;        // the Gantt chart, when it is the view shown
 let boardView = null;   // the board, when it is
 let timelineView = null;
 let bookingView = null;
-const current = () => view || boardView || timelineView || bookingView;
-/** Take down every view but `keep` ('gantt', 'board', 'timeline', 'booking'; null for all). */
+let workloadView = null;
+const current = () => view || boardView || timelineView || bookingView || workloadView;
+/** Take down every view but `keep` ('gantt', 'board', 'timeline', 'booking', 'workload'; null for all). */
 function dropOthers(keep) {
   if (keep !== 'gantt') dropView();
   if (keep !== 'board') dropBoard();
   if (keep !== 'timeline' && timelineView) { timelineView.destroy(); timelineView = null; S.signature = ''; S.firstDraw = true; }
   if (keep !== 'booking' && bookingView) { bookingView.destroy(); bookingView = null; S.signature = ''; S.firstDraw = true; }
+  if (keep !== 'workload' && workloadView) { workloadView.destroy(); workloadView = null; S.signature = ''; S.firstDraw = true; }
 }
 function ensureView() {
   if (view) return view;
@@ -159,6 +165,19 @@ function ensureBooking() {
     onRedo: () => redo(),
   });
   return bookingView;
+}
+function ensureWorkload() {
+  if (workloadView) return workloadView;
+  dropOthers('workload');
+  clear(stage);
+  workloadView = createWorkload(stage, {
+    onSelect: (id) => select(id, { tellGrist: true, reveal: false }),
+    onQuickEdit: (id) => openQuick(id),
+    onAnnounce: (text) => announce(text),
+    onUndo: () => undo(),
+    onRedo: () => redo(),
+  });
+  return workloadView;
 }
 
 /** A message in place of the view; `actions` are [label, run] buttons, the first one the main one. */
@@ -311,6 +330,45 @@ function bookFilterOptions() {
   return out;
 }
 
+// ---- the workload's columns -------------------------------------------------------------------------------
+const wlRowable = (c) => TL_KINDS.includes(c.kind) && c.refTable !== S.tableId && c.id !== S.roles.title;
+/** The workload's rows: this browser's choice, else the people the tasks are assigned to. */
+function wlRowCol() {
+  const picked = colById(S.view.wlRows);
+  if (picked && wlRowable(picked)) return picked;
+  const who = colById(S.roles.assignee);
+  return who && wlRowable(who) ? who : null;
+}
+const wlUnit = () => (WL_UNITS.includes(S.view.wlUnit) ? S.view.wlUnit : 'week');
+const effortCol = () => { const c = colById(S.roles.effort); return c && (c.kind === 'Numeric' || c.kind === 'Int') ? c : null; };
+/** The people table's capacity column: the one saved in Columns, else one whose name says so. */
+function capacityCol() {
+  const cols = S.peopleTable?.columns || [];
+  const saved = S.workload.capacity ? cols.find((c) => c.ref === S.workload.capacity.ref) || cols.find((c) => c.id === S.workload.capacity.id) : null;
+  if (saved && (saved.kind === 'Numeric' || saved.kind === 'Int')) return saved;
+  const guess = detectCapacity(cols);
+  return guess ? cols.find((c) => c.id === guess.id) : null;
+}
+/** Each person's hours on a working day, by row key, from the capacity column. */
+function capacityMap(personCol) {
+  const out = new Map();
+  const col = personCol?.refTable && S.peopleTable ? capacityCol() : null;
+  if (!col) return out;
+  const mode = capacityMode(col, S.peopleTable.rows.map((r) => r[col.id]));
+  for (const r of S.peopleTable.rows) out.set('r:' + r.id, capacityPerDay(r[col.id], mode, S.workload.hoursPerDay));
+  return out;
+}
+/** What the workload model needs, for these rows. */
+function wlContext(personCol) {
+  const cal = calendar();
+  const eff = effortCol();
+  return {
+    personCol, labels: S.labels, isWork: cal.isWork, hoursPerDay: S.workload.hoursPerDay,
+    effortCol: eff, effortUnit: effortUnitOf(eff, S.workload.effortUnit), capacity: capacityMap(personCol),
+    daysOff: personCol.refTable && S.daysOff.refTable === personCol.refTable ? S.daysOff.days : new Map(),
+  };
+}
+
 /** Every column whose References need labels: the roles' and those of the view on show. */
 function labelRoles() {
   const lane = laneCol();
@@ -321,6 +379,8 @@ function labelRoles() {
   if (res) extra._res = res.id;
   if (lab) extra._lab = lab.id;
   if (per.startsWith('col:')) extra._per = per.slice(4);
+  const wl = wlRowCol();
+  if (wl) extra._wl = wl.id;
   return { ...S.roles, ...extra };
 }
 /** The lane limits for one lane column, by lane key. */
@@ -358,6 +418,7 @@ function drawToolbar(model = null, level = 'full') {
   const b = S.built;
   const gantt = S.mode === 'gantt';
   const bm = S.mode === 'booking' ? S.bookModel : null;
+  const wm = S.mode === 'workload' ? S.wlModel : null;
   const res = bookResCol();
   const asOptions = (cols) => cols.map((c) => ({ id: c.id, label: c.label }));
   renderToolbar(toolbar, {
@@ -372,6 +433,7 @@ function drawToolbar(model = null, level = 'full') {
         : S.mode === 'timeline' && b ? arrange([...b.tasks, ...b.unscheduled]).entries.filter((e) => e.undated).length : 0,
       flagged: b ? b.flagged : 0,
       bookings: b ? b.tasks.length + b.unscheduled.length : 0, clashes: bm ? bm.clashes.size : 0, outside: bm ? bm.outside : 0,
+      overloads: wm ? wm.ahead.length : 0, noHours: wm ? wm.missing : 0,
     },
     groupOptions: asOptions(S.columns.filter(groupable)),
     groupBy: groupCol()?.id || null,
@@ -386,6 +448,8 @@ function drawToolbar(model = null, level = 'full') {
     ],
     periodsBy: bookPeriodsBy(),
     filterOptions: bookFilterOptions(), filterBy: S.view.bookFilter,
+    wlRowOptions: asOptions(S.columns.filter(wlRowable)), wlRowsBy: wlRowCol()?.id || null, wlUnit: wlUnit(),
+    canLevel: !!(wm && wm.ahead.length && (canEdit() || S.demo)),
     examples: Object.entries(EXAMPLE_LABELS).map(([id, label]) => ({ id, label: t(label) })), example: S.example,
   }, {
     onMode: setMode,
@@ -399,6 +463,10 @@ function drawToolbar(model = null, level = 'full') {
     onPeriods: (id) => { S.view.bookPeriods = id || null; saveView(); S.signature = ''; S.firstDraw = true; reload('tables'); },
     onFilter: (id) => { S.view.bookFilter = id || null; saveView(); S.signature = ''; recompute(); },
     onClash: () => { const id = [...(S.bookModel?.clashes || [])][0]; if (id != null) select(id, { tellGrist: true }); },
+    onWlRows: (id) => { S.view.wlRows = id || null; saveView(); S.signature = ''; reload('tables'); },
+    onWlUnit: (u) => { S.view.wlUnit = u; saveView(); S.signature = ''; S.firstDraw = true; recompute(); },
+    onLevel: () => levelNow(),
+    onOverload: () => { const o = S.wlModel?.ahead[0]; if (o) workloadView?.scrollToCell(S.wlModel.cellOf(o)); },
     onExample: (id) => bootDemo(id),
     onPrint: () => startPrint(),
     onKeys: () => openKeys(shell, S.mode),
@@ -407,6 +475,7 @@ function drawToolbar(model = null, level = 'full') {
 const saveView = () => rememberView(S.tableId, {
   groupBy: S.view.groupBy, critical: S.view.critical, collapsed: [...S.view.collapsed], laneBy: S.view.laneBy,
   tlLaneBy: S.view.tlLaneBy, bookRows: S.view.bookRows, bookPeriods: S.view.bookPeriods, bookFilter: S.view.bookFilter,
+  wlRows: S.view.wlRows, wlUnit: S.view.wlUnit,
 });
 
 /** Everything the chart needs, from the rows. */
@@ -435,11 +504,13 @@ function buildModel() {
 function recompute() {
   if (!S.ready) return;
   showDueHint(false);
+  showHoursHint(false);
   // A new, empty table (Grist's Table1 with A, B, C): offer to set it up.
   if (S.live && canEdit() && !S.rows.length && !S.columns.some((c) => !(c.type === 'Any' && !c.isFormula && /^[A-Z]$/.test(c.id)))) { starterState(); return; }
   if (S.mode === 'board') { recomputeBoard(); return; }
   if (S.mode === 'timeline') { recomputeTimeline(); return; }
   if (S.mode === 'booking') { recomputeBooking(); return; }
+  if (S.mode === 'workload') { recomputeWorkload(); return; }
   if (!ganttReady(S.roles)) {
     S.built = null;
     drawToolbar(null, 'switch');
@@ -705,6 +776,94 @@ async function bookCell({ resource, period }) {
     moveCursor(id).catch(() => {});
     if (rowById(id)) openPending();
   } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
+}
+
+// ---- the workload ------------------------------------------------------------------------------------------
+function recomputeWorkload() {
+  const person = wlRowCol();
+  if (!ganttReady(S.roles) || !person) {
+    S.built = null;
+    drawToolbar(null, 'switch');
+    if (!person) emptyState(t('Whose work is it?'), t('The workload has a row for each person: the column that says who a task is assigned to, such as Owner. Pick it as “Assigned to” in Columns.'));
+    else emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Pick the columns in Columns.'));
+    return;
+  }
+  const cal = calendar();
+  S.built = buildTasks(S.rows, { roles: S.roles, columns: S.columns, labels: S.labels, calendar: cal, settings: { ...S.gantt, colourBy: colourByCol()?.id || null } });
+  const unit = wlUnit();
+  const today = todayDay();
+  const r = bookingRange(datedTasks(), unit, today);
+  const periods = calendarPeriods(unit, r.from, r.to, weekStart());
+  const wl = buildWorkload(S.built.tasks, S.rows, { ...wlContext(person), from: periods[0].start, to: periods[periods.length - 1].end });
+  const rowOf = new Map(wl.people.map((p, i) => [p.key, i]));
+  const periodOf = (day) => periods.findIndex((p) => day >= p.start && day <= p.end);
+  const ahead = wl.overs.filter((o) => o.day >= today);
+  const people = wl.people.map((p) => ({
+    key: p.key, label: p.label, colour: p.colour, none: p.none, perDay: p.perDay, totals: periodTotals(p, periods, wl.from),
+    overDays: ahead.filter((o) => o.key === p.key).length, src: p,
+  }));
+  S.wlModel = { wl, periods, unit, people, ahead, missing: wl.missing, cellOf: (o) => ({ ri: rowOf.get(o.key), pi: periodOf(o.day) }) };
+  drawToolbar();
+  const v = ensureWorkload();
+  showHoursHint(!effortCol());
+  const sig = ['w', person.id, unit, periods[0].key, periods.length, S.selectedId, S.workload.hoursPerDay, todayDay(), dateLocale(gristCulture()),
+    ...people.map((p) => `${p.key}|${p.label}|${p.perDay}|` + p.totals.map((x) => `${Math.round(x.load * 10)}/${x.cap == null ? '-' : Math.round(x.cap * 10)}`).join(','))].join('\n');
+  if (sig === S.signature) return;
+  S.signature = sig;
+  const team = teamTotals(wl.people.filter((p) => !p.none), periods, wl.from);
+  v.update({
+    people, periods, unit, team, today, selectedId: S.selectedId, rowLabel: person.label, noneLabel: t('Not assigned'), locale: dateLocale(gristCulture()),
+    workdays: unit === 'day' ? periods.map((p) => cal.isWork(p.start)) : null,
+    tasksAt: (ri, pi) => tasksIn(people[ri].src, periods[pi]),
+    locate: (id) => {
+      for (let ri = 0; ri < people.length; ri++) {
+        const it = people[ri].src.items.find((x) => x.task.id === id);
+        if (it) { const pi = periodOf(it.days.find((d) => d >= today) ?? it.days[0]); if (pi >= 0) return { ri, pi }; }
+      }
+      return null;
+    },
+  }, { first: S.firstDraw, startAt: Math.max(0, periodOf(today)) });
+  S.firstDraw = false;
+}
+
+/** Level: the moves that take people under capacity, shown first, written as one action. */
+async function levelNow() {
+  const person = wlRowCol();
+  if (!S.wlModel || !person || !(canEdit() || S.demo)) return;
+  const cal = calendar();
+  const c = ctx();
+  const dueCol = colById(S.roles.due);
+  const r = levelPlan(S.built.tasks, S.rows, {
+    ...wlContext(person), links: linksOf(S.built.tasks), today: todayDay(),
+    shiftEnd: (task, start) => (cal.workdays ? cal.endAfter(start, cal.length(task.start, task.end)) : start + (task.end - task.start)),
+    beforeDay: (day) => cal.shift(day, -1),
+    canMove: (task) => capabilities(task, c).move,
+    dueOf: (task) => (dueCol && task.endFrom === 'end' ? dayOf(rowById(task.id)?.[dueCol.id], dueCol.type) : null),
+  });
+  const items = [];
+  for (const m of r.moves) {
+    const task = taskById(m.id), row = rowById(m.id);
+    const plan = task && row ? planDates(task, row, c, 'move', m.start, m.end) : { error: 'gone' };
+    if (!plan.error) items.push({ id: m.id, plan, m, task });
+  }
+  const stuckNote = r.stuck.length ? tn(r.stuck.length, '{n} task can’t move without moving others or the end of the plan.', '{n} tasks can’t move without moving others or the end of the plan.') : null;
+  if (!items.length) {
+    toast(t('Nothing can move inside its slack: every overloaded task has started, is fixed, or has a task waiting for it.') + (stuckNote ? ' ' + stuckNote : ''));
+    return;
+  }
+  const shown = items.slice(0, 40).map(({ task, m }) => [task.title || t('(no name)'), `${fmtShortRange(m.was.start, m.was.end)} → ${fmtShortRange(m.start, m.end)}`]);
+  const yes = await confirmBox(shell, {
+    title: tn(items.length, 'Move {n} task later?', 'Move {n} tasks later?'),
+    body: r.after
+      ? t('Days over capacity from today on: {before} now, {after} after these moves.', { before: r.before, after: r.after })
+      : t('Days over capacity from today on: {before} now, none after these moves.', { before: r.before }),
+    items: shown,
+    note: [items.length > shown.length ? tn(items.length - shown.length, 'And {n} more.', 'And {n} more.') : null,
+      t('Each task keeps its length and stays before anything that waits for it. One Undo takes it all back.'), stuckNote].filter(Boolean).join(' '),
+    ok: tn(items.length, 'Move {n} task', 'Move {n} tasks'),
+  });
+  if (!yes) return;
+  writeMany(items.map(({ id, plan }) => ({ id, plan })), tn(items.length, 'Moved {n} task later to level the workload.', 'Moved {n} tasks later to level the workload.'));
 }
 
 let pending = 0;
@@ -1028,27 +1187,33 @@ async function addColumnFor(role) {
   } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
 }
 
-// The due-date note above the Gantt chart, dismissed per table in this browser.
-const hintKey = () => 'planStudio.dueHint.' + (S.tableId || 'demo');
-function showDueHint(on) {
+// A note above the view, dismissed per table in this browser: the due-date note over the Gantt chart, and the
+// workload's note that, with no hours to go on, it counts each task as a full day.
+function showBanner(name, on, text, action) {
+  const key = 'planStudio.' + name + '.' + (S.tableId || 'demo');
   let bar = stage.querySelector(':scope > .ps-banner');
   let off = false;
-  try { off = localStorage.getItem(hintKey()) === 'off'; } catch { /* private window */ }
-  if (!on || off) { bar?.remove(); stage.classList.remove('has-banner'); return; }
-  if (bar) return;
-  bar = el('div', { class: 'ps-banner', role: 'note' }, [
-    el('span', { text: t('These tasks have only a due date, so they show as milestones. With a start date they become bars.') }),
-    el('button', { type: 'button', class: 'ps-btn ps-btn--sm', text: t('Add a Start column'), onclick: () => addColumnFor('start') }),
-    el('button', { type: 'button', class: 'ps-icon-btn ps-banner__close', 'aria-label': t('Close'), text: '×', onclick: () => { try { localStorage.setItem(hintKey(), 'off'); } catch { /* fine */ } showDueHint(false); } }),
+  try { off = localStorage.getItem(key) === 'off'; } catch { /* private window */ }
+  if (!on || off) { if (bar?.dataset.name === name) { bar.remove(); stage.classList.remove('has-banner'); } return; }
+  if (bar?.dataset.name === name) return;
+  bar?.remove();
+  bar = el('div', { class: 'ps-banner', role: 'note', dataset: { name } }, [
+    el('span', { text }),
+    action ? el('button', { type: 'button', class: 'ps-btn ps-btn--sm', text: action.label, onclick: action.run }) : null,
+    el('button', { type: 'button', class: 'ps-icon-btn ps-banner__close', 'aria-label': t('Close'), text: '×', onclick: () => { try { localStorage.setItem(key, 'off'); } catch { /* fine */ } showBanner(name, false); } }),
   ]);
   stage.prepend(bar);
   stage.classList.add('has-banner');
 }
+const showDueHint = (on) => showBanner('dueHint', on, t('These tasks have only a due date, so they show as milestones. With a start date they become bars.'),
+  { label: t('Add a Start column'), run: () => addColumnFor('start') });
+const showHoursHint = (on) => showBanner('hoursHint', on, t('No Hours of work column, so each task counts as a full working day of each of its people.'),
+  S.live && canEdit() ? { label: t('Add an Hours column'), run: () => addColumnFor('effort') } : null);
 
 // ---- print -----------------------------------------------------------------------------------------------
 // The printout is built from the model on screen, for paper (print/render.js), into #ps-print, which
 // only shows when printing. In a Grist iframe, print() prints this widget alone.
-const VIEW_NAMES = { gantt: 'Gantt chart', timeline: 'Timeline', board: 'Board', booking: 'Booking grid' };
+const VIEW_NAMES = { gantt: 'Gantt chart', timeline: 'Timeline', board: 'Board', booking: 'Booking grid', workload: 'Workload' };
 let printing = false;
 function startPrint() {
   if (printing || !S.ready) return;
@@ -1124,7 +1289,7 @@ function printNode({ paper, fit }) {
       if (b.unit === 'table') return { label: p.label || fmtShortRange(p.start, p.end), sub: p.label ? fmtShortRange(p.start, p.end) : null };
       const d = dateFromDay(p.start);
       if (b.unit === 'day') return { label: fmt({ weekday: 'short', day: 'numeric' }).format(d), sub: fmt({ month: 'short' }).format(d) };
-      if (b.unit === 'week') return { label: t('W{n}', { n: isoWeek(p.start).week }), sub: fmt({ day: 'numeric', month: 'short' }).format(d) };
+      if (b.unit === 'week') return { label: t('W{n}', { n: isoWeek(p.start + 3).week }), sub: fmt({ day: 'numeric', month: 'short' }).format(d) };
       return { label: fmt({ month: 'short', year: 'numeric' }).format(d) };
     };
     // Days, weeks and months print the booked stretch and one period either side, not the screen's
@@ -1140,6 +1305,30 @@ function printNode({ paper, fit }) {
         name: r.none ? t('No {col}', { col: res.label }) : String(r.label), tracks: r.tracks, clashes: r.items.filter((it) => it.clash).length,
         items: r.items.filter((it) => it.last >= lo && it.first <= hi)
           .map((it) => ({ first: Math.max(it.first, lo) - lo, last: Math.min(it.last, hi) - lo, track: it.track, label: labelOf(it.task), clash: it.clash })),
+      })),
+    });
+  }
+  if (S.mode === 'workload' && S.wlModel) {
+    const w = S.wlModel;
+    const locale2 = dateLocale(gristCulture());
+    const fmt = (o) => new Intl.DateTimeFormat(locale2, { timeZone: 'UTC', ...o });
+    const periodText = (p) => {
+      const d = dateFromDay(p.start);
+      if (w.unit === 'day') return { label: fmt({ weekday: 'short', day: 'numeric' }).format(d), sub: fmt({ month: 'short' }).format(d) };
+      if (w.unit === 'week') return { label: t('W{n}', { n: isoWeek(p.start + 3).week }), sub: fmt({ day: 'numeric', month: 'short' }).format(d) };
+      return { label: fmt({ month: 'short', year: 'numeric' }).format(d) };
+    };
+    // Print where there is work, and a period either side: not the screen's run-up of empty weeks.
+    const busy = w.periods.map((_, i) => w.people.some((p) => p.totals[i].load > 0.01));
+    const lo = Math.max(0, busy.indexOf(true) - 1);
+    const hi = busy.lastIndexOf(true) < 0 ? w.periods.length - 1 : Math.min(w.periods.length - 1, busy.lastIndexOf(true) + 1);
+    return renderWorkloadPrint({
+      title: printTitle(), subtitle: subtitleFor(view, count('{n} task', '{n} tasks'), locale, today), paper,
+      rowHeader: wlRowCol()?.label || '', locale: locale2,
+      periods: w.periods.slice(lo, hi + 1).map(periodText),
+      people: w.people.map((p) => ({
+        name: p.none ? t('Not assigned') : String(p.label ?? ''), perWeek: p.none ? null : p.perDay * 5, overDays: p.overDays,
+        cells: p.totals.slice(lo, hi + 1),
       })),
     });
   }
@@ -1271,20 +1460,24 @@ async function openColumns() {
   if (mappingOpen) return;
   mappingOpen = true;
   const datedTables = S.live ? await listDatedTables().catch(() => []) : [];
+  // The capacity column lives on the people table: read it, if no view has yet.
+  if (S.live && !S.peopleTable) { const who = wlRowCol(); if (who?.refTable) S.peopleTable = await loadTable(who.refTable).catch(() => null); }
   mappingOpen = openMapping(shell, {
     tableId: S.tableId, columns: S.columns, roles: S.roles, source: S.source, gantt: S.gantt, canEdit: canEdit() || S.demo,
-    board: S.board, booking: S.booking, opensAs: S.opensAs, cardFields: fieldCols(null).map((c) => c.id),
+    board: S.board, booking: S.booking, workload: S.workload, opensAs: S.opensAs, cardFields: fieldCols(null).map((c) => c.id),
+    peopleColumns: S.peopleTable?.columns || [], capacityGuess: capacityCol()?.id || null,
     canAddColumns: S.live && canEdit(),
     datedTables: datedTables.filter((x) => x !== S.tableId),
   }, {
     onClose: () => { mappingOpen = null; },
     onAddColumn: (role) => addColumnFor(role),
-    onSave: async ({ roles, gantt, board, booking, opensAs, language }) => {
+    onSave: async ({ roles, gantt, board, booking, workload, opensAs, language }) => {
       setLanguage(language);
       S.roles = roles;
       S.gantt = gantt;
       S.board = board;
       S.booking = booking;
+      S.workload = workload;
       if (opensAs !== S.opensAs) { S.opensAs = opensAs; S.mode = resolveMode(); }
       S.source = { kind: 'saved' };
       if (S.live) {
@@ -1292,7 +1485,7 @@ async function openColumns() {
         S.holidayDays = await loadHolidayDays(gantt.holidayTable).catch(() => new Map());
         await loadBookingTables();
         if (canEdit()) {
-          const next = writeOptions(S.options, { storedRoles: toStored(roles, S.columns), gantt, board, booking, view: opensAs });
+          const next = writeOptions(S.options, { storedRoles: toStored(roles, S.columns), gantt, board, booking, workload, view: opensAs });
           try { await setOptions(next); S.options = next; toast(t('Saved for this widget.')); }
           catch (e) { toast(t('Could not save: {msg}', { msg: errText(e) })); }
         }
@@ -1310,6 +1503,7 @@ async function loadDocState() {
   S.gantt = opts.gantt;
   S.board = opts.board;
   S.booking = opts.booking;
+  S.workload = opts.workload;
   S.opensAs = opts.view;
   const saved = opts.roles ? fromStored(opts.roles, S.columns, S.tableId) : {};
   if (Object.keys(saved).length) {
@@ -1325,12 +1519,23 @@ async function loadDocState() {
   await loadBookingTables();
 }
 
-/** The booking grid's periods table and the table its rows come from (for the filter), when it is on show. */
+/**
+ * The tables beside the task table that the view on show reads: the booking grid's periods table and
+ * the table its rows come from (for the filter); the workload's people (for their capacity) and their
+ * days off.
+ */
 async function loadBookingTables() {
-  if (S.demo || S.mode !== 'booking') return;
-  const res = bookResCol();
-  S.resourceTable = res?.refTable ? await loadTable(res.refTable).catch(() => null) : null;
-  S.periodTable = S.booking.periodTable && bookPeriodsBy().startsWith('table:') ? await loadTable(S.booking.periodTable).catch(() => null) : null;
+  if (S.demo) return;
+  if (S.mode === 'booking') {
+    const res = bookResCol();
+    S.resourceTable = res?.refTable ? await loadTable(res.refTable).catch(() => null) : null;
+    S.periodTable = S.booking.periodTable && bookPeriodsBy().startsWith('table:') ? await loadTable(S.booking.periodTable).catch(() => null) : null;
+  }
+  if (S.mode === 'workload') {
+    const who = wlRowCol();
+    S.peopleTable = who?.refTable ? await loadTable(who.refTable).catch(() => null) : null;
+    S.daysOff = await loadDaysOff(S.gantt.holidayTable).catch(() => ({ refTable: null, days: new Map() }));
+  }
 }
 
 // A column added, removed or renamed shows up as a different set of keys in the rows.
@@ -1411,6 +1616,7 @@ function onOptions(options) {
   S.gantt = o.gantt;
   S.board = o.board;
   S.booking = o.booking;
+  S.workload = o.workload;
   if (o.view !== S.opensAs) { S.opensAs = o.view; S.mode = resolveMode(); }
   if (o.roles) { S.roles = fromStored(o.roles, S.columns, S.tableId); S.source = { kind: 'saved' }; }
   reload('labels');
@@ -1472,6 +1678,10 @@ function bootDemo(example = null) {
   S.rows = stores ? storesRows() : speed ? speedRows() : sampleRows();
   S.labels = stores ? STORES_LABELS : speed ? SPEED_LABELS : SAMPLE_LABELS;
   S.resourceTable = stores ? STORES_RESOURCES : null;
+  // The website plan's people have hours a week (Dieter works part-time) and Ben has a day off.
+  S.peopleTable = stores || speed ? null : SAMPLE_PEOPLE;
+  S.daysOff = stores || speed ? { refTable: null, days: new Map() } : sampleDaysOff();
+  S.workload = { ...WORKLOAD_DEFAULTS };
   S.opensAs = stores ? 'booking' : 'auto';
   S.selectedId = null;
   demoHistory.undo.length = 0;

@@ -33,30 +33,34 @@ const choices = (list, colours = []) => JSON.stringify({
  */
 export function templates(t) {
   const people = t('People'), events = t('Events'), stores = t('Stores'), participants = t('Participants'), rooms = t('Rooms');
+  const weekly = colIdFor(t('Hours per week'));
   return [
     {
       id: 'plan', label: t('Project plan'), opensAs: 'gantt',
-      tables: [{ name: people, columns: [{ id: 'Name', type: 'Text', label: t('Name') }], show: 'Name' }],
+      // Hours per week on People and Hours on each task: the workload works from the start.
+      tables: [{ name: people, columns: [{ id: 'Name', type: 'Text', label: t('Name') }, { id: weekly, type: 'Numeric', label: t('Hours per week') }], show: 'Name' }],
       columns: [
         { id: colIdFor(t('Task')), type: 'Text', label: t('Task') },
         { id: colIdFor(t('Start')), type: 'Date', label: t('Start') },
         { id: colIdFor(t('End')), type: 'Date', label: t('End') },
         { id: colIdFor(t('Status')), type: 'Choice', label: t('Status'), widgetOptions: choices([t('To do'), t('Doing'), t('Blocked'), t('Done')], ['#94A3B8', '#3B82F6', '#EF4444', '#22C55E']) },
         { id: colIdFor(t('Owner')), type: 'Ref:' + people, label: t('Owner'), ref: people },
+        { id: colIdFor(t('Hours')), type: 'Numeric', label: t('Hours') },
         { id: colIdFor(t('Progress')), type: 'Numeric', label: t('Progress'), widgetOptions: JSON.stringify({ numMode: 'percent' }) },
         { id: colIdFor(t('Milestone')), type: 'Bool', label: t('Milestone') },
         { id: colIdFor(t('Depends on')), type: 'RefList:@self', label: t('Depends on'), ref: '@self' },
       ],
       rows: (day) => ({
-        [people]: [{ Name: 'Ann' }, { Name: 'Ben' }, { Name: 'Chloé' }],
+        [people]: [{ Name: 'Ann', [weekly]: 40 }, { Name: 'Ben', [weekly]: 40 }, { Name: 'Chloé', [weekly]: 30 }],
+        // Hours that fit their owners whatever weekday the plan starts on; milestones take no hours.
         '@self': [
-          [t('Kick-off'), 0, 0, t('Done'), 1, 1, true, []],
-          [t('Gather requirements'), 1, 4, t('Done'), 2, 1, false, [1]],
-          [t('Design'), 7, 14, t('Doing'), 3, 0.4, false, [2]],
-          [t('Build'), 15, 29, t('To do'), 2, 0, false, [3]],
-          [t('Test'), 30, 35, t('To do'), 1, 0, false, [4]],
-          [t('Launch'), 36, 36, t('To do'), 1, 0, true, [5]],
-        ].map(([title, s, e, status, owner, progress, ms, deps]) => ({ title, start: day(s), end: day(e), status, owner, progress, ms, deps })),
+          [t('Kick-off'), 0, 0, t('Done'), 1, null, 1, true, []],
+          [t('Gather requirements'), 1, 4, t('Done'), 2, 16, 1, false, [1]],
+          [t('Design'), 7, 14, t('Doing'), 3, 32, 0.4, false, [2]],
+          [t('Build'), 15, 29, t('To do'), 2, 80, 0, false, [3]],
+          [t('Test'), 30, 35, t('To do'), 1, 30, 0, false, [4]],
+          [t('Launch'), 36, 36, t('To do'), 1, null, 0, true, [5]],
+        ].map(([title, s, e, status, owner, hours, progress, ms, deps]) => ({ title, start: day(s), end: day(e), status, owner, hours, progress, ms, deps })),
       }),
     },
     {
@@ -176,10 +180,11 @@ export function columnForRole(role, t, tableId) {
     parent: ['Ref:' + tableId, t('Parent task')],
     dependsOn: ['RefList:' + tableId, t('Depends on')],
     order: ['Numeric', t('Order in a lane')],
+    effort: ['Numeric', t('Hours')],
     period: ['Choice', t('Period'), choices([1, 2, 3].map((n) => t('Period {n}', { n })))],
   }[role];
   if (!C) return null;
   const [type, label, widgetOptions] = C;
   return { id: colIdFor(label), type, label, ...(widgetOptions ? { widgetOptions } : {}) };
 }
-export const ASSISTED_ROLES = ['start', 'end', 'due', 'duration', 'status', 'progress', 'done', 'milestone', 'parent', 'dependsOn', 'order', 'period'];
+export const ASSISTED_ROLES = ['start', 'end', 'due', 'duration', 'status', 'progress', 'done', 'milestone', 'parent', 'dependsOn', 'order', 'period', 'effort'];

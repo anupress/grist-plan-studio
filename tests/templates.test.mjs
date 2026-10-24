@@ -12,6 +12,7 @@ const T = await imp('src/model/templates.js');
 const I = await imp('src/i18n/index.js');
 const { detectRoles } = await imp('src/model/roles.js');
 const { columnsFromFixture } = await imp('src/model/schema.js');
+const { detectCapacity } = await imp('src/model/workload.js');
 
 let pass = 0, fail = 0;
 const eq = (n, got, want) => { if (JSON.stringify(got) === JSON.stringify(want)) pass++; else { fail++; console.log(`  FAIL ${n}\n    got  ${JSON.stringify(got)}\n    want ${JSON.stringify(want)}`); } };
@@ -29,7 +30,7 @@ I.setLanguage('en', { remember: false });
   eq('the placeholders go, the columns come, References point at the right tables', actions.map((a) => a[0] + ' ' + (a[0] === 'AddColumn' ? a[2] + ':' + a[3].type : a[0] === 'AddTable' ? a[1] : a[2])), [
     'AddTable People2', 'RemoveColumn A', 'RemoveColumn B', 'RemoveColumn C',
     'AddColumn Task:Text', 'AddColumn Start:Date', 'AddColumn End:Date', 'AddColumn Status:Choice', 'AddColumn Owner:Ref:People2',
-    'AddColumn Progress:Numeric', 'AddColumn Milestone:Bool', 'AddColumn Depends_on:RefList:Table1',
+    'AddColumn Hours:Numeric', 'AddColumn Progress:Numeric', 'AddColumn Milestone:Bool', 'AddColumn Depends_on:RefList:Table1',
   ]);
   const refs = { 'People2.Name': 51, 'Table1.Owner': 60, 'Table1.Task': 55, 'Table1.Depends_on': 63 };
   const data = T.dataActions(plan, { tableId: 'Table1' }, names, { colRef: (tb, c) => refs[tb + '.' + c] || null }, (n) => (20000 + n) * 86400);
@@ -40,7 +41,9 @@ I.setLanguage('en', { remember: false });
   const own = data[data.length - 1];
   eq('six sample tasks, dated from today, linked in a chain', [own[0], own[1], own[2].length, own[3].Start[1], own[3].Depends_on[1]], ['BulkAddRecord', 'Table1', 6, (20001) * 86400, ['L', 1]]);
   const cols = columnsFromFixture(plan.columns.map((c) => ({ id: c.id, type: c.ref ? (c.ref === '@self' ? 'RefList:Table1' : 'Ref:People') : c.type })));
-  eq('what it makes is recognised', detectRoles(cols, { tableId: 'Table1' }).roles, { title: 'Task', start: 'Start', end: 'End', status: 'Status', progress: 'Progress', milestone: 'Milestone', assignee: 'Owner', dependsOn: 'Depends_on' });
+  eq('what it makes is recognised', detectRoles(cols, { tableId: 'Table1' }).roles, { title: 'Task', start: 'Start', end: 'End', status: 'Status', progress: 'Progress', milestone: 'Milestone', assignee: 'Owner', dependsOn: 'Depends_on', effort: 'Hours' });
+  eq('People get a capacity column (M9)', actions[0][2].map((c) => c.id + ':' + c.type), ['Name:Text', 'Hours_per_week:Numeric']);
+  eq('…and every sample person a number in it', data.find((a) => a[0] === 'BulkAddRecord' && a[1] === 'People2')[3].Hours_per_week, [40, 40, 30]);
 }
 
 // every template, in every language, makes a table detection understands
@@ -54,9 +57,10 @@ for (const lang of ['en', 'de', 'fr']) {
     roles[tpl.id] = Object.keys(found).sort().join(',');
     // what a booking is called: its name, not who booked it (found live in Grist: "Booked by" won once)
     if (tpl.id === 'rooms') eq(`${lang}: a room booking is named by its first column`, found.title, tpl.columns[0].id);
+    if (tpl.id === 'plan') eq(`${lang}: the People table's hours a week are its capacity`, detectCapacity(columnsFromFixture(tpl.tables[0].columns.map((c) => ({ id: c.id, label: c.label, type: c.type }))))?.mode, 'hours');
   }
   eq(`${lang}: project plan, event booking plan, room booking are detected`, roles, {
-    plan: 'assignee,dependsOn,end,milestone,progress,start,status,title',
+    plan: 'assignee,dependsOn,effort,end,milestone,progress,start,status,title',
     events: 'period,project,resource,title',
     rooms: 'end,resource,start,title',
   });

@@ -97,3 +97,9 @@
 .pp-booked.is-clash { color: var(--pp-crit); background: #fbecec; font-weight: 600; }
 .pp-free { background: var(--pp-free); }
 .pp-flag { font-weight: 600; }
+/* the workload (M9): hours of capacity per cell, over in the warning colour, days off grey */
+.pp-load { padding: 0 5px; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.pp-load.is-over { color: var(--pp-crit); background: #fbecec; font-weight: 600; }
+.pp-load.has-overdays .pp-flag { color: var(--pp-crit); }
+/* flat on paper: a fine hatch over hundreds of cells makes the PDF crawl */
+.pp-off { background: #eef1f4; }

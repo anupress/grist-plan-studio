@@ -97,9 +97,15 @@ export const ROLES = [
     strong: ['period', 'weekend', 'slot', 'time slot', 'session', 'shift', 'round', 'zeitraum', 'wochenende', 'schicht', 'durchgang',
       'zeitfenster', 'periode', 'creneau', 'week end', 'seance'], weak: ['week', 'woche', 'semaine'] },
   { id: 'order', kinds: NUM, panel: true, strong: ['order', 'rank', 'position', 'sort', 'sort order', 'reihenfolge', 'ordre', 'rang'], weak: [] },
-  { id: 'effort', kinds: NUM,
-    strong: ['effort', 'hours', 'estimate', 'estimated hours', 'estimation', 'estimation h', 'aufwand', 'stunden',
-      'schatzung', 'charge', 'heures'], weak: [] },
+  // The work a task needs (the workload view): planned hours or person-days, never hours already spent
+  // or a person's hours a week.
+  { id: 'effort', kinds: NUM, panel: true,
+    exclude: ['actual', 'spent', 'logged', 'worked', 'per week', 'a week', 'tatsachlich', 'tatsaechlich', 'gebucht', 'geleistet',
+      'pro woche', 'reel', 'reelles', 'passe', 'passees', 'par semaine'],
+    strong: ['effort', 'hours', 'estimate', 'estimated hours', 'estimation', 'estimation h', 'planned hours', 'hours planned',
+      'effort hours', 'work hours', 'person days', 'man days', 'aufwand', 'stunden', 'schatzung', 'schaetzung', 'arbeitsaufwand',
+      'stundenaufwand', 'personentage', 'manntage', 'geplante stunden', 'charge', 'heures', 'charge estimee', 'heures prevues',
+      'jours homme'], weak: [] },
 ];
 export const ROLE_IDS = ROLES.map((r) => r.id);
 const BY_ID = new Map(ROLES.map((r) => [r.id, r]));

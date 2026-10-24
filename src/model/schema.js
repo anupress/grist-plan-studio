@@ -30,7 +30,7 @@ export function kindOf(type) {
  * The person-made columns of one table, in the order Grist shows them.
  *
  * @returns {Array<{ref:number, id:string, label:string, type:string, kind:string, isFormula:boolean,
- *   refTable:string|null, visibleColId:string|null, choices:string[], choiceOptions:object}>}
+ *   refTable:string|null, visibleColId:string|null, choices:string[], choiceOptions:object, numMode:string|null}>}
  */
 export function tableColumns(tableId, metaTables, metaColumns) {
   const table = metaTables.find((t) => t.tableId === tableId);
@@ -53,6 +53,8 @@ export function tableColumns(tableId, metaTables, metaColumns) {
         visibleColId: c.visibleCol ? (byRef.get(c.visibleCol)?.colId || null) : null,
         choices: Array.isArray(opts.choices) ? opts.choices : [],
         choiceOptions: opts.choiceOptions && typeof opts.choiceOptions === 'object' ? opts.choiceOptions : {},
+        // 'percent' for a number shown as a percentage (a capacity of 50 % is stored as 0.5)
+        numMode: typeof opts.numMode === 'string' ? opts.numMode : null,
       };
     });
 }
@@ -64,7 +66,7 @@ export function tableColumns(tableId, metaTables, metaColumns) {
 export function columnsFromFixture(cols) {
   return cols.map((c, i) => ({
     ref: i + 1, id: c.id, label: c.label || c.id, type: c.type, kind: kindOf(c.type), isFormula: !!c.isFormula,
-    refTable: refTableOf(c.type), visibleColId: null, choices: c.choices || [], choiceOptions: {},
+    refTable: refTableOf(c.type), visibleColId: null, choices: c.choices || [], choiceOptions: {}, numMode: c.numMode || null,
   }));
 }
 

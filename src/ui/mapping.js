@@ -27,6 +27,7 @@ const ROLE_TEXT = {
   order: ['Order in a lane', 'A number column. Dragging a card up or down on the board writes it.'],
   resource: ['Resource', 'A room, store, flat or vehicle: the booking grid has a row for each.'],
   period: ['Period', 'A column that names when, such as Weekend 1, 2, 3: the booking grid has a column for each. Not needed when bookings have dates.'],
+  effort: ['Hours of work', 'The work a task needs: hours, or person-days when the column’s name says days. The workload spreads it over the task’s working days.'],
 };
 // Columns a chart can be coloured by
 const COLOUR_KINDS = ['Choice', 'ChoiceList', 'Ref', 'RefList', 'Text', 'Bool'];
@@ -41,14 +42,16 @@ function sourceText(source) {
 
 /**
  * @param host     element the panel opens in
- * @param s        {tableId, columns, roles, source, gantt, board, booking, opensAs, cardFields: [colId], canEdit, canAddColumns, datedTables}
- * @param on       {onSave({roles, gantt, board, booking, opensAs, language}), onAddColumn(role), onClose()}
+ * @param s        {tableId, columns, roles, source, gantt, board, booking, workload, opensAs, cardFields: [colId], canEdit, canAddColumns, datedTables,
+ *                  peopleColumns (of the table the people come from), capacityGuess (its capacity column found by name)}
+ * @param on       {onSave({roles, gantt, board, booking, workload, opensAs, language}), onAddColumn(role), onClose()}
  */
 export function openMapping(host, s, on) {
   let roles = { ...s.roles };
   const gantt = { ...s.gantt };
   const board = { ...s.board, wip: { ...(s.board?.wip || {}) } };
   const booking = { ...s.booking };
+  const workload = { ...s.workload };
   let opensAs = s.opensAs || 'auto';
   let fieldsTouched = false;
   const selects = new Map();
@@ -120,12 +123,12 @@ export function openMapping(host, s, on) {
       el('div', { class: 'ps-field' }, [
         el('label', { for: 'ps-holtab', text: t('Days off from a table') }),
         sel('ps-holtab', gantt.holidayTable || '', [['', t('none')], ...(s.datedTables || []).map((id) => [id, id])], (e) => { gantt.holidayTable = e.target.value || null; }),
-        el('p', { class: 'ps-hint', text: t('Each row with a date is a day off; a second date column makes it a run of days. Rows that name a person are left out.') }),
+        el('p', { class: 'ps-hint', text: t('Each row with a date is a day off; a second date column makes it a run of days. A row that names a person is that person’s day off, in the workload.') }),
       ]),
 el('h3', { text: t('Board') }),
       el('div', { class: 'ps-field' }, [
         el('label', { for: 'ps-opens', text: t('This widget opens as') }),
-        sel('ps-opens', opensAs, [['auto', t('Automatic')], ['gantt', t('Gantt chart')], ['timeline', t('Timeline')], ['board', t('Board')], ['booking', t('Booking grid')]], (e) => { opensAs = e.target.value; }),
+        sel('ps-opens', opensAs, [['auto', t('Automatic')], ['gantt', t('Gantt chart')], ['timeline', t('Timeline')], ['board', t('Board')], ['booking', t('Booking grid')], ['workload', t('Workload')]], (e) => { opensAs = e.target.value; }),
         el('p', { class: 'ps-hint', text: t('Automatic: the Gantt chart when the table has dates, otherwise the board. For everyone who opens this page; the toolbar switches the view in this browser only.') }),
       ]),
       el('div', { class: 'ps-field' }, [
@@ -150,6 +153,29 @@ el('h3', { text: t('Board') }),
         el('label', { for: 'ps-booklab', text: t('Bookings show') }),
         sel('ps-booklab', booking.labelBy?.id || '', [['', t('the name')], ...s.columns.filter((c) => FIELD_KINDS.includes(c.kind)).map((c) => [c.id, c.label])],
           (e) => { const c = s.columns.find((x) => x.id === e.target.value); booking.labelBy = c ? { ref: c.ref, id: c.id } : null; }),
+      ]),
+      el('h3', { text: t('Workload') }),
+      el('div', { class: 'ps-field' }, [
+        el('label', { for: 'ps-wlday', text: t('A working day has') }),
+        el('div', { class: 'ps-inline' }, [
+          el('input', { type: 'number', id: 'ps-wlday', min: '1', max: '24', step: '0.5', class: 'ps-input ps-input--num', value: String(workload.hoursPerDay),
+            onchange: (e) => { const v = Number(e.target.value); workload.hoursPerDay = v >= 1 && v <= 24 ? v : 8; } }),
+          el('span', { text: t('hours') }),
+        ]),
+      ]),
+      el('div', { class: 'ps-field' }, [
+        el('label', { for: 'ps-wlunit', text: t('Hours of work count') }),
+        sel('ps-wlunit', workload.effortUnit, [['auto', t('Automatic (from the column’s name)')], ['hours', t('hours')], ['days', t('person-days')]], (e) => { workload.effortUnit = e.target.value; }),
+      ]),
+      el('div', { class: 'ps-field' }, [
+        el('label', { for: 'ps-wlcap', text: t('Each person’s capacity') }),
+        sel('ps-wlcap', workload.capacity?.id || '', [
+          ['', s.capacityGuess ? t('Automatic ({col})', { col: s.capacityGuess }) : t('Automatic (a full day each)')],
+          ...(s.peopleColumns || []).filter((c) => c.kind === 'Numeric' || c.kind === 'Int').map((c) => [c.id, c.label]),
+        ], (e) => { const c = (s.peopleColumns || []).find((x) => x.id === e.target.value); workload.capacity = c ? { ref: c.ref, id: c.id } : null; }),
+        el('p', { class: 'ps-hint', text: s.peopleColumns?.length
+          ? t('A column of the people table: hours a week (40), or a share (0.5 or 50 %). An empty cell is a full day.')
+          : t('When “Assigned to” is a Reference to a people table, a column there can give each person’s hours a week. Without one, everyone has a full day.') }),
       ]),
       el('h3', { text: t('Colours') }),
       el('div', { class: 'ps-field' }, [
@@ -178,7 +204,7 @@ el('h3', { text: t('Board') }),
           board.fields = [...panel.querySelectorAll('.ps-checks input[type=checkbox]:checked')].map((b) => s.columns.find((c) => c.id === b.value)).filter(Boolean).map((c) => ({ ref: c.ref, id: c.id }));
         }
         close();
-        on.onSave({ roles: clean, gantt, board, booking, opensAs, language });
+        on.onSave({ roles: clean, gantt, board, booking, workload, opensAs, language });
       } }),
     ]),
   ]);
