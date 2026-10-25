@@ -101,21 +101,21 @@ export function weekendDays(frame, x0, x1, weekend = [0, 6]) {
   return out;
 }
 
-/** A task's box in chart coordinates. Milestones are a point (the middle of their day). */
-export function barBox(frame, task, rowIndex) {
-  const y = rowIndex * ROW_H + (ROW_H - BAR_H) / 2;
+/** A task's box in chart coordinates. Milestones are a point (the middle of their day). Row and bar heights are the person's (model/display.js). */
+export function barBox(frame, task, rowIndex, rowH = ROW_H, barH = BAR_H) {
+  const y = rowIndex * rowH + (rowH - barH) / 2;
   if (task.kind === 'milestone') {
     const cx = xOf(frame, task.start) + frame.px / 2;
-    return { x: cx - BAR_H / 2, y, w: BAR_H, h: BAR_H, cx };
+    return { x: cx - barH / 2, y, w: barH, h: barH, cx };
   }
   const x = xOf(frame, task.start);
-  return { x, y, w: Math.max(3, (task.end - task.start + 1) * frame.px), h: BAR_H };
+  return { x, y, w: Math.max(3, (task.end - task.start + 1) * frame.px), h: barH };
 }
 
 /** The rows worth drawing for a scroll position, with some to spare above and below. */
-export function rowWindow(scrollTop, viewH, n, overscan = 8) {
-  const first = Math.max(0, Math.floor(scrollTop / ROW_H) - overscan);
-  const last = Math.min(n - 1, Math.ceil((scrollTop + viewH) / ROW_H) + overscan);
+export function rowWindow(scrollTop, viewH, n, overscan = 8, rowH = ROW_H) {
+  const first = Math.max(0, Math.floor(scrollTop / rowH) - overscan);
+  const last = Math.min(n - 1, Math.ceil((scrollTop + viewH) / rowH) + overscan);
   return { first, last };
 }
 

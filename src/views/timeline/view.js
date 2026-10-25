@@ -11,7 +11,7 @@
 
 import { el, clear } from '../../core/util.js';
 import { onColor } from '../../core/theme/apply.js';
-import { makeFrame, barBox, rowWindow, scrollLeftFor, xOf, dayAt, ROW_H } from '../gantt/layout.js';
+import { makeFrame, barBox, rowWindow, scrollLeftFor, xOf, dayAt, ROW_H, BAR_H } from '../gantt/layout.js';
 import { formatters, rangeText, drawScale, drawShade } from '../gantt/scale.js';
 import { laneAtTrack } from '../../model/timeline.js';
 import { t, tn } from '../../i18n/index.js';
@@ -67,13 +67,15 @@ export function createTimeline(host, on = {}) {
     return null;
   };
 
+  let RH = ROW_H, BH = BAR_H;   // this person's row and bar heights (model/display.js)
   function size() {
     listW = listWidthFor(scroll.clientWidth || 900);
     canvas.style.setProperty('--list-w', listW + 'px');
     canvas.style.setProperty('--chart-w', frame.width + 'px');
     canvas.style.setProperty('--head-h', HEAD_H + 'px');
-    canvas.style.setProperty('--body-h', Math.max(1, model.tracks) * ROW_H + 'px');
-    canvas.style.setProperty('--row-h', ROW_H + 'px');
+    canvas.style.setProperty('--body-h', Math.max(1, model.tracks) * RH + 'px');
+    canvas.style.setProperty('--row-h', RH + 'px');
+    canvas.style.setProperty('--bar-h', BH + 'px');
   }
 
   // ---- drawing ------------------------------------------------------------------------------------------
@@ -83,7 +85,7 @@ export function createTimeline(host, on = {}) {
     clear(list);
     clear(bands);
     model.lanes.forEach((lane, i) => {
-      const top = lane.offset * ROW_H, h = lane.tracks * ROW_H;
+      const top = lane.offset * RH, h = lane.tracks * RH;
       if (lane.offset + lane.tracks <= firstTrack || lane.offset > lastTrack) return;
       const clashes = lane.bars.filter((b) => b.clash).length;
       const name = laneName(lane);
@@ -114,7 +116,7 @@ export function createTimeline(host, on = {}) {
         // only the rows on screen: a person's band can be a hundred rows deep
         if (lane.offset + b.track < firstTrack || lane.offset + b.track > lastTrack) continue;
         const task = b.task;
-        const box = barBox(frame, { kind: task.kind === 'milestone' ? 'milestone' : 'bar', start: task.start, end: task.end }, lane.offset + b.track);
+        const box = barBox(frame, { kind: task.kind === 'milestone' ? 'milestone' : 'bar', start: task.start, end: task.end }, lane.offset + b.track, RH, BH);
         if (box.x > x1 || box.x + box.w < x0) continue;
         const title = task.title || t('(no name)');
         const c = caps(task);
@@ -128,7 +130,8 @@ export function createTimeline(host, on = {}) {
           }));
           continue;
         }
-        const inside = labelFits(title, box.w);
+        const labels = model.labels || 'auto';
+        const inside = labels === 'auto' && labelFits(title, box.w);
         bars.appendChild(el('div', {
           class: 'ps-bar' + (selected ? ' is-selected' : '') + (c.move ? ' can-move' : '') + (b.clash ? ' is-clash' : ''),
           ...attrs, style: { left: box.x + 'px', top: box.y + 'px', width: box.w + 'px', '--fill': fill, '--ink': task.colour ? onColor(task.colour) : 'var(--ps-bar-ink)' },
@@ -139,7 +142,7 @@ export function createTimeline(host, on = {}) {
           c.end ? el('span', { class: 'ps-bar__h ps-bar__h--r', dataset: { part: 'end' } }) : null,
         ]));
         const room = nextStart.get(b) - (box.x + box.w) - 12;
-        if (!inside && room > 40) {
+        if (!inside && labels !== 'off' && room > 40) {
           bars.appendChild(el('span', { class: 'ps-bar__out', dataset: { id: String(task.id), lane: lane.key }, style: { left: box.x + box.w + 6 + 'px', top: box.y + 'px', maxWidth: Math.min(320, room) + 'px' }, text: title }));
         }
       }
@@ -150,12 +153,12 @@ export function createTimeline(host, on = {}) {
     if (!model || !frame || drag) return;
     const x0 = Math.max(0, scroll.scrollLeft - 200);
     const x1 = scroll.scrollLeft + chartViewW() + 200;
-    const { first, last } = rowWindow(scroll.scrollTop, scroll.clientHeight - HEAD_H, model.tracks);
+    const { first, last } = rowWindow(scroll.scrollTop, scroll.clientHeight - HEAD_H, model.tracks, 8, RH);
     const key = `${first}:${last}:${Math.floor(x0 / 400)}`;
     if (!force && key === drawn) return;
     drawn = key;
-    drawScale({ frame, top: scaleTop, bottom: scaleBottom, F, today: model.today, holidays: model.holidays, x0: x0 - 400, x1: x1 + 400 });
-    drawShade({ frame, shade, todayLine, holidays: model.holidays, today: model.today, x0: x0 - 400, x1: x1 + 400 });
+    drawScale({ frame, top: scaleTop, bottom: scaleBottom, F, today: model.today, holidays: model.holidays, x0: x0 - 400, x1: x1 + 400, show: model.show });
+    drawShade({ frame, shade, todayLine, holidays: model.holidays, today: model.today, x0: x0 - 400, x1: x1 + 400, show: model.show });
     drawLanes(first, last);
     drawBars(first, last, x0 - 400, x1 + 400);
   }
@@ -235,7 +238,7 @@ export function createTimeline(host, on = {}) {
     const task = d.bar.task;
     if (d.mode === 'move') {
       if (d.canMove) { d.start = task.start + delta; d.end = task.end + delta; }
-      if (model.laneMovable) d.toKey = laneAtTrack(model, Math.floor(chartY(e.clientY) / ROW_H))?.key ?? d.toKey;
+      if (model.laneMovable) d.toKey = laneAtTrack(model, Math.floor(chartY(e.clientY) / RH))?.key ?? d.toKey;
     } else if (d.mode === 'start') d.start = Math.min(task.end, task.start + delta);
     else d.end = Math.max(task.start, task.end + delta);
     preview(d);
@@ -310,9 +313,9 @@ export function createTimeline(host, on = {}) {
   function reveal(id) {
     const f = findBar(id);
     if (!f || !frame) return;
-    const top = (f.lane.offset + f.bar.track) * ROW_H, viewH = scroll.clientHeight - HEAD_H;
+    const top = (f.lane.offset + f.bar.track) * RH, viewH = scroll.clientHeight - HEAD_H;
     if (top < scroll.scrollTop) scroll.scrollTop = top;
-    else if (top + ROW_H > scroll.scrollTop + viewH) scroll.scrollTop = top + ROW_H - viewH;
+    else if (top + RH > scroll.scrollTop + viewH) scroll.scrollTop = top + RH - viewH;
     const x = xOf(frame, f.bar.task.start), xe = xOf(frame, f.bar.task.end + 1);
     if (x < scroll.scrollLeft || xe > scroll.scrollLeft + chartViewW()) scroll.scrollLeft = Math.max(0, x - 40);
   }
@@ -321,6 +324,8 @@ export function createTimeline(host, on = {}) {
     const zoomChanged = !model || model.zoom !== next.zoom || model.weekStart !== next.weekStart;
     const keep = !first && !fit && frame ? centreDay() : null;
     model = next;
+    RH = next.rowH || ROW_H;
+    BH = next.barH || BAR_H;
     F = formatters(next.locale);
     corner.textContent = next.laneLabel || '';
     root.classList.toggle('is-editable', !!next.editable);

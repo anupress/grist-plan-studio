@@ -13,11 +13,12 @@
 
 /**
  * @param {Array} tasks  all tasks, each with {id, index, start, end, parentId}
- * @param {{group?: {key: (t) => string|null, label: (k) => string, order?: string[]}, collapsed?: Set<string>}} opts
+ * @param {{group?: {key: (t) => string|null, label: (k) => string, order?: string[]}, collapsed?: Set<string>, sort?: (a, b) => number}} opts
+ *   sort: the order of siblings (and of the tasks with no dates), in place of the table's own; model/display.js makes it
  * @returns {{entries: Array, summaries: Map<number, {start, end, count}>, visibleIds: Set<number>}}
  */
-export function arrange(tasks, { group = null, collapsed = new Set() } = {}) {
-  const all = [...tasks].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+export function arrange(tasks, { group = null, collapsed = new Set(), sort = null } = {}) {
+  const all = [...tasks].sort(sort || ((a, b) => (a.index ?? 0) - (b.index ?? 0)));
   const byId = new Map(all.map((t) => [t.id, t]));
   const keyOf = (t) => (group ? group.key(t) ?? '' : '');
 

@@ -28,10 +28,13 @@ export function rangeText(F, span) {
   return `${(sameYear ? F.dayMonth : F.dayMonthYear).format(a)} – ${F.dayMonthYear.format(b)}`;
 }
 
-export function headLabel(F, unit, c, w) {
+/** show.weekNumbers off: a week is named by the day it starts, as most calendars do without numbers. */
+export function headLabel(F, unit, c, w, show = {}) {
   switch (unit) {
     case 'day': return String(c.d);
-    case 'week': return w >= 70 ? t('W{n}', { n: c.wk }) + ' · ' + F.dayMonth.format(dateFromDay(c.start)) : t('W{n}', { n: c.wk });
+    case 'week':
+      if (show.weekNumbers === false) return w >= 44 ? F.dayMonth.format(dateFromDay(c.start)) : String(c.d);
+      return w >= 70 ? t('W{n}', { n: c.wk }) + ' · ' + F.dayMonth.format(dateFromDay(c.start)) : t('W{n}', { n: c.wk });
     case 'month': return (w >= 80 ? F.month : F.monthShort).format(dateFromDay(c.start));
     case 'quarter': return t('Q{n}', { n: c.q });
     case 'year': return String(c.y);
@@ -44,19 +47,19 @@ export function topLabel(F, unit, c, w) {
 }
 
 /** The header cells between x0 and x1 (chart pixels). */
-export function drawScale({ frame, top, bottom, F, today, holidays, x0, x1 }) {
+export function drawScale({ frame, top, bottom, F, today, holidays, x0, x1, show = {} }) {
   const z = ZOOMS[frame.zoom];
   const cells = (row, unit, label) => {
     clear(row);
     for (const c of ticks(frame, unit, x0, x1)) {
       const isToday = unit === 'day' && c.start === today;
-      const weekend = unit === 'day' && frame.px >= 6 && [0, 6].includes(new Date(c.start * 864e5).getUTCDay());
+      const weekend = show.weekends !== false && unit === 'day' && frame.px >= 6 && [0, 6].includes(new Date(c.start * 864e5).getUTCDay());
       const holiday = unit === 'day' && holidays?.get(c.start);
       row.appendChild(el('div', {
         class: 'ps-scale__cell' + (isToday ? ' is-today' : '') + (weekend ? ' is-weekend' : '') + (holiday ? ' is-holiday' : ''),
         style: { left: c.x + 'px', width: c.w + 'px' },
         title: holiday || (unit === 'week' ? rangeText(F, { start: c.start, end: c.end }) : null),
-      }, [el('span', { text: label(F, unit, c, c.w) })]));
+      }, [el('span', { text: label(F, unit, c, c.w, show) })]));
     }
   };
   if (z.top) cells(top, z.top, topLabel); else clear(top);
@@ -64,9 +67,9 @@ export function drawScale({ frame, top, bottom, F, today, holidays, x0, x1 }) {
 }
 
 /** Weekends and holidays between x0 and x1, and where today's line goes. */
-export function drawShade({ frame, shade, todayLine, holidays, today, x0, x1 }) {
+export function drawShade({ frame, shade, todayLine, holidays, today, x0, x1, show = {} }) {
   clear(shade);
-  for (const d of weekendDays(frame, x0, x1)) {
+  for (const d of show.weekends === false ? [] : weekendDays(frame, x0, x1)) {
     shade.appendChild(el('div', { class: 'ps-chart__weekend', style: { left: xOf(frame, d) + 'px', width: frame.px + 'px' } }));
   }
   if (holidays && frame.px >= 3) {
@@ -77,6 +80,6 @@ export function drawShade({ frame, shade, todayLine, holidays, today, x0, x1 }) 
     }
   }
   const inFrame = today >= frame.from && today <= frame.to;
-  todayLine.hidden = !inFrame;
+  todayLine.hidden = !inFrame || show.today === false;
   if (inFrame) todayLine.style.left = Math.round(xOf(frame, today) + frame.px / 2) + 'px';
 }

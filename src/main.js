@@ -47,6 +47,8 @@ import { createCalendar } from './views/calendar/view.js';
 import { renderToolbar } from './ui/toolbar.js';
 import { openMapping } from './ui/mapping.js';
 import { createFilterBar } from './ui/filterbar.js';
+import { openDisplay, SECTIONS as DISPLAY_SECTIONS } from './ui/display.js';
+import { cleanDisplay, isDefaultDisplay, heights, taskSorter, listColumns, MAX_LIST_COLS } from './model/display.js';
 import { applyFind, rowsKept, cleanFind, emptyFind, choicesOf, facetRows, FIND_KINDS, NONE } from './model/find.js';
 import { openQuickEdit } from './ui/quickedit.js';
 import { confirmBox, numberBox, chooseBox, logBox } from './ui/dialog.js';
@@ -74,7 +76,7 @@ const S = {
   find: { active: false, keep: null, shown: 0, total: 0 },   // what this browser's quick filters keep (model/find.js)
   pinned: new Set(),   // rows added here while a filter is on: shown until the filter changes, so a new task does not vanish
   zoom: null, fitNext: false, selectedId: null, firstDraw: true,
-  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, find: emptyFind() },   // this browser's view of this table
+  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, find: emptyFind(), display: cleanDisplay(null) },   // this browser's view of this table
   calDay: null,        // a day in the month or week the calendar shows; null = today (not saved: looking around)
   example: 'plan',     // the demo's data: 'plan' (a website relaunch) or 'stores' (pop-up stores × weekends)
   pendingEdit: null,   // {id, note}: open quick edit once Grist sends this new row
@@ -230,6 +232,7 @@ function ensureCalendar() {
     onToday: () => { S.calDay = null; S.signature = ''; recompute(); },
     onMode: (m) => { S.view.calMode = m; saveView(); S.signature = ''; recompute(); },
     onDay: (day) => { S.calDay = day; S.view.calMode = 'week'; saveView(); S.signature = ''; recompute(); },
+    onNewOn: (day) => newTask(day),
     onFind: (id) => { const x = taskById(id); if (x?.start != null) { S.calDay = x.start; S.signature = ''; recompute(); } },
     onAnnounce: (text) => announce(text),
     onUndo: () => undo(),
@@ -312,7 +315,13 @@ const fmtShortRange = (a, b) => {
   const f = shortFormat(!thisYear(a) || !thisYear(b));
   return typeof f.formatRange === 'function' ? f.formatRange(dateFromDay(a), dateFromDay(b)) : `${fmtShort(a)} – ${fmtShort(b)}`;
 };
-const colourByCol = () => (S.gantt.colourBy ? S.columns.find((c) => c.ref === S.gantt.colourBy.ref) || S.columns.find((c) => c.id === S.gantt.colourBy.id) || null : null);
+const disp = () => cleanDisplay(S.view.display);
+/** The column the bars are coloured by: this browser's choice in Display, else what Settings says. */
+const colourByCol = () => {
+  const mine = disp().colourBy ? S.columns.find((c) => c.id === disp().colourBy) : null;
+  if (mine) return mine;
+  return S.gantt.colourBy ? S.columns.find((c) => c.ref === S.gantt.colourBy.ref) || S.columns.find((c) => c.id === S.gantt.colourBy.id) || null : null;
+};
 const GROUP_KINDS = ['Choice', 'ChoiceList', 'Ref', 'RefList', 'Text', 'Bool'];
 const groupable = (c) => GROUP_KINDS.includes(c.kind) && c.refTable !== S.tableId && c.id !== S.roles.title;
 const groupCol = () => (S.view.groupBy ? S.columns.find((c) => c.id === S.view.groupBy && groupable(c)) || null : null);
@@ -601,7 +610,61 @@ function noMatch() {
   emptyState(t('No task matches'), t('The search and filters above leave nothing. Nothing is deleted: clear them to see every task again.'), [[t('Clear filters'), clearFind]]);
 }
 
+// ---- display (M15) -----------------------------------------------------------------------------------------
+// Row height, the order of the rows, colour, names on bars, week numbers, weekends, today, and columns beside the names:
+// this browser's, per table, carried by a saved view; nothing in the document.
+/** What the Gantt chart and the timeline are told about it. */
+function displayProps(withList) {
+  const d = disp();
+  const h = heights(d);
+  const cols = withList ? listCols() : [];
+  return {
+    rowH: h.rowH, barH: h.barH, labels: d.labels, show: { weekNumbers: d.weekNumbers, weekends: d.weekends, today: d.today },
+    listCols: cols.map((c) => ({ id: c.id, label: c.label })),
+    listText: cols.length ? (task) => listTexts(task) : null,
+  };
+}
+/** The columns beside the names that are still in the table. */
+const listCols = () => disp().cols.map((id) => colById(id)).filter(Boolean);
+/** A task's text in each of them. */
+function listTexts(task) {
+  const row = rowById(task.id);
+  return listCols().map((c) => (row ? cellText(row, c, S.labels, fmtShort) || '' : ''));
+}
+let displayPanel = null;
+function displayState() {
+  const d = disp();
+  const cand = listColumns(S.columns, S.roles, S.tableId).map((c) => ({ id: c.id, label: c.label }));
+  const colourable = S.columns.filter((c) => (c.kind === 'Choice' || c.kind === 'ChoiceList' || c.kind === 'Ref' || c.kind === 'RefList' || c.kind === 'Text' || c.kind === 'Bool') && c.id !== S.roles.title && c.refTable !== S.tableId).map((c) => ({ id: c.id, label: c.label }));
+  // the dates are said by the bars and by the list already: sorting by start or end has its own entries, and the list shows both
+  const dates = new Set([S.roles.start, S.roles.end, S.roles.due]);
+  return { mode: S.mode, display: d, sortOptions: cand.filter((c) => !dates.has(c.id)), colourOptions: colourable, colOptions: cand.filter((c) => c.id !== S.roles.start && c.id !== S.roles.end), maxCols: MAX_LIST_COLS, isDefault: isDefaultDisplay(d) };
+}
+function setDisplay(next) {
+  S.view.display = cleanDisplay(next);
+  saveView();
+  S.signature = '';
+  applyDensity();
+  recompute();
+  displayPanel?.refresh(displayState());
+}
+function applyDensity() { shell.dataset.density = disp().density; }
+function toggleDisplay() {
+  if (displayPanel) { displayPanel.close(); return; }
+  if (!DISPLAY_SECTIONS[S.mode]) return;
+  displayPanel = openDisplay(shell, displayState(), {
+    onChange: (patch) => setDisplay({ ...disp(), ...patch }),
+    onReset: () => setDisplay(null),
+    onClose: (byKey) => { displayPanel = null; drawToolbar(S.mode === 'gantt' ? S.model : null); if (byKey) document.querySelector('.ps-display-btn')?.focus(); },
+  });
+  drawToolbar(S.mode === 'gantt' ? S.model : null);
+}
+
 function drawToolbar(model = null, level = 'full') {
+  // a view with no Display (the agenda, the workload) closes the panel
+  if (displayPanel && !DISPLAY_SECTIONS[S.mode]) displayPanel.close();
+  else if (displayPanel) displayPanel.refresh(displayState());
+  applyDensity();
   drawFilterBar(level);
   const b = S.built;
   const gantt = S.mode === 'gantt';
@@ -648,6 +711,7 @@ function drawToolbar(model = null, level = 'full') {
     canCalendar: S.mode === 'agenda' && !!S.agendaModel?.ag.groups.some((g) => g.id !== 'late' && g.id !== 'undated'),
     timer: (() => { const r = myTimer(); return r ? { title: taskById(r.task)?.title || t('(no name)'), since: r.start, elapsed: elapsedText(r.start) } : null; })(),
     hasTime: hasTime(),
+    display: { available: !!DISPLAY_SECTIONS[S.mode], changed: !isDefaultDisplay(S.view.display), open: !!displayPanel },
     examples: Object.entries(EXAMPLE_LABELS).map(([id, label]) => ({ id, label: t(label) })), example: S.example,
   }, {
     onMode: setMode,
@@ -669,6 +733,7 @@ function drawToolbar(model = null, level = 'full') {
     onCalendar: () => exportCalendar(null),
     onReminders: () => openRemindersPanel(),
     onViews: () => openViewsPanel(),
+    onDisplay: () => toggleDisplay(),
     onOverload: () => { const o = S.wlModel?.ahead[0]; if (o) workloadView?.scrollToCell(S.wlModel.cellOf(o)); },
     onStopTimer: () => stopTimer(),
     onTimesheet: () => openTimesheetPanel(),
@@ -682,6 +747,7 @@ const saveView = () => rememberView(S.tableId, {
   tlLaneBy: S.view.tlLaneBy, bookRows: S.view.bookRows, bookPeriods: S.view.bookPeriods, bookFilter: S.view.bookFilter,
   wlRows: S.view.wlRows, wlUnit: S.view.wlUnit, wlMeasure: S.view.wlMeasure, agendaWho: S.view.agendaWho, calMode: S.view.calMode,
   find: cleanFind(S.view.find),
+  display: cleanDisplay(S.view.display),
 });
 
 /** Everything the chart needs, from the rows. */
@@ -698,7 +764,7 @@ function buildModel(rows = viewRows()) {
     label: (k) => k || t('(none)'),
     order: gc.kind === 'Choice' || gc.kind === 'ChoiceList' ? gc.choices : null,
   } : null;
-  const { entries, summaries } = arrange(all, { group, collapsed: S.view.collapsed });
+  const { entries, summaries } = arrange(all, { group, collapsed: S.view.collapsed, sort: taskSorter(disp().sort, { columns: S.columns, rowOf: rowById, labels: S.labels }) });
   // Links between dated tasks; a parent counts with the span of its children.
   const dated = all.map((x) => (summaries.has(x.id) ? { ...x, start: summaries.get(x.id).start, end: summaries.get(x.id).end, summary: true } : x)).filter((x) => x.start != null);
   const byId = new Map(dated.map((x) => [x.id, x]));
@@ -757,7 +823,8 @@ function recompute() {
   const editable = canEdit();
   const titleCol = S.columns.find((c) => c.id === S.roles.title);
   const sig = [S.zoom, weekStart(), S.selectedId, titleCol?.label, editable, S.view.critical, S.gantt.holidays, S.gantt.durationUnit,
-    [...S.view.collapsed].join(','), groupCol()?.id,
+    [...S.view.collapsed].join(','), groupCol()?.id, JSON.stringify(disp()),
+    ...(disp().cols.length ? m.entries.map((e) => (e.kind === 'task' ? listTexts(e.task).join('\u0003') : '')) : []),
     ...m.entries.map((e) => (e.kind === 'group' ? 'g' + e.key + e.collapsed : e.task.id + '\u0002' + e.task.hash + (e.summary ? `${e.summary.start}-${e.summary.end}` : ''))),
     ...m.links.map((l) => `${l.from}>${l.to}${l.late ? '!' : ''}`), ...m.crit.tasks].join('\n');
   if (sig === S.signature && !fitNow) return;
@@ -770,6 +837,7 @@ function recompute() {
     today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), selectedId: S.selectedId,
     titleLabel: titleCol ? titleCol.label : t('Task'),
     timeText: (task) => timeText(task),
+    ...displayProps(true),
   }, { first: S.firstDraw, fit: fitNow });
   S.firstDraw = false;
 }
@@ -841,7 +909,7 @@ function recomputeTimeline() {
   S.fitNext = false;
   drawToolbar();
   const editable = canEdit();
-  const sig = ['t', lane.id, S.zoom, weekStart(), S.selectedId, editable, S.gantt.holidays, todayDay(),
+  const sig = ['t', lane.id, S.zoom, weekStart(), S.selectedId, editable, S.gantt.holidays, todayDay(), JSON.stringify(disp()),
     ...tl.lanes.map((l) => `${l.key}|${l.label}|${l.tracks}|` + l.bars.map((b) => b.task.id + '@' + b.track + (b.clash ? '!' : '') + '\u0002' + b.task.hash).join('\u0003'))].join('\n');
   if (sig === S.signature && !fitNow) return;
   S.signature = sig;
@@ -851,6 +919,7 @@ function recomputeTimeline() {
     caps: (task) => capabilities(task, c), editable, laneMovable: editable && !lane.isFormula,
     today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), selectedId: S.selectedId,
     laneLabel: lane.label, noneLabel: t('No {col}', { col: lane.label }),
+    ...displayProps(false),
   }, { first: S.firstDraw, fit: fitNow });
   S.firstDraw = false;
 }
@@ -1105,7 +1174,7 @@ function recomputeCalendar() {
   S.signature = sig;
   const c = ctx();
   v.update({
-    grid, mode, maxTracks: MONTH_TRACKS, today, selectedId: S.selectedId,
+    grid, mode, maxTracks: MONTH_TRACKS, today, selectedId: S.selectedId, canAdd: canEdit() && ganttReady(S.roles),
     title: calTitle(mode, grid),
     weekdays: grid.weeks[0].days.map((d) => calFormat('wd').format(dateFromDay(d))),
     canDrag: (task) => editable && capabilities(task, c).move,
@@ -1306,7 +1375,7 @@ function applySavedView(id) {
   const v = S.savedViews.find((x) => x.id === id);
   if (!v) return;
   const keep = S.view.collapsed;
-  S.view = { ...S.view, ...Object.fromEntries(Object.entries(v.view)), collapsed: keep, critical: v.view.critical === true, find: cleanFind(v.view.find) };
+  S.view = { ...S.view, ...Object.fromEntries(Object.entries(v.view)), collapsed: keep, critical: v.view.critical === true, find: cleanFind(v.view.find), display: cleanDisplay(v.view.display) };
   S.pinned.clear();
   if (v.zoom) { S.zoom = v.zoom; rememberZoom(S.tableId, v.zoom); }
   saveView();
@@ -2270,10 +2339,12 @@ async function linkForNewTask() {
   return linkValue(S.rows, col) || { unknown: col };
 }
 
-async function newTask() {
+async function newTask(onDay) {
   if (!canEdit()) return;
+  // a click handler passes its event: only a day number is a day
+  const day = typeof onDay === 'number' ? onDay : todayDay();
   const link = await linkForNewTask();
-  const plan = newTaskFields(ctx(), { day: todayDay(), title: t('New task'), link: link && !link.unknown ? link : null });
+  const plan = newTaskFields(ctx(), { day, title: t('New task'), link: link && !link.unknown ? link : null });
   const note = link?.unknown ? t('This task will show here once its {col} matches the row selected in the linked widget.', { col: link.unknown.label }) : null;
   if (S.demo) {
     const id = Math.max(0, ...S.rows.map((r) => r.id)) + 1;

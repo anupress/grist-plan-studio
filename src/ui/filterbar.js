@@ -98,6 +98,11 @@ export function createFilterBar(on) {
     const focusKey = bar.contains(document.activeElement) ? document.activeElement.dataset?.fk || document.activeElement.closest?.('[data-chip]')?.dataset.chip : null;
     const wasChip = bar.contains(document.activeElement) && document.activeElement.classList.contains('ps-chip');
     bar.hidden = !state.visible;
+    // the words are set here, not where the elements are made: the strip is built before the language is known
+    input.placeholder = t('Search by name');
+    input.setAttribute('aria-label', t('Search by name'));
+    add.setAttribute('aria-label', t('Add a filter'));
+    bar.setAttribute('aria-label', t('Filter the tasks'));
     if (document.activeElement !== input && input.value !== state.q) input.value = state.q;
     clear(chips);
     for (const chip of state.chips) {

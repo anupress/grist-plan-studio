@@ -214,6 +214,14 @@
   font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer;
 }
 .ps-cal__num:hover { background: var(--ps-hover); }
+/* A day's own "+": there when the pointer is, or the focus, so an empty month stays quiet. */
+.ps-cal__add {
+  margin-left: auto; min-width: 24px; height: 22px; padding: 0; border: 0; border-radius: 11px; background: none; color: var(--ps-muted);
+  font: inherit; font-size: 16px; line-height: 1; cursor: pointer; opacity: 0;
+}
+.ps-cal__day:hover .ps-cal__add, .ps-cal__add:focus-visible { opacity: 1; }
+.ps-cal__add:hover { background: var(--ps-hover); color: var(--ps-ink); }
+@media (hover: none) { .ps-cal__add { opacity: 0.55; } }
 .ps-cal__day.is-outside .ps-cal__num { color: var(--ps-muted); }
 .ps-cal__num.is-today { background: var(--ps-accent); color: var(--ps-accent-ink); font-weight: 700; }
 .ps-cal__chip {

@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.7.0
+
+More control over how the views look, from the toolbar. Tested in Grist 1.7.20 (the Project Management template).
+
+- **Display**, a panel under the toolbar that leaves the view in sight: **row height** (comfortable or compact: rows 24 px
+  instead of 32, bars 16 instead of 20, board cards closer), **sort rows by** (Gantt chart: start, end, name or any column,
+  siblings among themselves so a task stays under its parent), **colour by** any column, **names on bars** (in the bar when
+  they fit, beside, or none), **week numbers**, **weekends** and **the today line** on or off, and up to three **columns
+  beside the names** in the Gantt chart's list, their headings lined up with the cells.
+- In the calendar every day has a **+** (and a double click on its empty part does the same): a task dated that day, its quick
+  edit open. The calendar's toolbar has **+ New task** for today.
+- This browser's choices, per table; a saved view keeps them, and applying one without them brings the defaults back. Nothing is
+  written to the document. **Back to the defaults** undoes them.
+- Fixed: the filter strip of 1.6.0 kept its placeholder and labels in English in a German or French widget (they were made
+  before the language was known).
+- German and French for every new word.
+
 ## 1.6.0
 
 A search and quick filters in every view that draws tasks. Tested in Grist 1.7.20 (the Project Management template: 16 tasks).

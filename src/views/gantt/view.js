@@ -18,14 +18,16 @@
 
 import { el, clear } from '../../core/util.js';
 import { onColor } from '../../core/theme/apply.js';
-import { makeFrame, barBox, rowWindow, scrollLeftFor, xOf, dayAt, ROW_H } from './layout.js';
+import { makeFrame, barBox, rowWindow, scrollLeftFor, xOf, dayAt, ROW_H, BAR_H } from './layout.js';
 import { formatters, rangeText, drawScale, drawShade } from './scale.js';
 import { dateFromDay } from '../../model/values.js';
 import { t } from '../../i18n/index.js';
 
 export const HEAD_H = 52;
-// The task list takes about a third of the widget, within limits: a narrow widget still shows bars.
-const listWidthFor = (w) => Math.round(Math.max(150, Math.min(300, w * 0.32)));
+// The task list takes about a third of the widget, within limits: a narrow widget still shows bars. Each column the
+// person added beside the names takes CELL_W more, up to well under two thirds.
+const CELL_W = 88;
+const listWidthFor = (w, cols = 0) => Math.round(Math.min(Math.max(150, Math.min(300, w * 0.32)) + cols * CELL_W, Math.max(150, w * 0.62)));
 const DRAG_START = 3;  // px the pointer must travel before a press becomes a drag
 const INDENT = 14;     // px per level in the task list
 const NO_CAPS = { move: false, start: false, end: false, draw: false };
@@ -54,7 +56,8 @@ export function createGantt(host, on = {}) {
   clear(host).appendChild(root);
 
   // {entries, span, links, critical, criticalLinks, holidays, caps(task), length(a, b), workdays,
-  //  linkable, editable, showCritical, today, zoom, weekStart, locale, selectedId, titleLabel}
+  //  linkable, editable, showCritical, today, zoom, weekStart, locale, selectedId, titleLabel,
+  //  rowH, barH, labels ('auto' | 'beside' | 'off'), show {weekNumbers, weekends, today}, listCols [{id, label}], listText(task) -> [string]}
   let model = null;
   let rows = [];      // model.entries
   let frame = null;
@@ -62,6 +65,7 @@ export function createGantt(host, on = {}) {
   let drawn = '';     // what the last draw covered, so a scroll inside it costs nothing
   let raf = 0;
   let listW = 280;
+  let RH = ROW_H, BH = BAR_H;   // this person's row and bar heights
   let drag = null;    // the gesture in progress
   let swallowUntil = 0;  // the click a drag's release produces is not a click on what is under it
   const indexOf = new Map();   // task id -> row
@@ -73,21 +77,23 @@ export function createGantt(host, on = {}) {
   const centreDay = () => (frame ? dayAt(frame, scroll.scrollLeft + chartViewW() / 2) : null);
 
   function size() {
-    listW = listWidthFor(scroll.clientWidth || 900);
+    listW = listWidthFor(scroll.clientWidth || 900, model?.listCols?.length || 0);
     canvas.style.setProperty('--list-w', listW + 'px');
     canvas.style.setProperty('--chart-w', frame.width + 'px');
     canvas.style.setProperty('--head-h', HEAD_H + 'px');
-    canvas.style.setProperty('--body-h', Math.max(1, rows.length) * ROW_H + 'px');
-    canvas.style.setProperty('--row-h', ROW_H + 'px');
+    canvas.style.setProperty('--body-h', Math.max(1, rows.length) * RH + 'px');
+    canvas.style.setProperty('--row-h', RH + 'px');
+    canvas.style.setProperty('--bar-h', BH + 'px');
+    canvas.style.setProperty('--cell-w', CELL_W + 'px');
     arrows.setAttribute('width', String(frame.width));
-    arrows.setAttribute('height', String(Math.max(1, rows.length) * ROW_H));
+    arrows.setAttribute('height', String(Math.max(1, rows.length) * RH));
   }
 
   function drawScaleRange(x0, x1) {
-    drawScale({ frame, top: scaleTop, bottom: scaleBottom, F, today: model.today, holidays: model.holidays, x0, x1 });
+    drawScale({ frame, top: scaleTop, bottom: scaleBottom, F, today: model.today, holidays: model.holidays, x0, x1, show: model.show });
   }
   function drawShadeRange(x0, x1) {
-    drawShade({ frame, shade, todayLine, holidays: model.holidays, today: model.today, x0, x1 });
+    drawShade({ frame, shade, todayLine, holidays: model.holidays, today: model.today, x0, x1, show: model.show });
   }
 
   const labelFits = (title, w) => w >= Math.min(title.length, 60) * 7 + 16;
@@ -105,8 +111,9 @@ export function createGantt(host, on = {}) {
   function barElements(e, i, selected) {
     const task = e.task;
     const span = spanOf(e);
-    const box = barBox(frame, { kind: e.summary ? 'bar' : task.kind, start: span.start, end: span.end }, i);
+    const box = barBox(frame, { kind: e.summary ? 'bar' : task.kind, start: span.start, end: span.end }, i, RH, BH);
     const title = task.title || t('(no name)');
+    const mode = model.labels || 'auto';
     const label = `${title}, ${rangeText(F, span)}`;
     const critical = model.showCritical && model.critical?.has(task.id);
     const link = model.linkable && !e.summary ? el('span', { class: 'ps-bar__link', dataset: { id: String(task.id), part: 'link' }, title: t('Drag onto another task: it starts after this one ends') }) : null;
@@ -117,7 +124,7 @@ export function createGantt(host, on = {}) {
         dataset: { id: String(task.id), part: 'summary' },
         style: { left: box.x + 'px', top: box.y + 'px', width: box.w + 'px' }, role: 'img', 'aria-label': label,
       }));
-      out.push(el('span', { class: 'ps-bar__out ps-bar__out--sum', dataset: { id: String(task.id) }, style: { left: box.x + box.w + 6 + 'px', top: box.y + 'px' }, text: title }));
+      if (mode !== 'off') out.push(el('span', { class: 'ps-bar__out ps-bar__out--sum', dataset: { id: String(task.id) }, style: { left: box.x + box.w + 6 + 'px', top: box.y + 'px' }, text: title }));
       return out;
     }
     const c = caps(task);
@@ -129,10 +136,10 @@ export function createGantt(host, on = {}) {
         dataset: { id: String(task.id), part: 'body' }, style: { left: box.x + 'px', top: box.y + 'px', '--fill': fill },
         role: 'img', 'aria-label': label,
       }, [link]));
-      out.push(el('span', { class: 'ps-bar__out', dataset: { id: String(task.id) }, style: { left: box.x + box.w + 4 + 'px', top: box.y + 'px' }, text: title }));
+      if (mode !== 'off') out.push(el('span', { class: 'ps-bar__out', dataset: { id: String(task.id) }, style: { left: box.x + box.w + 4 + 'px', top: box.y + 'px' }, text: title }));
       return out;
     }
-    const inside = labelFits(title, box.w);
+    const inside = mode === 'auto' && labelFits(title, box.w);
     out.push(el('div', {
       class: 'ps-bar' + (selected ? ' is-selected' : '') + (task.flag ? ' ps-bar--flag' : '') + (c.move ? ' can-move' : '') + (critical ? ' is-critical' : ''),
       dataset: { id: String(task.id), part: 'body' },
@@ -145,8 +152,15 @@ export function createGantt(host, on = {}) {
       c.end ? el('span', { class: 'ps-bar__h ps-bar__h--r', dataset: { part: 'end' } }) : null,
       link,
     ]));
-    if (!inside) out.push(el('span', { class: 'ps-bar__out', dataset: { id: String(task.id) }, style: { left: box.x + box.w + (link ? 14 : 6) + 'px', top: box.y + 'px' }, text: title }));
+    if (!inside && mode !== 'off') out.push(el('span', { class: 'ps-bar__out', dataset: { id: String(task.id) }, style: { left: box.x + box.w + (link ? 14 : 6) + 'px', top: box.y + 'px' }, text: title }));
     return out;
+  }
+
+  /** The extra columns of a task's row, as spans of one width, so the headings line up with them. */
+  function listCells(task) {
+    if (!model.listCols?.length || !model.listText) return null;
+    const texts = model.listText(task);
+    return model.listCols.map((c, k) => el('span', { class: 'ps-row__cell', text: texts[k] || '', title: texts[k] || '' }));
   }
 
   function drawRows(first, last) {
@@ -159,13 +173,13 @@ export function createGantt(host, on = {}) {
       if (!e) continue;
       if (e.kind === 'group') {
         const label = e.label || t('(none)');
-        list.appendChild(el('div', { class: 'ps-row ps-row--group', role: 'listitem', dataset: { toggle: 'g:' + e.key }, style: { top: i * ROW_H + 'px' } }, [
+        list.appendChild(el('div', { class: 'ps-row ps-row--group', role: 'listitem', dataset: { toggle: 'g:' + e.key }, style: { top: i * RH + 'px' } }, [
           caret('g:' + e.key, e.collapsed, label),
           el('span', { class: 'ps-row__title', text: label }),
           el('span', { class: 'ps-row__when', text: String(e.count) }),
         ]));
         if (e.start != null && Number.isFinite(e.start)) {
-          const box = barBox(frame, { kind: 'bar', start: e.start, end: e.end }, i);
+          const box = barBox(frame, { kind: 'bar', start: e.start, end: e.end }, i, RH, BH);
           bars.appendChild(el('div', { class: 'ps-grpbar', dataset: { toggle: 'g:' + e.key }, style: { left: box.x + 'px', top: box.y + 'px', width: box.w + 'px' }, title: `${label} · ${rangeText(F, e)}` }));
         }
         continue;
@@ -177,7 +191,7 @@ export function createGantt(host, on = {}) {
       list.appendChild(el('div', {
         class: 'ps-row' + (selected ? ' is-selected' : '') + (task.flag ? ' is-flagged' : '') + (e.undated ? ' is-undated' : '')
           + (i === firstUndated ? ' is-first-undated' : '') + (e.summary ? ' is-summary' : ''),
-        role: 'listitem', dataset: { id: String(task.id) }, style: { top: i * ROW_H + 'px' },
+        role: 'listitem', dataset: { id: String(task.id) }, style: { top: i * RH + 'px' },
         'aria-label': `${title}, ${e.undated ? t('No dates') : rangeText(F, span)}`, 'aria-current': selected ? 'true' : null,
         'aria-level': String(e.depth + 1),
       }, [
@@ -185,13 +199,14 @@ export function createGantt(host, on = {}) {
         e.kids ? caret('p:' + task.id, e.collapsed, title) : null,
         el('span', { class: 'ps-row__title', text: title }),
         el('span', { class: 'ps-row__when', text: whenText(e.undated ? task : span) }),
+        ...(listCells(task) || []),
       ]));
-      if (selected) bars.appendChild(el('div', { class: 'ps-chart__selrow', style: { top: i * ROW_H + 'px' } }));
+      if (selected) bars.appendChild(el('div', { class: 'ps-chart__selrow', style: { top: i * RH + 'px' } }));
       if (e.undated) {
         const c = caps(task);
         bars.appendChild(el('div', {
           class: 'ps-drawrow' + (c.draw ? ' can-draw' : '') + (i === firstUndated ? ' is-first-undated' : ''),
-          dataset: { id: String(task.id), part: 'draw' }, style: { top: i * ROW_H + 'px' },
+          dataset: { id: String(task.id), part: 'draw' }, style: { top: i * RH + 'px' },
         }, [el('span', { class: 'ps-drawrow__hint', text: c.draw ? t('Drag across the chart to give this task dates') : t('No dates') })]));
         continue;
       }
@@ -208,8 +223,8 @@ export function createGantt(host, on = {}) {
     if (e.kind !== 'task' || e.undated) return null;
     const span = spanOf(e);
     const ms = !e.summary && e.task.kind === 'milestone';
-    const box = barBox(frame, { kind: ms ? 'milestone' : 'bar', start: span.start, end: span.end }, i);
-    const y = i * ROW_H + ROW_H / 2;
+    const box = barBox(frame, { kind: ms ? 'milestone' : 'bar', start: span.start, end: span.end }, i, RH, BH);
+    const y = i * RH + RH / 2;
     if (ms) return { x: side === 'out' ? box.cx + 8 : box.cx - 8, y };
     return { x: side === 'out' ? box.x + box.w : box.x, y };
   }
@@ -218,7 +233,7 @@ export function createGantt(host, on = {}) {
     const r = 6;
     if (b.x - a.x >= 2 * r + 4) return `M${a.x},${a.y} H${a.x + r} V${b.y} H${b.x - 1}`;
     // The successor starts before the predecessor ends (or too close): go round, between the rows.
-    const mid = b.y > a.y ? a.y + ROW_H / 2 : a.y - ROW_H / 2;
+    const mid = b.y > a.y ? a.y + RH / 2 : a.y - RH / 2;
     return `M${a.x},${a.y} H${a.x + r} V${mid} H${b.x - 2 * r} V${b.y} H${b.x - 1}`;
   }
 
@@ -250,7 +265,7 @@ export function createGantt(host, on = {}) {
     if (!model || !frame || drag) return;
     const x0 = Math.max(0, scroll.scrollLeft - 200);
     const x1 = scroll.scrollLeft + chartViewW() + 200;
-    const { first, last } = rowWindow(scroll.scrollTop, scroll.clientHeight - HEAD_H, rows.length);
+    const { first, last } = rowWindow(scroll.scrollTop, scroll.clientHeight - HEAD_H, rows.length, 8, RH);
     const bucket = Math.floor(x0 / 400);
     const key = `${first}:${last}:${bucket}`;
     if (!force && key === drawn) return;
@@ -312,12 +327,12 @@ export function createGantt(host, on = {}) {
     const shown = { ...task, start, end };
     if (mode === 'draw') {
       if (!d.ghost) { d.ghost = el('div', { class: 'ps-bar ps-bar--ghost', style: { '--fill': 'var(--ps-bar)' } }); bars.appendChild(d.ghost); }
-      const box = barBox(frame, { kind: 'bar', start, end }, d.row);
+      const box = barBox(frame, { kind: 'bar', start, end }, d.row, RH, BH);
       Object.assign(d.ghost.style, { left: box.x + 'px', top: box.y + 'px', width: box.w + 'px' });
     } else if (task.kind === 'milestone') {
-      d.el.style.left = barBox(frame, shown, d.row).x + 'px';
+      d.el.style.left = barBox(frame, shown, d.row, RH, BH).x + 'px';
     } else {
-      const box = barBox(frame, shown, d.row);
+      const box = barBox(frame, shown, d.row, RH, BH);
       d.el.style.left = box.x + 'px';
       d.el.style.width = box.w + 'px';
     }
@@ -507,9 +522,9 @@ export function createGantt(host, on = {}) {
   function reveal(id) {
     const i = indexOf.get(id);
     if (i == null || !frame) return;
-    const top = i * ROW_H, viewH = scroll.clientHeight - HEAD_H;
+    const top = i * RH, viewH = scroll.clientHeight - HEAD_H;
     if (top < scroll.scrollTop) scroll.scrollTop = top;
-    else if (top + ROW_H > scroll.scrollTop + viewH) scroll.scrollTop = top + ROW_H - viewH;
+    else if (top + RH > scroll.scrollTop + viewH) scroll.scrollTop = top + RH - viewH;
     const e = rows[i];
     if (e.kind !== 'task' || e.undated) return;
     const span = spanOf(e);
@@ -528,10 +543,12 @@ export function createGantt(host, on = {}) {
     const keep = !first && !fit && frame ? centreDay() : null;
     model = next;
     rows = next.entries;
+    RH = next.rowH || ROW_H;
+    BH = next.barH || BAR_H;
     F = formatters(next.locale);
     indexOf.clear();
     rows.forEach((e, i) => { if (e.kind === 'task') indexOf.set(e.task.id, i); });
-    corner.textContent = next.titleLabel || t('Task');
+    clear(corner).append(el('span', { class: 'ps-corner__title', text: next.titleLabel || t('Task') }), ...(next.listCols || []).map((c) => el('span', { class: 'ps-corner__cell', text: c.label, title: c.label })));
     root.classList.toggle('is-editable', !!next.editable);
     const span = next.span;
     frame = makeFrame(span, next.today, next.zoom, next.weekStart);
@@ -554,7 +571,7 @@ export function createGantt(host, on = {}) {
     scrollToToday: () => model && scrollToDay(model.today),
     scrollToUndated: () => {
       const i = rows.findIndex((e) => e.kind === 'task' && e.undated);
-      if (i >= 0) { scroll.scrollTop = i * ROW_H; draw(true); }
+      if (i >= 0) { scroll.scrollTop = i * RH; draw(true); }
     },
     focus: () => scroll.focus({ preventScroll: true }),
     destroy: () => { ro?.disconnect(); clear(host); },

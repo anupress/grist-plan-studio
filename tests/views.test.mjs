@@ -20,7 +20,7 @@ eq('…and nothing else: no folded rows, no stray keys', Object.keys(snap.view).
 eq('a choice not made is null', [snap.view.tlLaneBy, snap.view.wlMeasure, snap.view.bookRows], [null, null, null]);
 eq('a view that does not exist falls back to the Gantt chart, a bad zoom to none', [S.snapshotView({ mode: 'nope', zoom: 'hours', view: {} }).mode, S.snapshotView({ mode: 'nope', zoom: 'hours', view: {} }).zoom], ['gantt', null]);
 eq('the calendar is a view', S.snapshotView({ mode: 'calendar', zoom: null, view: { calMode: 'month' } }).mode, 'calendar');
-eq('a bad value for a choice becomes null', S.snapshotView({ mode: 'board', zoom: 'week', view: { wlUnit: 'fortnight', critical: 'yes', groupBy: '' } }).view, { groupBy: null, critical: null, laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, find: null });
+eq('a bad value for a choice becomes null', S.snapshotView({ mode: 'board', zoom: 'week', view: { wlUnit: 'fortnight', critical: 'yes', groupBy: '' } }).view, { groupBy: null, critical: null, laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, find: null, display: null });
 
 // the quick filters travel with a view
 const withFind = S.snapshotView({ mode: 'gantt', zoom: null, view: { find: { q: ' logo ', sel: { Status: ['Doing', 'Doing', 7], Owner: [] }, cols: ['Priority'], junk: 1 } } });
@@ -29,6 +29,14 @@ eq('a view with no filter keeps null, not an empty one', [S.snapshotView({ mode:
 eq('a filter column shown with nothing chosen is still kept (the chip comes back)', S.snapshotView({ mode: 'gantt', zoom: null, view: { find: { cols: ['Priority'] } } }).view.find, { q: '', sel: {}, cols: ['Priority'] });
 eq('a junk filter becomes null', S.snapshotView({ mode: 'gantt', zoom: null, view: { find: 'oops' } }).view.find, null);
 eq('a list read from the document cleans the filter too', S.cleanViews([{ id: 'f1', name: 'Stuck', mode: 'gantt', zoom: null, view: { find: { sel: { Status: ['Stuck', 3] } } } }])[0].view.find, { q: '', sel: { Status: ['Stuck'] }, cols: [] });
+
+// how the rows and bars look travels with a view too
+const withDisplay = S.snapshotView({ mode: 'gantt', zoom: null, view: { display: { density: 'compact', sort: 'start', labels: 'off', weekNumbers: false, cols: ['Status', 'Status', 'Owner'], junk: 1 } } });
+eq('a view keeps the display choices, cleaned', withDisplay.view.display, { density: 'compact', sort: 'start', colourBy: null, labels: 'off', weekNumbers: false, weekends: true, today: true, cols: ['Status', 'Owner'] });
+eq('the default display is kept as null, so an old view and a new one with nothing chosen are the same', [S.snapshotView({ mode: 'gantt', zoom: null, view: {} }).view.display, S.snapshotView({ mode: 'gantt', zoom: null, view: { display: { density: 'comfortable', labels: 'auto' } } }).view.display], [null, null]);
+eq('a junk display becomes null', S.snapshotView({ mode: 'gantt', zoom: null, view: { display: 'wide' } }).view.display, null);
+eq('a list read from the document cleans the display too', S.cleanViews([{ id: 'd1', name: 'Dense', mode: 'gantt', zoom: null, view: { display: { density: 'compact', labels: 'inside' } } }])[0].view.display, { density: 'compact', sort: null, colourBy: null, labels: 'auto', weekNumbers: true, weekends: true, today: true, cols: [] });
+eq('this browser’s memory of a table gives a clean display when nothing is stored', (() => { globalThis.localStorage = { getItem: () => null, setItem: () => {} }; return S.storedView('t').display.density; })(), 'comfortable');
 
 const good = (id, name, extra = {}) => ({ id, name, mode: 'board', zoom: 'week', view: { laneBy: 'Status' }, ...extra });
 const cleaned = S.cleanViews([

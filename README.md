@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.6.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.7.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -232,11 +232,30 @@ are left of stays in the list at 0.
 - **The workload counts only what is shown**, and says so; **Level** is off while a filter is on, because a move could
   run into a task the filter hides.
 
+## Display
+
+**Display** in the toolbar (Gantt chart, timeline, board, calendar) opens a panel under it that leaves the view in
+sight, so each choice shows at once. The same table can be a dense list for one person and a roomy plan for another:
+
+- **Row height**: comfortable or compact (rows 24 px instead of 32, bars 16 px instead of 20; board cards sit closer).
+- **Sort rows by** (Gantt chart): start date, end date, name or any column; siblings are sorted among themselves,
+  so a task stays under its parent; empty values go last, and a Choice goes by its own list (To do, Doing, Done).
+- **Colour by**: any Choice, Reference, list, text or yes/no column, in place of what Settings says.
+- **Names on bars**: in the bar when they fit (else beside), always beside, or none.
+- **Show**: week numbers, weekends and the today line, each on or off.
+- **Columns beside the names** (Gantt chart): up to three, any column; the headings line up with the cells.
+- In the calendar a day has its own **+** (shown where the pointer or the focus is, and faintly on a touch screen), and a
+  double click on a day's empty part does the same: a task dated that day, with its quick edit open. **+ New task**
+  in the toolbar makes one for today.
+
+These are this browser's choices, per table; a saved view keeps them; nothing is written to the document.
+**Back to the defaults** undoes them all.
+
 ## Saved views, and moving over from another widget
 
 **Views** in the toolbar lists the views people saved for this widget: a name, and how the widget was set up
 when it was saved: which view, the zoom, what to group by, the board's lane column, the booking grid's rows
-and periods, the workload's measure, Mine or Everyone, month or week, and the filters. A click applies one (nothing is written
+and periods, the workload's measure, Mine or Everyone, month or week, the filters, and how it looks (Display). A click applies one (nothing is written
 to the document); **Update** replaces it with how the widget looks now; the form saves the current view under
 a name, and a name that exists is replaced. They are kept in the widget's options, so everyone who opens the
 page sees them, and only people who can edit the document can save one.
@@ -253,7 +272,7 @@ finished, its `Project_Id` reads as the project's name, and its hours (`Estimate
   opens in, what a card shows, lane limits, the booking grid's periods, the time-entries table and the
   saved views (when someone presses Save in Views).
 - **In this browser**: zoom, grouping, folded rows, the lane column and the last view, the
-  interface language, who you are for timers and for Mine, Mine or Everyone, and the search and filters. Looking around never writes to the document.
+  interface language, who you are for timers and for Mine, Mine or Everyone, the search and filters, and Display. Looking around never writes to the document.
 
 ## Privacy
 

@@ -34,9 +34,9 @@ const button = (text, title, onclick, cls = '') => el('button', { type: 'button'
  *          readOnlyWhy, canAdd, groupOptions, groupBy, hasLinks, critical, laneOptions, laneBy, tlLaneOptions, tlLaneBy,
  *          rowOptions, rowsBy, periodOptions, periodsBy, filterOptions, filterBy, wlRowOptions, wlRowsBy, wlUnit, wlMeasure (null without time entries), canLevel,
  *          agendaWho ('mine' | 'all' | null without people), agendaDoable, canCalendar, narrow (a phone: no calendar),
- *          timer: {title, since, elapsed} | null, hasTime, examples, example}} s
+ *          timer: {title, since, elapsed} | null, hasTime, display: {available, changed, open}, examples, example}} s
  * @param {{onMode, onZoom, onFit, onToday, onColumns, onNew, onUndated, onGroup, onCritical, onLanes, onTlLanes,
- *          onRows, onPeriods, onFilter, onClash, onWlRows, onWlUnit, onWlMeasure, onAgendaWho, onCalendar, onReminders, onViews, onLevel, onOverload, onStopTimer, onTimesheet, onExample,
+ *          onRows, onPeriods, onFilter, onClash, onWlRows, onWlUnit, onWlMeasure, onAgendaWho, onCalendar, onReminders, onViews, onDisplay, onLevel, onOverload, onStopTimer, onTimesheet, onExample,
  *          onPrint, onKeys}} on
  */
 export function renderToolbar(host, s, on) {
@@ -91,6 +91,8 @@ export function renderToolbar(host, s, on) {
           text: t('Critical path'), title: t('Show the tasks that decide the end date'), onclick: on.onCritical }) : null,
         ...zoomTools(),
       ];
+    } else if (view === 'calendar') {
+      tools = [s.canAdd ? button(t('+ New task'), t('A task for today'), on.onNew, ' ps-btn--primary') : null];
     } else if (view === 'timeline') {
       tools = [s.tlLaneOptions?.length ? picker(t('Lanes'), t('Make a lane for each value of'), s.tlLaneOptions, s.tlLaneBy, on.onTlLanes) : null, ...zoomTools()];
     } else if (view === 'board') {
@@ -149,6 +151,10 @@ export function renderToolbar(host, s, on) {
         el('button', { type: 'button', class: 'ps-timer__stop', text: t('Stop'), title: t('Stop the timer and log its time'), onclick: on.onStopTimer }),
       ]) : null,
       s.hasTime && level === 'full' ? button(t('Timesheet'), t('Hours logged this week, per task and day'), on.onTimesheet) : null,
+      level === 'full' && s.display?.available ? el('button', {
+        type: 'button', class: 'ps-btn ps-display-btn' + (s.display.changed ? ' is-on' : ''), text: t('Display'), 'aria-haspopup': 'dialog', 'aria-expanded': s.display.open ? 'true' : 'false',
+        title: s.display.changed ? t('How rows and bars look: changed from the default') : t('How rows and bars look: row height, order, colours, names, columns'), onclick: on.onDisplay,
+      }) : null,
       level === 'full' ? button(t('Views'), t('Saved views: a view as you set it up, under a name'), on.onViews) : null,
       level === 'full' && view !== 'agenda' ? button(t('Print'), t('Print or save as PDF (Ctrl+P)'), on.onPrint, ' ps-hide-narrow') : null,
       level === 'bare' ? null : el('button', { type: 'button', class: 'ps-btn ps-btn--key ps-hide-narrow', text: '?', title: t('Keyboard shortcuts (?)'), 'aria-label': t('Keyboard shortcuts'), onclick: on.onKeys }),

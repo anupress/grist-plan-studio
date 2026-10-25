@@ -169,20 +169,20 @@ button, input, select { font: inherit; color: inherit; }
 .ps-chart__selrow { position: absolute; left: 0; right: 0; height: var(--row-h); background: var(--ps-sel); }
 
 .ps-bar {
-  position: absolute; height: 20px; border-radius: 5px; background: var(--fill); color: var(--ink);
-  font-size: 12px; line-height: 20px; overflow: hidden; cursor: pointer; z-index: 2;
+  position: absolute; height: var(--bar-h, 20px); border-radius: 5px; background: var(--fill); color: var(--ink);
+  font-size: 12px; line-height: var(--bar-h, 20px); overflow: hidden; cursor: pointer; z-index: 2;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.10);
 }
 /* Progress: a thin strip along the bottom edge, kept clear of the label so it never reads as underlining. */
 .ps-bar__progress { position: absolute; left: 0; bottom: 0; height: 3px; background: rgba(0, 0, 0, 0.32); }
-.ps-bar__label { position: relative; display: block; padding: 0 8px; line-height: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-bar__label { position: relative; display: block; padding: 0 8px; line-height: calc(var(--bar-h, 20px) - 3px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ps-bar.is-selected, .ps-ms.is-selected::before { outline: 2px solid var(--ps-focus); outline-offset: 2px; }
 .ps-bar--flag { background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 255, 255, 0.45) 6px 9px); box-shadow: inset 0 0 0 1px var(--ps-today); }
 .ps-bar__out {
-  position: absolute; height: 20px; line-height: 20px; font-size: 12px; color: var(--ps-ink); white-space: nowrap;
+  position: absolute; height: var(--bar-h, 20px); line-height: var(--bar-h, 20px); font-size: 12px; color: var(--ps-ink); white-space: nowrap;
   max-width: 320px; overflow: hidden; text-overflow: ellipsis; cursor: pointer; z-index: 2;
 }
-.ps-ms { position: absolute; width: 20px; height: 20px; cursor: pointer; z-index: 2; }
+.ps-ms { position: absolute; width: var(--bar-h, 20px); height: var(--bar-h, 20px); cursor: pointer; z-index: 2; }
 .ps-ms::before {
   content: ""; position: absolute; inset: 3px; background: var(--fill); transform: rotate(45deg); border-radius: 2px;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
@@ -299,13 +299,13 @@ button, input, select { font: inherit; color: inherit; }
 .ps-row--group .ps-row__when { font-weight: 400; }
 
 .ps-sum {
-  position: absolute; height: 8px; margin-top: 6px; background: var(--ps-ink); opacity: 0.75; cursor: pointer; z-index: 2;
+  position: absolute; height: 8px; margin-top: calc((var(--bar-h, 20px) - 8px) / 2); background: var(--ps-ink); opacity: 0.75; cursor: pointer; z-index: 2;
   clip-path: polygon(0 0, 100% 0, 100% 100%, calc(100% - 6px) 55%, 6px 55%, 0 100%);
 }
 .ps-sum.is-selected { outline: 2px solid var(--ps-focus); outline-offset: 4px; }
 .ps-sum.is-critical { background: var(--ps-crit); opacity: 1; }
 .ps-bar__out--sum { font-weight: 600; }
-.ps-grpbar { position: absolute; height: 4px; margin-top: 8px; border-radius: 2px; background: var(--ps-muted); opacity: 0.45; cursor: pointer; }
+.ps-grpbar { position: absolute; height: 4px; margin-top: calc((var(--bar-h, 20px) - 4px) / 2); border-radius: 2px; background: var(--ps-muted); opacity: 0.45; cursor: pointer; }
 
 .ps-bar.is-critical { box-shadow: 0 0 0 2px var(--ps-crit); }
 .ps-ms.is-critical::before { box-shadow: 0 0 0 2px var(--ps-crit); }
@@ -607,4 +607,43 @@ button, input, select { font: inherit; color: inherit; }
   .ps-filterbar { padding: 6px 10px; }
   .ps-find__box { flex: 1 1 100%; max-width: none; }
   .ps-find__status { margin-left: 0; flex: 1 1 100%; }
+}
+
+/* ---- display (M15) ---- */
+/* The columns beside the names in the Gantt chart's list: one width, so the headings line up with them. */
+.ps-gantt__corner { gap: 8px; padding-right: 10px; }
+.ps-corner__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ps-corner__cell, .ps-row__cell { flex: none; width: var(--cell-w, 88px); box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-row__cell { font-size: 12px; color: var(--ps-muted); }
+.ps-display-btn.is-on { border-color: var(--ps-chrome-ink); }
+/* The panel sits under the toolbar and leaves the view in sight, so each choice shows at once. */
+.ps-disp {
+  position: absolute; right: 12px; z-index: 12; box-sizing: border-box; width: 300px; max-width: calc(100% - 24px); max-height: calc(100% - 70px); overflow: auto;
+  padding: 12px 14px; background: var(--ps-surface); color: var(--ps-ink); border: 1px solid var(--ps-line-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+.ps-disp__title { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+.ps-disp__row { display: block; margin: 0 0 10px; }
+.ps-disp__label { display: block; margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--ps-muted); }
+.ps-disp .ps-seg { display: flex; }
+.ps-disp .ps-seg__btn { flex: 1; min-height: 28px; background: var(--ps-surface); color: var(--ps-ink); border-color: var(--ps-line-strong); }
+.ps-disp .ps-seg__btn.is-on { background: var(--ps-accent-soft); color: var(--ps-accent); font-weight: 600; }
+.ps-disp select.ps-input { height: 30px; padding: 4px 8px; }
+.ps-disp__checks { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.ps-disp__check { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; cursor: pointer; }
+.ps-disp__check input { width: 16px; height: 16px; margin: 0; accent-color: var(--ps-accent); }
+.ps-disp__cols { list-style: none; margin: 0; padding: 0; max-height: 132px; overflow: auto; }
+.ps-disp__cols .ps-disp__check { display: flex; }
+.ps-disp__cols .ps-disp__check span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-disp__scope { margin: 4px 0 0; }
+.ps-disp__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ps-line); }
+.ps-disp__foot .ps-link { padding: 4px 2px; margin: -4px -2px; }
+.ps-disp__foot .ps-link:disabled { color: var(--ps-muted); text-decoration: none; cursor: default; }
+/* Compact: the board's cards sit closer, as the Gantt chart's rows do. */
+.ps-app[data-density="compact"] .ps-card { padding: 5px 8px 6px 11px; }
+.ps-app[data-density="compact"] .ps-card__title { -webkit-line-clamp: 2; line-height: 1.3; }
+.ps-app[data-density="compact"] .ps-card__meta { margin-top: 4px; min-height: 18px; }
+.ps-app[data-density="compact"] .ps-card__fields, .ps-app[data-density="compact"] .ps-card__time { margin-top: 3px; }
+.ps-app[data-density="compact"] .ps-card__progress { margin-top: 5px; }
+@media (max-width: 600px) {
+  .ps-disp { right: 8px; left: 8px; width: auto; max-width: none; }
 }

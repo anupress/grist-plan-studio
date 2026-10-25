@@ -17,7 +17,7 @@ const HOLD_MS = 350;      // a touch has to rest this long on a bar before it dr
 const MOVE_MOUSE = 4;     // px a mouse has to travel before a press becomes a drag
 
 /**
- * @param on {onSelect(id), onQuickEdit(id), onMove({id, delta}), onNav(dir), onToday(), onMode('month' | 'week'), onDay(day),
+ * @param on {onSelect(id), onQuickEdit(id), onMove({id, delta}), onNav(dir), onToday(), onMode('month' | 'week'), onDay(day), onNewOn(day) (a task on a day: the + of a day, or a double click on its empty part),
  *            onFind(id) (the bar is not in this month or week), onAnnounce(text), onUndo(), onRedo()}
  */
 export function createCalendar(host, on = {}) {
@@ -86,7 +86,13 @@ export function createCalendar(host, on = {}) {
           'aria-label': (today ? t('Today') + ', ' : '') + model.dayLabel(day), title: t('Show the week of {date}', { date: model.fmtDay(day) }), tabindex: '-1',
           onclick: () => on.onDay?.(day),
         }),
+        model.canAdd ? el('button', {
+          type: 'button', class: 'ps-cal__add', text: '+', tabindex: '-1',
+          'aria-label': t('Add a task on {date}', { date: model.dayLabel(day) }), title: t('Add a task on {date}', { date: model.fmtDay(day) }),
+          onclick: (e) => { e.stopPropagation(); on.onNewOn?.(day); },
+        }) : null,
       ]);
+      if (model.canAdd) cell.addEventListener('dblclick', (e) => { if (e.target === cell) on.onNewOn?.(day); });
       dayNodes.set(day, cell);
       node.appendChild(cell);
     });
