@@ -19,6 +19,7 @@
 
 import { dayOf, refId, listOf, plain, num, progressScale } from './values.js';
 import { linkTypeOf } from './links.js';
+import { parseChecklist } from './checklist.js';
 import { makeCalendar } from './calendar.js';
 import { getPalette } from '../core/theme/palettes.js';
 
@@ -30,6 +31,9 @@ const isHex = (s) => typeof s === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.
 
 // A status that means finished, in English, German and French.
 export const DONE_WORDS = /^(done|complete|completed|closed|finished|shipped|resolved|archived|archive|archivee|archiviert|erledigt|fertig|abgeschlossen|geschlossen|termine|terminee|fait|clos|cloture)$/;
+// A status that says the task is stuck, in English, German and French.
+export const BLOCKED_WORDS = /^(blocked|blocker|stuck|on hold|impediment|blockiert|gesperrt|bloque|bloquee|bloquant|en pause)$/;
+export const isBlockedStatus = (s) => BLOCKED_WORDS.test(String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase());
 export const isDoneStatus = (s) => DONE_WORDS.test(String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase());
 
 /** Grist's default choice fill is white or unset: treat both as "no colour chosen". */
@@ -56,7 +60,7 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
   const byId = (id) => (id ? columns.find((c) => c.id === id) || null : null);
   const col = (role) => byId(roles[role]);
   const C = Object.fromEntries(['title', 'start', 'end', 'due', 'duration', 'status', 'progress', 'done', 'milestone',
-    'assignee', 'project', 'colour', 'parent', 'dependsOn', 'lag', 'linkType', 'baselineStart', 'baselineEnd', 'doneOn'].map((r) => [r, col(r)]));
+    'assignee', 'project', 'colour', 'parent', 'dependsOn', 'lag', 'linkType', 'blocked', 'checklist', 'baselineStart', 'baselineEnd', 'doneOn'].map((r) => [r, col(r)]));
   const colourBy = byId(S.colourBy);
   const groupBy = byId(S.groupBy);
   const groupBy2 = byId(S.groupBy2);
@@ -150,6 +154,10 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
       // finished by any sign the table gives: Done ticked, full progress, or a status such as Done or Erledigt
       finished: done || (progress != null && progress >= 1) || isDoneStatus(statusKey),
     };
+    // stuck: the yes/no column, or a status that says so; a finished task is not blocked
+    // the checklist's counts: {done, total}, or null when the task has none
+    if (C.checklist) { const r = parseChecklist(plain(cell(row, 'checklist'))); t.checks = r.total ? { done: r.done, total: r.total } : null; } else t.checks = null;
+    t.blocked = !t.finished && ((C.blocked ? plain(cell(row, 'blocked')) === true : false) || isBlockedStatus(statusKey));
 
     if (start != null) {
       t.start = start;
@@ -177,7 +185,7 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
     }
     // What a redraw compares: the drawn facts of this task, nothing else.
     t.hash = [t.title, t.start, t.end, t.kind, t.flag, t.status, t.project, t.colour, t.progress, t.people.join('|'),
-      t.parentId, t.deps.join(','), t.lag, t.linkType, t.group, t.group2, t.baseStart, t.baseEnd, t.doneOn].join('\u0001');
+      t.parentId, t.deps.join(','), t.lag, t.linkType, t.blocked, t.checks ? t.checks.done + '/' + t.checks.total : '', t.group, t.group2, t.baseStart, t.baseEnd, t.doneOn].join('\u0001');
     tasks.push(t);
   }
   return { tasks, unscheduled, flagged };

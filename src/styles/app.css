@@ -87,7 +87,7 @@ button, input, select { font: inherit; color: inherit; }
 .ps-bar-left, .ps-bar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .ps-brand { display: inline-flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
 /* The mark is brand blue, which disappears into the chrome: a white plate keeps it legible. */
-.ps-brand__logo { width: 22px; height: 22px; flex: none; box-sizing: border-box; padding: 2px; border-radius: 6px; background: #fff; }
+.ps-brand__logo { width: 24px; height: 24px; flex: none; box-sizing: border-box; padding: 2px; border-radius: 6px; background: #fff; }
 .ps-brand__name { font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
 /* The mode pill: a dot plus a word, because colour alone is not information. */
 .ps-mode {
@@ -281,9 +281,9 @@ button, input, select { font: inherit; color: inherit; }
 
 /* ---- structure (M3) ---- */
 /* #bd2830: 4.5:1 even on a hovered, striped workload cell (#c42b33 was 4.4) */
-:root { --ps-crit: #bd2830; --ps-holiday: rgba(217, 119, 6, 0.10); --ps-link: #64748b; }
-:root[data-grist-appearance="dark"] { --ps-crit: #ff6b6f; --ps-holiday: rgba(251, 191, 36, 0.12); --ps-link: #94a3b8; }
-@media (prefers-color-scheme: dark) { :root:not([data-grist-appearance="light"]) { --ps-crit: #ff6b6f; --ps-holiday: rgba(251, 191, 36, 0.12); --ps-link: #94a3b8; } }
+:root { --ps-crit: #bd2830; --ps-holiday: rgba(217, 119, 6, 0.10); --ps-link: #64748b; --ps-hatch: rgba(20, 32, 43, 0.16); }
+:root[data-grist-appearance="dark"] { --ps-crit: #ff6b6f; --ps-holiday: rgba(251, 191, 36, 0.12); --ps-link: #94a3b8; --ps-hatch: rgba(180, 196, 214, 0.22); }
+@media (prefers-color-scheme: dark) { :root:not([data-grist-appearance="light"]) { --ps-crit: #ff6b6f; --ps-holiday: rgba(251, 191, 36, 0.12); --ps-link: #94a3b8; --ps-hatch: rgba(180, 196, 214, 0.22); } }
 
 .ps-row__indent { flex: none; }
 .ps-caret {
@@ -442,6 +442,8 @@ button, input, select { font: inherit; color: inherit; }
   /* tick boxes a thumb can hit: a larger box, and a row as tall as a button */
   .ps-field--check, .ps-check { min-height: 40px; }
   .ps-field--check input[type=checkbox], .ps-check input[type=checkbox] { width: 24px; height: 24px; margin: 0; flex: none; }
+  /* the names column is a keyhole here: the name gets its width, the dates are on the bar (and in its tooltip) */
+  .ps-row:not(.ps-row--group) .ps-row__when { display: none; }
 }
 
 @media (max-width: 560px) {
@@ -746,3 +748,16 @@ button, input, select { font: inherit; color: inherit; }
 /* the zoom strip gives way to a menu when the widget is not wide (the toolbar then stays two rows) */
 .ps-zoompick { display: none; }
 @media (max-width: 1180px) { .ps-seg--zoom { display: none; } .ps-zoompick { display: inline-block; } }
+
+/* a task that cannot go on (M28): striped, and said in words everywhere it can be read */
+.ps-bar.is-blocked { background-image: repeating-linear-gradient(135deg, rgba(20, 32, 43, 0.34) 0 4px, transparent 4px 9px); }
+/* the stripe says "stuck"; the name sits on a plain plate so it stays easy to read */
+.ps-cal__chip.is-blocked { background-image: repeating-linear-gradient(135deg, var(--ps-hatch) 0 4px, transparent 4px 9px); }
+.ps-cal__chip.is-blocked .ps-cal__chip-text { padding: 0 4px; margin-left: -2px; border-radius: 3px; background: var(--ps-card); }
+.ps-card__blocked { margin: 6px 0 0; font-size: 12px; font-weight: 600; color: var(--ps-crit); }
+
+/* the checklist in the edit window (M28) */
+.ps-checklist { display: flex; flex-direction: column; gap: 4px; }
+.ps-checklist .ps-check { min-height: 28px; }
+.ps-checklist .ps-check.is-done span { color: var(--ps-muted); text-decoration: line-through; }
+.ps-checklist .ps-input { margin-top: 4px; }

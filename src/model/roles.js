@@ -90,6 +90,12 @@ export const ROLES = [
     strong: ['done', 'is done', 'completed', 'complete', 'finished', 'closed', 'erledigt', 'fertig', 'abgeschlossen',
       'fait', 'termine', 'cloture'], weak: [] },
   { id: 'milestone', kinds: ['Bool'], panel: true, strong: ['milestone', 'is milestone', 'meilenstein', 'jalon'], weak: [] },
+  // a checklist kept in one text cell, a line to an item: "[ ] book the room" (M28)
+  { id: 'checklist', kinds: ['Text'], panel: true,
+    strong: ['checklist', 'check list', 'checklist items', 'to do list', 'todo list', 'task list', 'checkliste', 'pruefliste', 'prufliste', 'aufgabenliste', 'liste de controle', 'liste de verification', 'liste de taches', 'liste de tâches'], weak: [] },
+  // a task that cannot go on until something else happens (M28); a status such as Blocked says it too, with or without this column
+  { id: 'blocked', kinds: ['Bool'], panel: true,
+    strong: ['blocked', 'is blocked', 'blocker', 'impediment', 'on hold', 'stuck', 'blockiert', 'gesperrt', 'bloque', 'bloquee', 'bloquant', 'en pause'], weak: [] },
   { id: 'assignee', kinds: ['Ref', 'RefList', 'Choice', 'ChoiceList', 'Text'], panel: true,
     strong: ['assignee', 'assignees', 'assigned to', 'assigned', 'owner', 'person', 'people', 'responsible', 'lead',
       'who', 'team member', 'coordinator', 'verantwortlich', 'koordinator', 'zustandig', 'zustaendig', 'bearbeiter', 'mitarbeiter', 'person',

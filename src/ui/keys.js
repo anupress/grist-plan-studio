@@ -45,6 +45,7 @@ const BY_VIEW = {
     ['↑ ↓ ← →', 'Select the previous or next task'],
     ['Alt+← →', 'Move the task a day'],
     ['Alt+↑ ↓', 'Move the task a week'],
+    ['Alt+Shift+← →', 'Make it end a day earlier or later'],
     ['PageUp  PageDown', 'The previous or next month or week'],
   ],
   agenda: [

@@ -126,3 +126,48 @@ export function criticalPath(tasks, links, cal) {
   for (const l of L) if (crit.has(l.from) && crit.has(l.to) && byId.get(l.to).start <= minStart(l, byId.get(l.from), byId.get(l.to), cal)) critLinks.add(l.from + '>' + l.to);
   return { tasks: crit, links: critLinks };
 }
+
+/**
+ * Close the gaps (M28): a task that waits for others and starts later than its links allow is moved to the first day it may start, keeping
+ * its length; a task that follows it can then move up too. A task already started or finished, one that waits for nothing, one that cannot
+ * be moved, and anything before today are left alone. Pure: tests/links.test.mjs.
+ * @param tasks  dated tasks (parents only summing their children left out): id, start, end, finished, deps, lag, linkType
+ * @param opts   {today, canMove(task) -> boolean}
+ * @returns {Array<{id, start, end, was: {start, end}}>}  in the order the moves are made
+ */
+export function tightenPlan(tasks, links, cal, { today = -Infinity, canMove = () => true } = {}) {
+  const dated = tasks.filter((t) => t.start != null && t.end != null);
+  const byId = new Map(dated.map((t) => [t.id, t]));
+  const L = links.filter((l) => byId.has(l.from) && byId.has(l.to));
+  const incoming = new Map(), next = new Map(), indeg = new Map(dated.map((t) => [t.id, 0]));
+  for (const l of L) {
+    if (!incoming.has(l.to)) incoming.set(l.to, []);
+    incoming.get(l.to).push(l);
+    if (!next.has(l.from)) next.set(l.from, []);
+    next.get(l.from).push(l.to);
+    indeg.set(l.to, indeg.get(l.to) + 1);
+  }
+  // predecessors first (Kahn); tasks in a loop never get their turn
+  const order = [];
+  const ready = dated.filter((t) => indeg.get(t.id) === 0).map((t) => t.id);
+  while (ready.length) {
+    const id = ready.shift();
+    order.push(id);
+    for (const to of next.get(id) || []) { indeg.set(to, indeg.get(to) - 1); if (indeg.get(to) === 0) ready.push(to); }
+  }
+  const pos = new Map(dated.map((t) => [t.id, { start: t.start, end: t.end, len: cal.length(t.start, t.end) }]));
+  const floor = cal.workdays ? cal.after(today - 1) : today;
+  const moves = [];
+  for (const id of order) {
+    const task = byId.get(id), ins = incoming.get(id);
+    if (!ins || task.finished || task.start < today || !canMove(task)) continue;
+    const me = pos.get(id);
+    let earliest = floor;
+    for (const l of ins) earliest = Math.max(earliest, minStart(l, pos.get(l.from), me, cal));
+    if (earliest >= me.start) continue;
+    const end = cal.workdays ? cal.endAfter(earliest, me.len) : earliest + (me.end - me.start);
+    moves.push({ id, start: earliest, end, was: { start: me.start, end: me.end } });
+    pos.set(id, { ...me, start: earliest, end });
+  }
+  return moves;
+}

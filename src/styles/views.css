@@ -290,3 +290,11 @@
   .ps-ov__bar { grid-area: bar; }
   .ps-ov__lists { grid-template-columns: 1fr; }
 }
+
+/* the edges of a calendar bar that change its start and its end (M28) */
+.ps-cal__chip { position: relative; }
+.ps-cal__h { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; touch-action: none; }
+.ps-cal__h--l { left: -3px; }
+.ps-cal__h--r { right: -3px; }
+.ps-cal__h::after { content: ""; position: absolute; top: 4px; bottom: 4px; left: 3px; width: 2px; border-radius: 1px; background: var(--ps-muted); opacity: 0; }
+.ps-cal__chip:hover .ps-cal__h::after, .ps-cal__chip.is-selected .ps-cal__h::after, .ps-cal__chip:focus-visible .ps-cal__h::after { opacity: 0.8; }

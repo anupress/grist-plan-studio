@@ -89,10 +89,12 @@ export function buildBoard(tasks, rows, ctx) {
         .filter((f) => f.text != null && f.text !== ''),
       time: timeOf ? timeOf(task.id) : null,
       swim: swimCol ? laneKeyOf(row[swimCol.id], swimCol) : null,
+      blocked: !!task.blocked,
+      checks: task.checks || null,
       sub: kids?.get(task.id) || null,
     };
     card.hash = [card.title, card.lane, card.order, card.colour, card.people.join('|'), card.done, card.progress,
-      card.due, card.span, card.late, card.time ? `${Math.round(card.time.logged * 100)}/${card.time.planned ?? ''}` : '', card.swim, card.sub ? `${card.sub.done}/${card.sub.total}` : '', ...card.fields.map((f) => f.text)].join('\u0001');
+      card.due, card.span, card.late, card.time ? `${Math.round(card.time.logged * 100)}/${card.time.planned ?? ''}` : '', card.swim, card.blocked, card.checks ? `${card.checks.done}/${card.checks.total}` : '', card.sub ? `${card.sub.done}/${card.sub.total}` : '', ...card.fields.map((f) => f.text)].join('\u0001');
     lane.cards.push(card);
     byId.set(card.id, card);
   }

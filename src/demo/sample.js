@@ -38,6 +38,8 @@ export const SAMPLE_COLUMNS = [
   // how a task waits for the ones it depends on: the days between, and which ends are linked
   col(17, 'Lag_days', 'Int'),
   col(18, 'Link_type', 'Choice', { choices: ['Finish to start', 'Start to start', 'Finish to finish', 'Start to finish'] }),
+  // a checklist in a text cell, one item to a line
+  col(19, 'Checklist', 'Text'),
 ];
 
 /** The people, with their hours a week (Dieter works part-time): the workload reads their capacity here. */
@@ -98,6 +100,15 @@ export function sampleRows(today = todayDay()) {
   // with the copywriting it follows, the accessibility review waits two days after the build.
   const LINKS = { 14: ['Start to start', 21], 15: ['Finish to finish', 0], 16: ['Finish to start', 2] };
 
+  // Checklists, one item to a line: the cards say how many are ticked.
+  const CHECKS = {
+    9: ['x Home page', 'x Product page', '  Checkout', '  Mobile layouts'],
+    10: ['x Home page', 'x About us', 'x Product texts', '  Legal pages', '  Help centre'],
+    13: ['  Templates', '  Forms', '  Search'],
+    18: ['  Phones', '  Tablets', '  Screen reader'],
+  };
+  const checklist = (id) => (CHECKS[id] || []).map((l) => `[${l[0]}] ${l.slice(2)}`).join('\n');
+
   return Object.entries(T).map(([id, [task, s, e, due, status, owner, progress, ms, project, phase, deps, hours]]) => ({
     id: Number(id), Task: task, Start: s == null ? null : d(s), End: e == null ? null : d(e), Due: due == null ? null : d(due),
     Status: status, Owner: R('People', owner), Progress: progress, Milestone: ms, Project: R('Projects', project),
@@ -108,6 +119,7 @@ export function sampleRows(today = todayDay()) {
     Planned_start: PLAN[id] ? d(PLAN[id][0]) : null, Planned_end: PLAN[id] ? d(PLAN[id][1]) : null,
     Done_on: DONE[id] != null ? d(DONE[id]) : null,
     Lag_days: LINKS[id] ? LINKS[id][1] : 0, Link_type: LINKS[id] ? LINKS[id][0] : '',
+    Checklist: checklist(Number(id)),
   }));
 }
 

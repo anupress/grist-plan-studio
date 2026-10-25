@@ -3,6 +3,8 @@
 // writes in main.js (the same planDates the Gantt chart uses).
 //
 //   drag a bar            to another day: the task keeps its length and moves there
+//   drag a bar's edge     to change the day it starts or ends
+//   drag over empty days  to add a task that runs over them
 //   click a bar, Enter    quick edit
 //   arrow keys            the previous or next task; Alt+← → move it a day, Alt+↑ ↓ a week
 //   PageUp, PageDown      the previous or next month (week)
@@ -17,12 +19,12 @@ const HOLD_MS = 350;      // a touch has to rest this long on a bar before it dr
 const MOVE_MOUSE = 4;     // px a mouse has to travel before a press becomes a drag
 
 /**
- * @param on {onSelect(id), onQuickEdit(id), onMove({id, delta}), onNav(dir), onToday(), onMode('month' | 'week'), onDay(day), onNewOn(day) (a task on a day: the + of a day, or a double click on its empty part),
+ * @param on {onSelect(id), onQuickEdit(id), onMove({id, delta}), onResize({id, mode: 'start' | 'end', start, end}), onDraw({start, end}), onNav(dir), onToday(), onMode('month' | 'week'), onDay(day), onNewOn(day) (a task on a day: the + of a day, or a double click on its empty part),
  *            onFind(id) (the bar is not in this month or week), onAnnounce(text), onUndo(), onRedo()}
  */
 export function createCalendar(host, on = {}) {
   // model: {grid (model/calgrid.js), mode, title, weekdays: [7 names], today, selectedId, canDrag(task), isOff(day),
-  //   dayText(day, first), dayLabel(day), describe(task), meta(task), fmtRange(a, b), fmtDay(day)}
+  //   canResize(task, side), dayText(day, first), dayLabel(day), describe(task), meta(task), fmtRange(a, b), fmtDay(day)}
   let model = null;
   let pending = null;       // a model that arrived mid-drag, drawn when the drag ends
   let drag = null;
@@ -60,16 +62,19 @@ export function createCalendar(host, on = {}) {
     const label = [model.describe(x), x.finished ? t('done') : null, x.kind === 'milestone' ? t('milestone') : null].filter(Boolean).join(', ');
     const node = el('button', {
       type: 'button', tabindex: '-1', dataset: { id: String(x.id), week: String(week.start) },
-      class: 'ps-cal__chip' + (x.id === model.selectedId || model.multi?.has(x.id) ? ' is-selected' : '') + (x.finished ? ' is-done' : '') + (x.kind === 'milestone' ? ' is-milestone' : '')
+      class: 'ps-cal__chip' + (x.blocked ? ' is-blocked' : '') + (x.id === model.selectedId || model.multi?.has(x.id) ? ' is-selected' : '') + (x.finished ? ' is-done' : '') + (x.kind === 'milestone' ? ' is-milestone' : '')
         + (seg.fromLeft ? ' is-from-left' : '') + (seg.toRight ? ' is-to-right' : '') + (model.canDrag(x) ? ' is-movable' : ''),
       style: { gridColumn: `${seg.col0 + 1} / ${seg.col1 + 2}`, gridRow: String(seg.track + 2), ...(x.colour ? { '--stripe': x.colour } : {}) },
       'aria-label': label, 'aria-pressed': x.id === model.selectedId ? 'true' : 'false', title: label,
       onclick: (e) => { if (suppressClick) return; if (e.ctrlKey || e.metaKey || e.shiftKey) { on.onSelect?.(x.id, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey }); return; } on.onSelect?.(x.id); on.onQuickEdit?.(x.id); },
       onpointerdown: (e) => pressed(e, seg),
     }, [
+      // the edges that change the start and the end: only where the bar really starts and ends (not where it runs on from another week)
+      !seg.fromLeft && model.canResize?.(x, 'start') ? el('span', { class: 'ps-cal__h ps-cal__h--l', dataset: { side: 'start' }, 'aria-hidden': 'true' }) : null,
       el('span', { class: 'ps-cal__chip-text', text: x.title || t('(no name)') }),
       // a week has the room: who, and in what state
       model.mode === 'week' && model.meta(x) ? el('span', { class: 'ps-cal__chip-meta', text: model.meta(x) }) : null,
+      !seg.toRight && model.canResize?.(x, 'end') ? el('span', { class: 'ps-cal__h ps-cal__h--r', dataset: { side: 'end' }, 'aria-hidden': 'true' }) : null,
     ]);
     return node;
   }
@@ -92,7 +97,10 @@ export function createCalendar(host, on = {}) {
           onclick: (e) => { e.stopPropagation(); on.onNewOn?.(day); },
         }) : null,
       ]);
-      if (model.canAdd) cell.addEventListener('dblclick', (e) => { if (e.target === cell) on.onNewOn?.(day); });
+      if (model.canAdd) {
+        cell.addEventListener('dblclick', (e) => { if (e.target === cell) on.onNewOn?.(day); });
+        cell.addEventListener('pointerdown', (e) => { if (e.target === cell && e.pointerType === 'mouse' && e.button === 0) draw(e, day, cell); });
+      }
       dayNodes.set(day, cell);
       node.appendChild(cell);
     });
@@ -146,9 +154,21 @@ export function createCalendar(host, on = {}) {
     return hit.start + col;
   }
 
+  /** A mouse pressed on an empty day: dragging from it draws the days of a new task. */
+  function draw(e, day, cell) {
+    if (drag) return;
+    drag = { mode: 'draw', anchor: day, x: e.clientX, y: e.clientY, type: 'mouse', pointerId: e.pointerId, node: cell, active: false, delta: 0, timer: 0, range: null };
+    window.addEventListener('pointermove', moved);
+    window.addEventListener('pointerup', released);
+    window.addEventListener('pointercancel', cancelled);
+    document.addEventListener('keydown', escape, true);
+  }
+
   function pressed(e, seg) {
-    if (drag || (e.pointerType === 'mouse' && e.button !== 0) || !model.canDrag(seg.task)) return;
-    drag = { id: seg.task.id, task: seg.task, x: e.clientX, y: e.clientY, grab: dayAt(e.clientX, e.clientY), type: e.pointerType, pointerId: e.pointerId, node: e.currentTarget, active: false, delta: 0, timer: 0 };
+    const side = e.target?.dataset?.side || null;
+    if (drag || (e.pointerType === 'mouse' && e.button !== 0) || (side ? !model.canResize?.(seg.task, side) : !model.canDrag(seg.task))) return;
+    if (side) e.stopPropagation();
+    drag = { id: seg.task.id, task: seg.task, mode: side || 'move', x: e.clientX, y: e.clientY, grab: dayAt(e.clientX, e.clientY), type: e.pointerType, pointerId: e.pointerId, node: e.currentTarget, active: false, delta: 0, timer: 0, range: null };
     if (drag.type !== 'mouse') drag.timer = setTimeout(() => { if (drag && !drag.active) begin(); }, HOLD_MS);
     window.addEventListener('pointermove', moved);
     window.addEventListener('pointerup', released);
@@ -173,20 +193,38 @@ export function createCalendar(host, on = {}) {
       else return;
     }
     const day = dayAt(e.clientX, e.clientY);
-    drag.delta = day == null ? 0 : day - drag.grab;
-    const a = drag.task.start + drag.delta, b = drag.task.end + drag.delta;
-    for (const [d, node] of dayNodes) node.classList.toggle('is-drop', drag.delta !== 0 && d >= a && d <= b);
-    ghost.textContent = `${drag.task.title || t('(no name)')} · ${model.fmtRange(a, b)}`;
+    let a, b, shown;
+    if (drag.mode === 'draw') {
+      a = Math.min(drag.anchor, day ?? drag.anchor); b = Math.max(drag.anchor, day ?? drag.anchor);
+      drag.range = [a, b];
+      for (const [d, node] of dayNodes) node.classList.toggle('is-drop', d >= a && d <= b);
+      shown = `${t('New task')} · ${model.fmtRange(a, b)}`;
+    } else if (drag.mode === 'start' || drag.mode === 'end') {
+      // the edge follows the pointer, and cannot cross the other one
+      a = drag.mode === 'start' ? Math.min(day ?? drag.task.start, drag.task.end) : drag.task.start;
+      b = drag.mode === 'end' ? Math.max(day ?? drag.task.end, drag.task.start) : drag.task.end;
+      drag.range = [a, b];
+      for (const [d, node] of dayNodes) node.classList.toggle('is-drop', (a !== drag.task.start || b !== drag.task.end) && d >= a && d <= b);
+      shown = `${drag.task.title || t('(no name)')} · ${model.fmtRange(a, b)}`;
+    } else {
+      drag.delta = day == null ? 0 : day - drag.grab;
+      a = drag.task.start + drag.delta; b = drag.task.end + drag.delta;
+      for (const [d, node] of dayNodes) node.classList.toggle('is-drop', drag.delta !== 0 && d >= a && d <= b);
+      shown = `${drag.task.title || t('(no name)')} · ${model.fmtRange(a, b)}`;
+    }
+    ghost.textContent = shown;
     ghost.style.left = Math.min(window.innerWidth - ghost.offsetWidth - 8, e.clientX + 14) + 'px';
     ghost.style.top = Math.min(window.innerHeight - ghost.offsetHeight - 8, e.clientY + 16) + 'px';
   }
 
   function released() {
     if (!drag) return;
-    const { active, id, delta } = drag;
+    const { active, id, delta, mode, range, task } = drag;
     stop();
     if (!active) return;
     swallowClick();
+    if (mode === 'draw') { if (range) on.onDraw?.({ start: range[0], end: range[1] }); return; }
+    if (mode === 'start' || mode === 'end') { if (range && (range[0] !== task.start || range[1] !== task.end)) on.onResize?.({ id, mode, start: range[0], end: range[1] }); return; }
     if (delta) on.onMove?.({ id, delta });
   }
   /** The release that ends a drag is also a click on the bar it began on: swallow it. */
@@ -228,6 +266,14 @@ export function createCalendar(host, on = {}) {
     const chipNode = document.activeElement?.closest?.('.ps-cal__chip');
     if (!chipNode || !e.key.startsWith('Arrow')) return;
     const id = Number(chipNode.dataset.id);
+    if (e.altKey && e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      // the end a day earlier or later, as in the Gantt chart
+      e.preventDefault();
+      const task = model.grid.weeks.flatMap((w) => w.segments).find((s) => s.task.id === id)?.task;
+      const end = task ? task.end + (e.key === 'ArrowLeft' ? -1 : 1) : null;
+      if (task && model.canResize?.(task, 'end') && end >= task.start) on.onResize?.({ id, mode: 'end', start: task.start, end });
+      return;
+    }
     if (e.altKey) {
       e.preventDefault();
       const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];

@@ -30,6 +30,8 @@ const ROLE_TEXT = {
   progress: ['Progress', '0 to 1, or 0 to 100.'],
   done: ['Done', 'A ticked task counts as complete.'],
   milestone: ['Milestone', 'A ticked task is shown as a diamond.'],
+  checklist: ['Checklist', 'A text column with one item to a line, such as “[ ] book the room”: cards say how many are ticked, and the edit window has the boxes.'],
+  blocked: ['Blocked', 'A ticked task cannot go on: its bar is striped and it says so in words. A status such as Blocked counts too.'],
   assignee: ['Assigned to', null],
   project: ['Project', 'Colours the bars when there is no status.'],
   colour: ['Colour', 'A choice column, or text such as #2563eb.'],

@@ -10,6 +10,7 @@
 
 import { el, clear } from '../../core/util.js';
 import { t, tn } from '../../i18n/index.js';
+import { isBlockedStatus } from '../../model/tasks.js';
 
 const CAP = 150;   // rows drawn per group before a "Show all" button
 
@@ -43,7 +44,7 @@ export function createAgenda(host, on = {}) {
 
   function row(it) {
     const x = it.task;
-    const details = [whenText(it), x.people.join(', ') || null, x.status].filter(Boolean);
+    const details = [whenText(it), x.people.join(', ') || null, x.status, x.blocked && !isBlockedStatus(x.status) ? t('Blocked') : null, x.checks ? t('{done} of {total} checked', { done: x.checks.done, total: x.checks.total }) : null].filter(Boolean);
     const late = it.late > 0 ? tn(it.late, '{n} day late', '{n} days late') : null;
     const label = [x.title || t('(no name)'), late, ...details].join(', ');
     return el('li', { class: 'ps-ag__item' }, [

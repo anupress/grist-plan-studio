@@ -17,7 +17,7 @@ import { detectRoles, ganttReady, fromStored, toStored, fits, nameScore, withPla
 import { previewLines } from './model/settingsmap.js';
 import { buildTasks, spanOf } from './model/tasks.js';
 import { arrange } from './model/tree.js';
-import { linksOf, isLate, pushPlan, criticalPath, wouldLoop } from './model/schedule.js';
+import { linksOf, isLate, pushPlan, criticalPath, wouldLoop, tightenPlan } from './model/schedule.js';
 import { makeCalendar, holidaysBetween } from './model/calendar.js';
 import { todayDay, dateFromDay, plain, dayOf, num, isoFromDay, dayFromISO, progressScale } from './model/values.js';
 import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink, baselineFields, doneOnFields, canMoveDoneOn, doneFields, datesFields, encodeInput } from './model/edits.js';
@@ -272,6 +272,8 @@ function ensureCalendar() {
     onMode: (m) => { S.view.calMode = m; saveView(); S.signature = ''; recompute(); },
     onDay: (day) => { S.calDay = day; S.view.calMode = 'week'; saveView(); S.signature = ''; recompute(); },
     onNewOn: (day) => newTask(day),
+    onResize: ({ id, mode, start, end }) => editDates({ id, mode, start, end }),
+    onDraw: ({ start, end }) => newTask(start, 0, end),
     onFind: (id) => { const x = taskById(id); if (x?.start != null) { S.calDay = x.start; S.signature = ''; recompute(); } },
     onAnnounce: (text) => announce(text),
     onUndo: () => undo(),
@@ -718,11 +720,13 @@ const hasPlan = () => !!(S.roles.baselineStart || S.roles.baselineEnd);
 /** The columns beside the names; '@slip' (what the plan says about each task, M18) and '@wbs' (the outline number, 1.2.3) are not columns of the table. */
 const listCols = () => disp().cols.map((id) => (id === '@slip' ? (hasPlan() ? { id: '@slip', label: t('Against the plan') } : null) : id === '@wbs' ? { id: '@wbs', label: t('No.') } : colById(id))).filter(Boolean);
 /** Outline numbers for every task, in the order the Gantt chart draws them with nothing folded; remembered until the rows or the order change. */
+/** The keys the rows or cards are sorted by: the first, then the ones that break its ties. */
+const sortKeys = () => [disp().sort, ...disp().sortThen].filter(Boolean);
 let wbsMemo = { rows: null, sort: '', map: new Map() };
 function wbsMap() {
-  const sort = JSON.stringify(disp().sort);
+  const sort = JSON.stringify(sortKeys());
   if (wbsMemo.rows !== S.rows || wbsMemo.sort !== sort) {
-    const { entries } = arrange(allTasks(), { group: null, collapsed: new Set(), sort: taskSorter(disp().sort, { columns: S.columns, rowOf: rowById, labels: S.labels }) });
+    const { entries } = arrange(allTasks(), { group: null, collapsed: new Set(), sort: taskSorter(sortKeys(), { columns: S.columns, rowOf: rowById, labels: S.labels }) });
     wbsMemo = { rows: S.rows, sort, map: wbsOf(entries) };
   }
   return wbsMemo.map;
@@ -884,7 +888,7 @@ function buildModel(rows = viewRows()) {
     label: (k) => k || t('(none)'),
     order: gc2.kind === 'Choice' || gc2.kind === 'ChoiceList' ? gc2.choices : null,
   } : null;
-  const { entries, summaries } = arrange(all, { group, group2, collapsed: S.view.collapsed, sort: taskSorter(disp().sort, { columns: S.columns, rowOf: rowById, labels: S.labels }) });
+  const { entries, summaries } = arrange(all, { group, group2, collapsed: S.view.collapsed, sort: taskSorter(sortKeys(), { columns: S.columns, rowOf: rowById, labels: S.labels }) });
   // Links between dated tasks; a parent counts with the span of its children.
   const dated = all.map((x) => (summaries.has(x.id) ? { ...x, start: summaries.get(x.id).start, end: summaries.get(x.id).end, summary: true } : x)).filter((x) => x.start != null);
   const byId = new Map(dated.map((x) => [x.id, x]));
@@ -996,7 +1000,7 @@ function buildBoardModel() {
     laneCol: lane, orderCol: orderCol(), labels: S.labels, fields: fieldCols(lane), hideEmpty: S.board.hideEmpty,
     wip: wipFor(lane), today: todayDay(), cellText: (row, col) => cellText(row, col, S.labels, fmtShort), timeOf: (id) => timeOf(id),
     // the person's own order (Display): the cards of a lane then go by it, and a drop changes the lane only
-    sorter: taskSorter(disp().sort, { columns: S.columns, rowOf: rowById, labels: S.labels }),
+    sorter: taskSorter(sortKeys(), { columns: S.columns, rowOf: rowById, labels: S.labels }),
     // a lane's limit counts every open card, not only the ones the filters leave on show
     everyone, swimCol: swimCol(), kids,
   });
@@ -1329,6 +1333,7 @@ function recomputeCalendar() {
     title: calTitle(mode, grid),
     weekdays: grid.weeks[0].days.map((d) => calFormat('wd').format(dateFromDay(d))),
     canDrag: (task) => editable && capabilities(task, c).move,
+    canResize: (task, side) => editable && task.kind !== 'milestone' && !!capabilities(task, c)[side],
     isOff: (d) => !cal.isWork(d),
     dayText: (d, first) => (first ? calFormat('first') : calFormat('num')).format(dateFromDay(d)),
     dayLabel: (d) => calFormat('long').format(dateFromDay(d)),
@@ -1928,6 +1933,33 @@ async function setLimit(laneKey) {
     const next = writeOptions(S.options, { board: S.board });
     try { await setOptions(next); S.options = next; } catch (e) { toast(t('Could not save: {msg}', { msg: errText(e) })); }
   }
+}
+
+// ---- close the gaps (M28) --------------------------------------------------------------------------------------------
+/** Tasks that wait for others, moved up to the first day their links allow: shown first, written as one action. */
+async function tightenNow() {
+  if (!canEdit() || S.mode !== 'gantt') return;
+  if (S.find.keep) { toast(t('Clear the filters first: a move could run into a task the filter hides.')); return; }
+  const m = pushModel();
+  const cal = calendar(), c = ctx();
+  const moves = tightenPlan(m.dated.filter((x) => !x.summary), m.links, cal, { today: todayDay(), canMove: (task) => capabilities(task, c).move });
+  const items = [];
+  for (const mv of moves) {
+    const task = taskById(mv.id), row = rowById(mv.id);
+    const plan = task && row ? planDates(task, row, c, 'move', mv.start, mv.end) : { error: 'gone' };
+    if (!plan.error) items.push({ id: mv.id, plan, mv, task });
+  }
+  if (!items.length) { toast(t('No gaps: every task that waits already starts as early as its links allow.')); return; }
+  const shown = items.slice(0, 40).map(({ task, mv }) => [task.title || t('(no name)'), `${fmtShortRange(mv.was.start, mv.was.end)} → ${fmtShortRange(mv.start, mv.end)}`]);
+  const yes = await confirmBox(shell, {
+    title: tn(items.length, 'Move {n} task earlier?', 'Move {n} tasks earlier?'),
+    body: t('Each task that waits for others moves up to the first day its links allow, and keeps its length. Nothing moves before today; tasks already started or finished stay.'),
+    items: shown,
+    note: [items.length > shown.length ? tn(items.length - shown.length, 'And {n} more.', 'And {n} more.') : null, t('One Undo takes it all back.')].filter(Boolean).join(' '),
+    ok: tn(items.length, 'Move {n} task', 'Move {n} tasks'),
+  });
+  if (!yes) return;
+  writeMany(items.map(({ id, plan }) => ({ id, plan })), tn(items.length, 'Moved {n} task earlier.', 'Moved {n} tasks earlier.'));
 }
 
 // ---- time tracking (M10) ----------------------------------------------------------------------------------
@@ -2782,13 +2814,15 @@ function assignToMe() {
   if (!lane) return null;
   return { col, value: col.kind === 'RefList' || col.kind === 'ChoiceList' ? [lane.value] : lane.value };
 }
-async function newTask(onDay, parentId = 0) {
+async function newTask(onDay, parentId = 0, endDay = null) {
   if (!canEdit()) return;
   // a click handler passes its event: only a day number is a day
   const parent = typeof parentId === 'number' && parentId ? taskById(parentId) : null;
   const day = typeof onDay === 'number' ? onDay : parent?.start ?? todayDay();
   const link = await linkForNewTask();
   const plan = newTaskFields(ctx(), { day, title: parent ? t('New sub-task') : t('New task'), link: link && !link.unknown ? link : null, assign: assignToMe(), parentId: parent ? parent.id : 0 });
+  // dragged out over several days: it runs from the first to the last of them
+  if (typeof endDay === 'number' && endDay > day) { const d = datesFields(ctx(), day, endDay); Object.assign(plan.fields, d.fields); Object.assign(plan.patch, d.patch); }
   // the new task is shown under its parent, so the parent must be open
   if (parent && S.view.collapsed.delete('p:' + parent.id)) saveView();
   const note = link?.unknown ? t('This task will show here once its {col} matches the row selected in the linked widget.', { col: link.unknown.label }) : null;
@@ -3109,7 +3143,7 @@ function foldAll(fold) {
 function planTable() {
   if (!S.built) return null;
   const list = [...S.built.tasks, ...S.built.unscheduled].filter((x) => S.multi.size < 2 || S.multi.has(x.id));
-  const { entries } = arrange(list, { group: null, collapsed: new Set(), sort: taskSorter(disp().sort, { columns: S.columns, rowOf: rowById, labels: S.labels }) });
+  const { entries } = arrange(list, { group: null, collapsed: new Set(), sort: taskSorter(sortKeys(), { columns: S.columns, rowOf: rowById, labels: S.labels }) });
   return {
     head: [t('No.'), t('Task'), t('Start'), t('End'), t('Days'), t('Status'), t('Assigned to'), t('Progress %')],
     rows: tableRows(entries, { iso: isoFromDay, length: calendar().length }),
@@ -3158,6 +3192,7 @@ function openMore(btn) {
       edit && tasky && S.roles.title ? { label: t('Add several tasks…'), onClick: () => addSeveral(0) } : null,
       gantt && edit && ganttReady(S.roles) && S.built?.tasks.length ? { label: t('Set baseline'), onClick: () => setBaseline() } : null,
       gantt && S.model?.links.length ? { label: t('Critical path'), checked: !!S.view.critical, onClick: () => { S.view.critical = !S.view.critical; saveView(); S.signature = ''; recompute(); } } : null,
+      gantt && edit && S.model?.links.length ? { label: t('Close the gaps…'), onClick: () => tightenNow() } : null,
       hasParents ? { label: t('Fold all'), onClick: () => foldAll(true) } : null,
       folded ? { label: t('Unfold all'), onClick: () => foldAll(false) } : null,
       { separator: true },

@@ -16,7 +16,7 @@ const eq = (n, got, want) => { if (JSON.stringify(got) === JSON.stringify(want))
 eq('nothing stored is the default', D.cleanDisplay(null), { ...D.DISPLAY_DEFAULTS, cols: [] });
 eq('junk is the default', D.cleanDisplay('compact'), D.cleanDisplay(null));
 eq('a valid choice of each kind is kept', D.cleanDisplay({ density: 'compact', sort: 'col:Status', colourBy: 'Owner', labels: 'beside', weekNumbers: false, weekends: false, today: false, plan: true, cols: ['Status', 'Owner'], listW: null, laneW: null }),
-  { density: 'compact', sort: 'col:Status', laneSort: null, colourBy: 'Owner', labels: 'beside', weekNumbers: false, weekends: false, today: false, plan: true, cols: ['Status', 'Owner'], listW: null, laneW: null });
+  { density: 'compact', sort: 'col:Status', sortThen: [], laneSort: null, colourBy: 'Owner', labels: 'beside', weekNumbers: false, weekends: false, today: false, plan: true, cols: ['Status', 'Owner'], listW: null, laneW: null });
 eq('an unknown density, label mode or sort falls back', [D.cleanDisplay({ density: 'huge' }).density, D.cleanDisplay({ labels: 'inside' }).labels, D.cleanDisplay({ sort: 'random' }).sort, D.cleanDisplay({ sort: 'col:' }).sort], ['comfortable', 'auto', null, null]);
 eq('a toggle must be a yes or no', D.cleanDisplay({ weekends: 'no', today: 0 }), D.cleanDisplay(null));
 eq('list columns: strings only, once each, at most three', D.cleanDisplay({ cols: ['a', 'a', 7, 'b', 'c', 'd'] }).cols, ['a', 'b', 'c']);
@@ -62,6 +62,16 @@ eq('by a Reference: the people’s names, none last', order('col:Owner'), [3, 1,
 eq('by a number: empty last', order('col:Hours'), [5, 3, 1, 4, 2]);
 eq('by text: empty last, ties in the table’s order', order('col:Notes'), [3, 2, 5, 1, 4]);
 eq('sorting twice gives the same order', JSON.stringify(order('col:Status')) === JSON.stringify([...tasks].sort(D.taskSorter('col:Status', ctx)).sort(D.taskSorter('col:Status', ctx)).map((t) => t.id)), true);
+
+// several keys: the first decides, the next ones break its ties (M28)
+eq('by start then by name: the two tasks that start on day 5 are told apart by their names', [...tasks].sort(D.taskSorter(['start', 'name'], ctx)).map((t) => t.id), [3, 4, 5, 1, 2]);
+eq('by start then by name, the other way round from the table', [...tasks.map((t) => (t.id === 3 ? { ...t, title: 'Zz' } : t))].sort(D.taskSorter(['start', 'name'], ctx)).map((t) => t.id), [4, 3, 5, 1, 2]);
+eq('by a Choice then by name: the two with no status... only one has none, the order of the choices decides the rest', [...tasks].sort(D.taskSorter(['col:Status', 'name'], ctx)).map((t) => t.id), [2, 3, 1, 5, 4]);
+eq('a key that is gone is skipped', [...tasks].sort(D.taskSorter(['col:Gone', 'name'], ctx)).map((t) => t.id), [3, 2, 4, 1, 5]);
+eq('nothing but gone keys: no comparator', D.taskSorter(['col:Gone', null], ctx), null);
+eq('then-keys are kept, cleaned and limited to two', D.cleanDisplay({ sort: 'start', sortThen: ['name', 'name', 'start', 'col:X', 'bad', 'end'] }).sortThen, ['name', 'col:X']);
+eq('…and only with a first key', D.cleanDisplay({ sortThen: ['name'] }).sortThen, []);
+eq('a display with a then-key is not the default', D.isDefaultDisplay({ sort: 'start', sortThen: ['name'] }), false);
 
 // the tree: siblings are sorted, children stay under their parent
 const tree = [

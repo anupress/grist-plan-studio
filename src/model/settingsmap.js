@@ -12,6 +12,8 @@ export const ROLE_VIEWS = {
   progress: ['gantt', 'timeline', 'board', 'calendar', 'agenda', 'overview'],
   done: ['gantt', 'timeline', 'board', 'calendar', 'agenda', 'workload', 'overview'],
   milestone: ['gantt', 'timeline', 'calendar', 'agenda', 'overview'],
+  blocked: ['gantt', 'timeline', 'board', 'calendar', 'agenda', 'overview'],
+  checklist: ['gantt', 'board', 'agenda'],
   colour: ['gantt', 'timeline', 'board', 'calendar'],
   parent: ['gantt', 'agenda', 'workload', 'overview'],
   dependsOn: ['gantt', 'workload'],

@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.19.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.20.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -319,6 +319,22 @@ with no lag, as before. The demo has three such links.
   gain its total and how much of it is done, and every bar is that sum, in words, with the number of tasks beside it.
 - **By** in the Overview also offers **the week** and **the month tasks end**: how many tasks, or how many hours or euros, end in each
   week, done, late and still open. (A week is not a column of your table, so a click on it filters nothing.)
+
+## Close the gaps, blocked tasks, checklists, sorting, the calendar's bar edges
+
+- **Close the gaps…** (in **More**, in the Gantt chart): every task that waits for others moves up to the first day its links allow
+  (link type, lag and the working calendar all count) and keeps its length. Nothing moves before today; tasks already started or
+  finished stay. A dialog lists the moves first; one Undo takes them all back.
+- **Blocked**: a yes/no column (found by name, or added from Settings) marks a task that cannot go on until something else happens; a
+  status such as “Blocked” counts too. The bar is striped, the card, the agenda and the edit window say so in words, and the Overview
+  counts them among the tasks that need attention.
+- **Checklist**: a text column with one item to a line, such as `[ ] book the room` and `[x] send the invitations`. The edit window shows a
+  box for each item and a line to add one; a card, a bar's tooltip and the agenda say “1 of 3 checked”. Only the ticked or added lines
+  change in the cell.
+- **Sort by, then by, and then by** (in **Display**): up to three keys, each a date, the name or any column; a row that ties on the
+  first is told apart by the second. Empty values come last and the table's own order breaks the last tie, so sorting twice shuffles nothing.
+- **In the calendar, drag the edge of a bar** to change the day a task starts or ends, **drag across empty days** to add a task that
+  runs over them, or press **Alt+Shift+← →** to end it a day earlier or later. One Undo each.
 
 ## Search and filters
 

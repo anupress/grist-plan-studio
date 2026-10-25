@@ -21,7 +21,8 @@
   margin-left: auto; flex: none; border: 0; background: none; padding: 1px 5px; border-radius: 4px;
   font: inherit; font-size: 12px; color: var(--ps-muted); font-variant-numeric: tabular-nums;
 }
-button.ps-lane__count { cursor: pointer; }
+/* a count that can be clicked is a button: 24 px to hit, the number stays at the lane's right edge */
+button.ps-lane__count { cursor: pointer; min-width: 24px; min-height: 24px; text-align: right; }
 button.ps-lane__count:hover { background: var(--ps-hover); color: var(--ps-ink); box-shadow: inset 0 0 0 1px var(--ps-line); }
 .ps-lane.is-over .ps-lane__head { border-top-color: var(--ps-crit); }
 .ps-lane.is-over .ps-lane__count { color: var(--ps-crit); font-weight: 700; }
@@ -80,12 +81,12 @@ button.ps-lane__count:hover { background: var(--ps-hover); color: var(--ps-ink);
 .ps-card__when.is-today .ps-card__late { color: var(--ps-soon); }
 .ps-card__people { display: inline-flex; flex: none; margin-left: auto; }
 .ps-av {
-  width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; flex: none;
-  font-size: 10px; font-weight: 600; letter-spacing: 0.03em; line-height: 1; color: var(--ps-ink);
+  width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; flex: none;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em; line-height: 1; color: var(--ps-ink);
   background: var(--ps-surface-2); box-shadow: inset 0 0 0 1px var(--ps-line-strong), 0 0 0 2px var(--ps-card);
 }
 .ps-av + .ps-av { margin-left: -4px; }
-.ps-av--more { color: var(--ps-muted); font-size: 10px; }
+.ps-av--more { color: var(--ps-muted); font-size: 11px; }
 .ps-card__progress { margin-top: 8px; height: 3px; border-radius: 2px; background: var(--ps-line); overflow: hidden; }
 .ps-card__progress > span { display: block; height: 100%; background: var(--stripe, var(--ps-accent)); }
 
@@ -125,7 +126,7 @@ button.ps-lane__count:hover { background: var(--ps-hover); color: var(--ps-ink);
 .ps-checks--tall { max-height: 280px; }
 
 /* Folded lanes (M23): a strip with the name standing up and the count, still a place to drop a card. */
-.ps-lane__fold { align-self: center; margin-left: -2px; }
+.ps-lane__fold { align-self: center; margin-left: -2px; width: 24px; height: 24px; line-height: 24px; }
 .ps-lane.is-folded { width: 44px; flex: none; max-width: 44px; }
 .ps-lane__head.is-folded { flex-direction: column; align-items: center; gap: 8px; margin: 0; padding: 9px 0 10px; }
 .ps-lane__head.is-folded .ps-lane__fold { margin-left: 0; }

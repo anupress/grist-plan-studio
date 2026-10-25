@@ -33,7 +33,8 @@ export function helpFor(view) {
       about: t('A month or a week, with a bar for each task on the days it covers.'),
       can: [
         t('Drag a bar to another day: the task keeps its length and moves there.'),
-        t('Click a day’s number to open its week; the + of a day adds a task on it.'),
+        t('Click a day’s number to open its week; the + of a day adds a task on it, and so does dragging across empty days.'),
+        t('Drag the left or right edge of a bar to change the day the task starts or ends.'),
         t('A day with more bars than fit says how many more: click it to open the week.'),
       ],
     };
@@ -82,6 +83,7 @@ export function helpFor(view) {
         t('Right-click a task for its menu: add a sub-task, indent it, mark it done, copy it to a later date or repeat it. [ and ] move it one level out or in.'),
         t('Click a task with Ctrl or Shift held to select several, or hold Shift and drag a box over the chart. A bar dragged from the selection takes the others along. The strip above the view marks them done, sets a column on all of them, moves their dates or deletes them.'),
         t('More, in the toolbar, adds several tasks from a list, copies the plan as text or a CSV file, folds everything and prints.'),
+        t('Close the gaps, in More, moves every task that waits up to the first day its links allow, and shows you the moves first.'),
       ],
     };
   }
@@ -105,6 +107,8 @@ export function tipFor(view) {
 const general = () => [
   t('Search and the chips under the toolbar leave tasks out of the view; they never change your table.'),
   t('Display sets how rows and bars look in this browser. Settings says which column means what.'),
+  t('Display can sort the rows or cards by up to three things: sort by, then by, and then by.'),
+  t('A task can be marked Blocked, or hold a checklist with a box for each item. A blocked task is striped and says so in words; cards, bars and the agenda say how many items are ticked.'),
   t('Each change you make is one step in Grist’s Undo (Ctrl+Z).'),
   t('A task’s edit window can duplicate it, with its sub-tasks, or delete it. Both are one step in Undo.'),
 ];

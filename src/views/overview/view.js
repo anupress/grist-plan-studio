@@ -89,6 +89,7 @@ export function createOverview(host, on = {}) {
       kpi(t('Open'), o.open, null, tn(o.total, '{n} task', '{n} tasks')),
       ...(o.doable ? [kpi(t('Late'), o.late, o.late ? 'late' : null)] : []),
       kpi(t('Due in 7 days'), o.soon),
+      ...(o.blocked ? [kpi(t('Blocked'), o.blocked, 'late')] : []),
       ...(o.doable ? [kpi(t('Done'), o.done, null, t('{n}% done', { n: pct }))] : []),
       kpi(t('No dates'), o.undated),
       // with a number column to add up: its total, and how much of it is done

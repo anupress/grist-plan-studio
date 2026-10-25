@@ -178,6 +178,8 @@ export function columnForRole(role, t, tableId) {
     progress: ['Numeric', t('Progress'), JSON.stringify({ numMode: 'percent' })],
     done: ['Bool', t('Done')],
     milestone: ['Bool', t('Milestone')],
+    blocked: ['Bool', t('Blocked')],
+    checklist: ['Text', t('Checklist')],
     parent: ['Ref:' + tableId, t('Parent task')],
     dependsOn: ['RefList:' + tableId, t('Depends on')],
     lag: ['Int', t('Lag (days)')],
@@ -193,4 +195,4 @@ export function columnForRole(role, t, tableId) {
   const [type, label, widgetOptions] = C;
   return { id: colIdFor(label), type, label, ...(widgetOptions ? { widgetOptions } : {}) };
 }
-export const ASSISTED_ROLES = ['start', 'end', 'due', 'duration', 'status', 'progress', 'done', 'milestone', 'parent', 'dependsOn', 'lag', 'linkType', 'order', 'period', 'effort', 'baselineStart', 'baselineEnd', 'doneOn'];
+export const ASSISTED_ROLES = ['start', 'end', 'due', 'duration', 'status', 'progress', 'done', 'milestone', 'blocked', 'checklist', 'parent', 'dependsOn', 'lag', 'linkType', 'order', 'period', 'effort', 'baselineStart', 'baselineEnd', 'doneOn'];

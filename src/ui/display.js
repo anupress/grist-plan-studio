@@ -70,6 +70,19 @@ export function openDisplay(host, state, on) {
       { id: 'start', label: t('Start date') }, { id: 'end', label: t('End date') }, { id: 'name', label: t('Name') },
       ...s.sortOptions.map((o) => ({ id: 'col:' + o.id, label: o.label })),
     ], d.sort, t('The table’s order')));
+    // up to two more keys, for the rows that tie: the second shows once the first is chosen
+    if (sections.includes('sort') && d.sort) {
+      const keys = [{ id: 'start', label: t('Start date') }, { id: 'end', label: t('End date') }, { id: 'name', label: t('Name') }, ...s.sortOptions.map((o) => ({ id: 'col:' + o.id, label: o.label }))];
+      const then = (i) => el('label', { class: 'ps-disp__row' }, [
+        el('span', { class: 'ps-disp__label', text: i === 0 ? t('then by') : t('and then by') }),
+        el('select', { class: 'ps-input', dataset: { fk: 'sortThen' + i }, onchange: (e) => { const next = [...d.sortThen]; if (e.target.value) next[i] = e.target.value; else next.length = i; on.onChange({ sortThen: next.filter(Boolean) }); } }, [
+          el('option', { value: '', text: t('nothing'), selected: !d.sortThen[i] }),
+          ...keys.filter((o) => o.id !== d.sort && !d.sortThen.some((x, j) => j !== i && x === o.id)).map((o) => el('option', { value: o.id, text: o.label, selected: o.id === d.sortThen[i] })),
+        ]),
+      ]);
+      body.push(then(0));
+      if (d.sortThen[0]) body.push(then(1));
+    }
     if (sections.includes('lanes')) body.push(select(t('Sort lanes by'), 'laneSort', [
       { id: 'name', label: t('Name') }, { id: 'busiest', label: t('Most tasks first') }, { id: 'start', label: t('Earliest start first') },
     ], d.laneSort, t('The lanes’ own order')));

@@ -151,7 +151,7 @@ export function createGantt(host, on = {}) {
     const box = barBox(frame, { kind: e.summary ? 'bar' : task.kind, start: span.start, end: span.end }, i, RH, BH);
     const title = task.title || t('(no name)');
     const mode = model.labels || 'auto';
-    const label = [title, rangeText(F, span), slipText(task)].filter(Boolean).join(', ');
+    const label = [title, rangeText(F, span), slipText(task), task.blocked ? t('Blocked') : null].filter(Boolean).join(', ');
     const critical = model.showCritical && model.critical?.has(task.id);
     const link = model.linkable && !e.summary ? el('span', { class: 'ps-bar__link', dataset: { id: String(task.id), part: 'link' }, title: t('Drag onto another task: it starts after this one ends') }) : null;
     const out = [];
@@ -179,7 +179,7 @@ export function createGantt(host, on = {}) {
     }
     const inside = mode === 'auto' && labelFits(title, box.w);
     out.push(el('div', {
-      class: 'ps-bar' + (selected ? ' is-selected' : '') + (task.flag ? ' ps-bar--flag' : '') + (c.move ? ' can-move' : '') + (critical ? ' is-critical' : ''),
+      class: 'ps-bar' + (selected ? ' is-selected' : '') + (task.blocked ? ' is-blocked' : '') + (task.flag ? ' ps-bar--flag' : '') + (c.move ? ' can-move' : '') + (critical ? ' is-critical' : ''),
       dataset: { id: String(task.id), part: 'body' },
       style: { left: box.x + 'px', top: box.y + 'px', width: box.w + 'px', '--fill': fill, '--ink': ink },
       role: 'img', 'aria-label': label,
@@ -359,6 +359,8 @@ export function createGantt(host, on = {}) {
     const timeText = model.timeText?.(task);
     if (timeText) lines.push(el('div', { text: timeText }));
     if (model.showCritical && model.critical?.has(task.id)) lines.push(el('div', { class: 'ps-tip__crit', text: t('On the critical path: a day late here is a day late at the end') }));
+    if (task.checks) lines.push(el('div', { text: t('{done} of {total} checked', { done: task.checks.done, total: task.checks.total }) }));
+    if (task.blocked) lines.push(el('div', { class: 'ps-tip__warn', text: t('Blocked: it cannot go on until something else happens.') }));
     if (task.flag === 'endBeforeStart') lines.push(el('div', { class: 'ps-tip__warn', text: t('The end date is before the start date. Drawn as one day.') }));
     const c = caps(task);
     if (!e.summary && model.editable && !c.move && !c.start && !c.end) lines.push(el('div', { class: 'ps-tip__note', text: t('Its dates come from formulas, so they can’t be dragged.') }));

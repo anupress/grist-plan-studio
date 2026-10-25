@@ -99,6 +99,27 @@ eq('…and ending the same day is not', Sc.isLate(Sc.linksOf(ffOk)[0], new Map(f
   eq('a list with nothing that is here pushes nothing', Sc.pushPlan(plan, links, [{ id: 99, start: 1, end: 2 }], plain), []);
 }
 
+// ---- closing the gaps
+{
+  const T0 = (id, s, e, over = {}) => T(id, s, e, over);
+  const today = day('2026-11-02');
+  const run = (tasks, cal = plain, opts = {}) => Sc.tightenPlan(tasks, Sc.linksOf(tasks), cal, { today, ...opts }).map((m) => [m.id, iso(m.start), iso(m.end)]);
+  eq('a task that starts a week after what it waits for ends moves up to the day after', run([T0(1, '2026-11-02', '2026-11-04'), T0(2, '2026-11-12', '2026-11-13', { deps: [1] })]), [[2, '2026-11-05', '2026-11-06']]);
+  eq('…and what follows it moves up behind it', run([T0(1, '2026-11-02', '2026-11-04'), T0(2, '2026-11-12', '2026-11-13', { deps: [1] }), T0(3, '2026-11-20', '2026-11-20', { deps: [2] })]), [[2, '2026-11-05', '2026-11-06'], [3, '2026-11-07', '2026-11-07']]);
+  eq('a task already where its links put it is left', run([T0(1, '2026-11-02', '2026-11-04'), T0(2, '2026-11-05', '2026-11-06', { deps: [1] })]), []);
+  eq('a task that waits for nothing is left where it is', run([T0(1, '2026-11-20', '2026-11-22')]), []);
+  eq('never before today', run([T0(1, '2026-10-20', '2026-10-22'), T0(2, '2026-11-12', '2026-11-13', { deps: [1] })]), [[2, '2026-11-02', '2026-11-03']]);
+  eq('a task already under way is left', run([T0(1, '2026-11-02', '2026-11-04'), T0(2, '2026-10-30', '2026-11-13', { deps: [1] })]), []);
+  eq('a finished task is left', run([T0(1, '2026-11-02', '2026-11-04'), T0(2, '2026-11-12', '2026-11-13', { deps: [1], finished: true })]), []);
+  eq('a task that cannot be moved is left, and what follows it is judged by where it is', run([T0(1, '2026-11-02', '2026-11-04'), T0(2, '2026-11-12', '2026-11-13', { deps: [1] }), T0(3, '2026-11-20', '2026-11-20', { deps: [2] })], plain, { canMove: (t) => t.id !== 2 }), [[3, '2026-11-14', '2026-11-14']]);
+  eq('with two predecessors it waits for the later one', run([T0(1, '2026-11-02', '2026-11-04'), T0(2, '2026-11-02', '2026-11-09'), T0(3, '2026-11-20', '2026-11-21', { deps: [1, 2] })]), [[3, '2026-11-10', '2026-11-11']]);
+  eq('start to start with a lag of 2: two days after the other starts', run([T0(1, '2026-11-03', '2026-11-10'), T0(2, '2026-11-20', '2026-11-22', { deps: [1], linkType: 'ss', lag: 2 })]), [[2, '2026-11-05', '2026-11-07']]);
+  eq('a loop moves nothing', run([T0(1, '2026-11-10', '2026-11-11', { deps: [2] }), T0(2, '2026-11-20', '2026-11-21', { deps: [1] })]), []);
+  const wk = makeCalendar({ workdays: true });
+  eq('working days: from a Friday end to the Monday, three working days long', run([T0(1, '2026-11-04', '2026-11-06'), T0(2, '2026-11-18', '2026-11-20', { deps: [1] })], wk), [[2, '2026-11-09', '2026-11-11']]);
+  eq('working days: never into a weekend today', Sc.tightenPlan([T0(1, '2026-10-20', '2026-10-22'), T0(2, '2026-11-12', '2026-11-13', { deps: [1] })], Sc.linksOf([T0(1, '2026-10-20', '2026-10-22'), T0(2, '2026-11-12', '2026-11-13', { deps: [1] })]), wk, { today: day('2026-11-07') }).map((m) => iso(m.start)), ['2026-11-09']);
+}
+
 // ---- the critical path
 {
   // A (Mon 2 – Wed 4) ; B waits for A start to start with lag 1 (Tue 3 – Fri 6) ; plan ends Fri 6: A is on the path through B only when B can't slip

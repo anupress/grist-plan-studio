@@ -74,6 +74,7 @@ export function buildOverview(tasks, unscheduled, { today, doable = true, rowOf,
   const late = leaves.filter(isLate).length;
   const soon = leaves.filter((x) => !x.finished && dated(x) && x.end >= today && x.end < today + SOON_DAYS).length;
   const undated = leaves.filter((x) => !x.finished && !dated(x)).length;
+  const blocked = leaves.filter((x) => x.blocked).length;
   const weight = (x) => { if (!measure) return 1; const v = num(rowOf(x.id)?.[measure.id]); return Number.isFinite(v) ? v : 0; };
   const state = (x) => (x.finished ? 'done' : isLate(x) ? 'late' : 'open');
 
@@ -119,5 +120,5 @@ export function buildOverview(tasks, unscheduled, { today, doable = true, rowOf,
     .map((x) => ({ task: x, day: x.end, inDays: x.end - today }))
     .sort((a, b) => a.day - b.day || a.task.index - b.task.index).slice(0, MILESTONES_SHOWN);
 
-  return { total, open: total - done, done, late, soon, undated, share: total ? done / total : null, doable, measure: sums, breakdowns, lateList, milestones };
+  return { total, open: total - done, done, late, soon, undated, share: total ? done / total : null, doable, blocked, measure: sums, breakdowns, lateList, milestones };
 }

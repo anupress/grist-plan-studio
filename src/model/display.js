@@ -17,6 +17,7 @@ export const MAX_LIST_COLS = 3;
 export const DISPLAY_DEFAULTS = Object.freeze({
   density: 'comfortable',   // 'comfortable' | 'compact'
   sort: null,               // null (the table's order) | 'start' | 'end' | 'name' | 'col:<column id>'; the Gantt's rows, the board's cards
+  sortThen: [],             // up to two more keys of the same kinds, for rows that tie on the first (M28)
   laneSort: null,           // null (the lanes' own order) | 'name' | 'busiest' | 'start'; the timeline's lanes
   colourBy: null,           // a column id, or null (what Settings says)
   labels: 'auto',           // where a bar's name goes: in it when it fits (else beside), beside always, or nowhere
@@ -28,13 +29,15 @@ export const DISPLAY_DEFAULTS = Object.freeze({
 });
 
 const id = (v) => typeof v === 'string' && v.length > 0 && v.length <= 80;
+const sortKey = (v) => v === 'start' || v === 'end' || v === 'name' || (typeof v === 'string' && v.startsWith('col:') && id(v.slice(4)));
 
 /** A stored display -> a clean one: every key valid or its default. */
 export function cleanDisplay(v) {
-  const d = { ...DISPLAY_DEFAULTS, cols: [] };
+  const d = { ...DISPLAY_DEFAULTS, cols: [], sortThen: [] };
   if (!v || typeof v !== 'object') return d;
   if (v.density in DENSITIES) d.density = v.density;
-  if (v.sort === 'start' || v.sort === 'end' || v.sort === 'name' || (typeof v.sort === 'string' && v.sort.startsWith('col:') && id(v.sort.slice(4)))) d.sort = v.sort;
+  if (sortKey(v.sort)) d.sort = v.sort;
+  if (Array.isArray(v.sortThen) && d.sort) d.sortThen = [...new Set(v.sortThen.filter(sortKey).filter((k) => k !== d.sort))].slice(0, 2);
   if (LANE_SORTS.includes(v.laneSort)) d.laneSort = v.laneSort;
   if (id(v.colourBy)) d.colourBy = v.colourBy;
   if (LABEL_MODES.includes(v.labels)) d.labels = v.labels;
@@ -80,33 +83,37 @@ function sortValue(row, col, labels) {
 /**
  * A comparator over tasks for the rows' order, or null for the table's own. Empty values go last; ties keep the
  * table's order, so sorting twice never shuffles.
- * @param key  see DISPLAY_DEFAULTS.sort
- * @param ctx  {columns, rowOf(id) -> row, labels}
+ * @param keys  see DISPLAY_DEFAULTS.sort: one key, or a list of them (the first decides, the next ones break its ties)
+ * @param ctx   {columns, rowOf(id) -> row, labels}
  */
-export function taskSorter(key, { columns, rowOf, labels = {} }) {
-  if (!key) return null;
+export function taskSorter(keys, { columns, rowOf, labels = {} }) {
   const tie = (a, b) => (a.index ?? 0) - (b.index ?? 0);
+  // 0 when two tasks are equal on this key, so the next key gets its say
   const numeric = (get) => (a, b) => {
     const x = get(a), y = get(b);
-    if (x == null && y == null) return tie(a, b);
+    if (x == null && y == null) return 0;
     if (x == null) return 1;
     if (y == null) return -1;
-    return x - y || tie(a, b);
+    return x - y;
   };
-  if (key === 'start') return numeric((t) => t.start);
-  if (key === 'end') return numeric((t) => t.end);
-  if (key === 'name') return (a, b) => byText(a.title || '', b.title || '') || tie(a, b);
-  const col = columns.find((c) => c.id === key.slice(4));
-  if (!col) return null;
-  const val = (t) => { const r = rowOf(t.id); return r ? sortValue(r, col, labels) : null; };
-  return (a, b) => {
-    const x = val(a), y = val(b);
-    if (x == null && y == null) return tie(a, b);
-    if (x == null) return 1;
-    if (y == null) return -1;
-    if (typeof x === 'number' && typeof y === 'number') return x - y || tie(a, b);
-    return byText(x, y) || tie(a, b);
+  const one = (key) => {
+    if (key === 'start') return numeric((t) => t.start);
+    if (key === 'end') return numeric((t) => t.end);
+    if (key === 'name') return (a, b) => byText(a.title || '', b.title || '');
+    const col = typeof key === 'string' ? columns.find((c) => c.id === key.slice(4)) : null;
+    if (!col) return null;
+    const val = (t) => { const r = rowOf(t.id); return r ? sortValue(r, col, labels) : null; };
+    return (a, b) => {
+      const x = val(a), y = val(b);
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      return typeof x === 'number' && typeof y === 'number' ? x - y : byText(x, y);
+    };
   };
+  const chain = (Array.isArray(keys) ? keys : [keys]).filter(Boolean).map(one).filter(Boolean);
+  if (!chain.length) return null;
+  return (a, b) => { for (const c of chain) { const r = c(a, b); if (r) return r; } return tie(a, b); };
 }
 
 /** The columns a person may sort by or show in the list: not the name, not the links between tasks. */

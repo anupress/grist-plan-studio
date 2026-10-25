@@ -140,7 +140,7 @@ export function createTimeline(host, on = {}) {
         const labels = model.labels || 'auto';
         const inside = labels === 'auto' && labelFits(title, box.w);
         bars.appendChild(el('div', {
-          class: 'ps-bar' + (selected ? ' is-selected' : '') + (c.move ? ' can-move' : '') + (b.clash ? ' is-clash' : ''),
+          class: 'ps-bar' + (selected ? ' is-selected' : '') + (task.blocked ? ' is-blocked' : '') + (c.move ? ' can-move' : '') + (b.clash ? ' is-clash' : ''),
           ...attrs, style: { left: box.x + 'px', top: box.y + 'px', width: box.w + 'px', '--fill': fill, '--ink': task.colour ? onColor(task.colour) : 'var(--ps-bar-ink)' },
         }, [
           task.progress != null && task.progress > 0 ? el('span', { class: 'ps-bar__progress', style: { width: Math.round(task.progress * 100) + '%' } }) : null,

@@ -6,12 +6,13 @@ import { el, clear } from '../core/util.js';
 import { encodeInput } from '../model/edits.js';
 import { dayOf, isoFromDay, dayFromISO, listOf, refId, plain } from '../model/values.js';
 import { t } from '../i18n/index.js';
+import { parseChecklist, setItem, addItem } from '../model/checklist.js';
 import { trapFocus } from './dialog.js';
 
 // role -> label (the labels are the Columns panel's, so both say the same)
 const FIELD_LABELS = {
   title: 'Name', start: 'Start date', end: 'End date', due: 'Due date', duration: 'Duration in days',
-  status: 'Status', progress: 'Progress', done: 'Done', milestone: 'Milestone', assignee: 'Assigned to', project: 'Project',
+  status: 'Status', progress: 'Progress', done: 'Done', milestone: 'Milestone', blocked: 'Blocked', checklist: 'Checklist', assignee: 'Assigned to', project: 'Project',
   parent: 'Parent task', dependsOn: 'Depends on', lag: 'Lag (days)', linkType: 'Link type', baselineStart: 'Planned start', baselineEnd: 'Planned end', doneOn: 'Done on',
 };
 
@@ -57,6 +58,34 @@ export function inputFor(col, cell, labels, id, disabled) {
   }
   const node = el('input', { type: 'text', id, class: 'ps-input', value: plain(cell) == null ? '' : String(plain(cell)), disabled });
   return { node, read: () => node.value, initial: plain(cell) == null ? '' : String(plain(cell)) };
+}
+
+/** A checklist kept in a text cell: a box for each item, and a line to add one. The text it hands back changes only what was ticked or added. */
+function checklistInput(cell, id, disabled) {
+  const start = plain(cell) == null ? '' : String(plain(cell));
+  let text = start;
+  const node = el('div', { id, class: 'ps-checklist', role: 'group', 'aria-label': t('Checklist') });
+  const draw = (refocus = false) => {
+    clear(node);
+    for (const it of parseChecklist(text).items) {
+      const box = el('input', { type: 'checkbox', checked: it.done, disabled });
+      const row = el('label', { class: 'ps-check' + (it.done ? ' is-done' : '') }, [box, el('span', { text: it.text })]);
+      box.addEventListener('change', () => { text = setItem(text, it.line, box.checked); row.classList.toggle('is-done', box.checked); });
+      node.appendChild(row);
+    }
+    if (disabled) return;
+    const add = el('input', { type: 'text', class: 'ps-input', maxlength: '200', placeholder: t('Add an item'), 'aria-label': t('Add an item') });
+    add.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (add.value.trim()) { text = addItem(text, add.value); draw(true); }
+    });
+    node.appendChild(add);
+    if (refocus) add.focus();
+  };
+  draw();
+  return { node, read: () => text, initial: start };
 }
 
 /**
@@ -111,7 +140,7 @@ export function openQuickEdit(host, s, on) {
     if (!col) continue;
     const id = 'ps-qe-' + role;
     const locked = !s.editable || col.isFormula;
-    const inp = inputFor(col, s.row[col.id], s.labels[col.id], id, locked);
+    const inp = role === 'checklist' && col.kind === 'Text' ? checklistInput(s.row[col.id], id, locked) : inputFor(col, s.row[col.id], s.labels[col.id], id, locked);
     inputs.push({ col, inp, locked });
     fieldRows.push(el('div', { class: 'ps-field' + (col.kind === 'Bool' ? ' ps-field--check' : '') }, [
       el('label', { for: id, text: t(label) }),

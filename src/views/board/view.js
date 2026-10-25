@@ -93,6 +93,16 @@ export function createBoard(host, on) {
     ]);
   }
 
+  /** The checklist in the card's words: how many items are ticked, with a short bar beside them. */
+  function checkLine(card) {
+    const c = card.checks;
+    if (!c || !c.total) return null;
+    return el('p', { class: 'ps-card__sub ps-card__checks' + (c.done >= c.total ? ' is-all' : '') }, [
+      el('span', { class: 'ps-card__subbar', 'aria-hidden': 'true' }, [el('span', { style: { width: Math.round((100 * c.done) / c.total) + '%' } })]),
+      el('span', { text: t('{done} of {total} checked', { done: c.done, total: c.total }) }),
+    ]);
+  }
+
   function cardNode(card) {
     const people = card.people.slice(0, 3);
     const more = card.people.length - people.length;
@@ -111,6 +121,8 @@ export function createBoard(host, on) {
       ]))) : null,
       timeLine(card),
       subLine(card),
+      checkLine(card),
+      card.blocked ? el('p', { class: 'ps-card__blocked', text: t('Blocked') }) : null,
       (() => {
         const when = whenText(card);
         if (!when && !people.length) return null;

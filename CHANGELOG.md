@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.20.0
+
+Close the gaps, blocked tasks, checklists, sorting by several things, and more in the calendar. Tested in Grist 1.7.20 (every write read
+back from the table, every one undone with Grist's Undo and the steps counted).
+
+- **Close the gaps…** (More): moves every waiting task to the first day its links allow; the moves are listed first, one Undo.
+- **Blocked**: a yes/no column or a status marks a task that cannot go on; striped bar, words on cards, the agenda and the edit window,
+  counted in the Overview.
+- **Checklist**: a text column, one item to a line; boxes and a line to add one in the edit window, “1 of 3 checked” on cards, bars and the agenda.
+- **Sort by, then by, and then by** in Display: up to three keys.
+- **Calendar**: drag the edge of a bar to change its start or end, drag across empty days to add a task over them, Alt+Shift+← → ends a task a day earlier or later.
+- German and French for every new word.
+
 ## 1.19.0
 
 Two levels of groups, and more in the overview. Tested in Grist 1.7.20.
