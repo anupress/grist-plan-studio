@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.16.0
+
+Copy, repeat, several tasks at once, and a menu on every task. Tested in Grist 1.7.20 (every write read back from the table, every one undone with Grist's Undo and the steps counted).
+
+- **Copy…**: a task, or a task with its sub-tasks, on a later day, repeated every n days, weeks or months, or until a day; the copies
+  start over; one step in Undo. It covers recurring tasks and phase templates.
+- **Add several tasks**: one task a line, indentation for sub-tasks, optional dates one after the other; the preview says what it
+  will make. Also under a chosen task.
+- **Add sub-task**, **Indent** and **Outdent** (`]` and `[`), **Mark as done** and **as not done**.
+- **A menu on a task** (right-click or Shift+F10) in the Gantt chart, timeline, board, calendar, agenda and booking grid.
+- **More** in the toolbar: Set baseline, Fold all, Unfold all, Copy as text, Download as CSV, Print. The toolbar is two rows instead
+  of three at 1070 px.
+- **Outline numbers** beside the names (Display).
+- The board's printout shows swimlanes as bands.
+- German and French for every new word.
+
 ## 1.15.0
 
 The board gets swimlanes. Tested in Grist 1.7.20 (band counts compared with the table, every drop read back, one Undo each).

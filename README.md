@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.15.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.16.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -263,6 +263,26 @@ and the **Del** key deletes the selected task. Both are one step in Grist's Undo
   renamed. A task with sub-tasks asks whether to copy them too: each copy sits under the copy of its parent, links between
   the copies point at the copies, and links to anything else stay as they were.
 - Neither is offered to someone who cannot edit the document.
+
+## Copy, repeat and add several tasks
+
+- **Copy…** (in a task's menu and in its edit window) makes the task again on a later day, or every few days, weeks or months,
+  or until a day you give: "every Monday until the end of the year". A task with sub-tasks is copied with them, every date
+  moving by the same number of days. The copies start over (not started, no progress, no day it was done) unless you untick that.
+  All the copies are one step in Grist's Undo. This is how to repeat a task and how to use a finished phase as a template.
+  Months are calendar months: the 31st plus a month is the last day of the next one.
+- **Add several tasks** (**More**) takes a list, one task a line, typed or pasted from a mail or a spreadsheet. A line indented
+  under another becomes its sub-task; bullets, dashes, numbers and `[ ]` boxes at the start of a line are dropped. Give them a
+  start day and a length and they can follow one another (each waiting for the one before) or all start together. It says how many
+  tasks it will make, and between which days, before it writes. **Add several sub-tasks…** in a task's menu puts them under that task.
+- **The menu on a task**: right-click a bar, a row, a card or a calendar chip, or press Shift+F10: edit, open Grist's card, add a
+  sub-task, indent or outdent (also `]` and `[`), mark done or open again, duplicate, copy, delete. Done and open go through whatever
+  the table has: the Done box, the status (the choice that means finished, or the first that does not), the progress and the day it
+  was done.
+- **More** in the toolbar also holds: Set baseline, Fold all and Unfold all, **Copy as text** (a table to paste into a mail or a
+  spreadsheet), **Download as CSV** and Print. Both exports are the tasks on show with their outline number, dates, days, status,
+  people and progress.
+- **Outline numbers** (1, 1.1, 1.2.1) are a column beside the names in Display, in the Gantt chart.
 
 ## Search and filters
 

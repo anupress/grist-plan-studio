@@ -10,6 +10,7 @@ const COMMON = [
   ['Del', 'Delete the selected task (it asks first)'],
   ['/', 'Search by name'],
   ['D', 'Open or close Display'],
+  ['Shift+F10', 'Open the menu of the selected task'],
   ['?', 'Help and these shortcuts'],
 ];
 const BY_VIEW = {
@@ -18,6 +19,7 @@ const BY_VIEW = {
     ['← →', 'Fold or unfold a parent task'],
     ['Alt+← →', 'Move the task a day'],
     ['Alt+Shift+← →', 'Make it end a day earlier or later'],
+    ['[ ]', 'Move the task one level out or in'],
     ['+ −', 'Zoom in or out'],
     ['T', 'Scroll to today'],
   ],

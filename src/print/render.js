@@ -120,6 +120,14 @@ export function renderTimePrint(s) {
 /**
  * @param s {title, subtitle, paper, lanes: [{name, count, over, colour, cards: [{title, when, late, people, fields: [{label, text}], done}]}]}
  */
+const card = (c) => el('div', { class: 'pp-card' + (c.done ? ' is-done' : ''), style: c.colour ? { borderLeftColor: c.colour } : {} }, [
+  el('div', { class: 'pp-card__title', text: (c.done ? '✓ ' : '') + c.title }),
+  c.fields.length ? el('div', { class: 'pp-card__fields', text: c.fields.map((f) => `${f.label}: ${f.text}`).join(' · ') }) : null,
+  c.when || c.people ? el('div', { class: 'pp-card__meta' }, [
+    c.when ? el('span', { class: c.late ? 'is-late' : '', text: c.when }) : null,
+    c.people ? el('span', { text: c.people }) : null,
+  ]) : null,
+]);
 export function renderBoardPrint(s) {
   const page = pageArea(s.paper);
   const root = el('div', { class: 'pp-root' });
@@ -138,16 +146,11 @@ export function renderBoardPrint(s) {
           el('span', { class: 'pp-lane__name', text: lane.name }), el('span', { class: 'pp-lane__count', text: lane.count }),
         ]))),
       ]),
-      el('tbody', {}, [el('tr', {}, lanes.map((lane) => el('td', { class: 'pp-lane' }, [
-        ...lane.cards.map((c) => el('div', { class: 'pp-card' + (c.done ? ' is-done' : ''), style: c.colour ? { borderLeftColor: c.colour } : {} }, [
-          el('div', { class: 'pp-card__title', text: (c.done ? '✓ ' : '') + c.title }),
-          c.fields.length ? el('div', { class: 'pp-card__fields', text: c.fields.map((f) => `${f.label}: ${f.text}`).join(' · ') }) : null,
-          c.when || c.people ? el('div', { class: 'pp-card__meta' }, [
-            c.when ? el('span', { class: c.late ? 'is-late' : '', text: c.when }) : null,
-            c.people ? el('span', { text: c.people }) : null,
-          ]) : null,
-        ])),
-      ])))]),
+      // with swimlanes: a heading for each band, then its cards under the lanes
+      el('tbody', {}, s.bands ? s.bands.flatMap((band) => [
+        el('tr', {}, [el('th', { class: 'pp-band', colspan: String(n), text: band.name + (band.count ? ' · ' + band.count : '') })]),
+        el('tr', {}, lanes.map((lane, i) => el('td', { class: 'pp-lane' }, band.cells[a + i].map(card)))),
+      ]) : [el('tr', {}, lanes.map((lane) => el('td', { class: 'pp-lane' }, lane.cards.map(card))))]),
     ]));
   });
   return root;

@@ -98,9 +98,9 @@ function calendarSection(c, on, close) {
 }
 
 /**
- * @param s  {row, roles, columns, labels, extra: [column] (more fields to show, M22), editable, canOpenCard, canCopy (Duplicate and Delete are offered), note, booking: true in the booking grid, time: see timeSection,
+ * @param s  {row, roles, columns, labels, extra: [column] (more fields to show, M22), editable, canOpenCard, canCopy (Duplicate, Copy and Delete are offered), canSub (Add sub-task is), note, booking: true in the booking grid, time: see timeSection,
  *            calendar: {words} | null, plan: how far the task has drifted from its plan, in words | null}
- * @param on {onSave({fields, patch}), onOpenCard(), onDuplicate(), onDelete(), onClose(), onStartTimer(), onStopTimer(), onLogTime(), onSetupTime(), onCalendar()}
+ * @param on {onSave({fields, patch}), onOpenCard(), onDuplicate(), onCopy(), onAddSub(), onDelete(), onClose(), onStartTimer(), onStopTimer(), onLogTime(), onSetupTime(), onCalendar()}
  */
 export function openQuickEdit(host, s, on) {
   const inputs = [];
@@ -163,9 +163,11 @@ export function openQuickEdit(host, s, on) {
     ]),
     timeSection(s.time, on, () => close()),
     calendarSection(s.calendar, on, () => close()),
-    s.canOpenCard || s.canCopy ? el('div', { class: 'ps-drawer__tools' }, [
+    s.canOpenCard || s.canCopy || s.canSub ? el('div', { class: 'ps-drawer__tools' }, [
       s.canOpenCard ? el('button', { type: 'button', class: 'ps-btn', text: t('Open Grist’s card'), title: t('Every column of this row, in Grist’s record card'), onclick: () => { close(); on.onOpenCard?.(); } }) : null,
       s.canCopy ? el('button', { type: 'button', class: 'ps-btn', text: t('Duplicate'), title: t('A copy of this task, one step in Undo'), onclick: () => { close(); on.onDuplicate?.(); } }) : null,
+      s.canCopy ? el('button', { type: 'button', class: 'ps-btn', text: t('Copy…'), title: t('The task on a later date, or every week or month, with its sub-tasks'), onclick: () => { close(); on.onCopy?.(); } }) : null,
+      s.canSub ? el('button', { type: 'button', class: 'ps-btn', text: t('Add sub-task'), title: t('A new task under this one'), onclick: () => { close(); on.onAddSub?.(); } }) : null,
       el('span', { class: 'ps-spacer' }),
       s.canCopy ? el('button', { type: 'button', class: 'ps-btn ps-btn--danger', text: t('Delete'), title: t('Delete this task (it asks first)'), onclick: () => { close(); on.onDelete?.(); } }) : null,
     ]) : null,

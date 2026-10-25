@@ -703,3 +703,26 @@ button, input, select { font: inherit; color: inherit; }
 .ps-gantt.is-panning, .ps-gantt.is-panning .ps-gantt__chart { cursor: grabbing; user-select: none; }
 .ps-chip--toggle::after { display: none; }
 .ps-qe-more { margin-top: 18px; }
+
+/* ---- copy, several tasks at once, the menus (M24) ---- */
+/* the menu on a task and the More menu: floating over the chart, so a shadow is right here */
+.ps-menu {
+  position: absolute; z-index: 25; min-width: 210px; max-width: min(320px, calc(100% - 8px)); padding: 4px; box-sizing: border-box;
+  background: var(--ps-surface); border: 1px solid var(--ps-line-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+.ps-menu__item {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px; width: 100%; box-sizing: border-box; padding: 6px 10px;
+  border: 0; border-radius: 5px; background: none; color: var(--ps-ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.ps-menu__item:hover:not(:disabled) { background: var(--ps-hover); }
+.ps-menu__item:focus-visible { outline: none; background: var(--ps-hover); box-shadow: inset 0 0 0 2px var(--ps-focus); }
+.ps-menu__item:disabled { color: var(--ps-muted); cursor: default; opacity: 0.7; }
+.ps-menu__item.is-danger { color: var(--ps-crit); }
+.ps-menu__hint { flex: none; font-size: 12px; color: var(--ps-muted); }
+.ps-menu__sep { height: 1px; margin: 4px 6px; background: var(--ps-line); }
+.ps-more-btn::after {
+  content: ""; display: inline-block; width: 5px; height: 5px; margin: 0 1px 3px 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg);
+}
+.ps-dialog--wide { width: min(480px, calc(100% - 32px)); max-height: calc(100% - 36px); overflow: auto; }
+.ps-ol__text { min-height: 150px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.5; }
+.ps-dialog p.ps-cp__preview { margin: 12px 0 16px; font-size: 13px; font-weight: 500; color: var(--ps-ink); }

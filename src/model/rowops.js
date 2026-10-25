@@ -10,6 +10,7 @@
 
 import { dayOf, refId, listOf, plain, num } from './values.js';
 import { encodeInput } from './edits.js';
+import { isDoneStatus } from './tasks.js';
 
 const colOf = (ctx, role) => (ctx.roles[role] ? ctx.columns.find((c) => c.id === ctx.roles[role]) || null : null);
 
@@ -81,11 +82,13 @@ function inputOf(col, cell) {
  * @param ctx    {tableId, roles, columns}
  * @param tasks  every task: id, parentId, deps
  * @param rows   the rows, encoded (what the widget keeps)
- * @param opts   {children: 'all' | 'none', firstId: the row number the first copy gets, copyTitle(title) -> the copy's name}
+ * @param opts   {children: 'all' | 'none', firstId: the row number the first copy gets, copyTitle(title) -> the copy's name,
+ *                shift: days every date of the copy moves by (the start, end, due and planned dates; others are copied as they are),
+ *                fresh: the copy starts over (not done, no progress, no day it was done, the first status that is not a finished one)}
  * @returns {{action: [string, string, number[], object], ids: number[], rows: object[], map: Map} | {error: 'gone' | 'noName'}}
  *   rows: the copies as the widget keeps rows (for the demo and for a bar at once); map: original id -> copy id
  */
-export function planDuplicate(ctx, tasks, rows, id, { children = 'none', firstId, copyTitle = (s) => s } = {}) {
+export function planDuplicate(ctx, tasks, rows, id, { children = 'none', firstId, copyTitle = (s) => s, shift = 0, fresh = false } = {}) {
   const source = tasks.find((x) => x.id === id);
   if (!source) return { error: 'gone' };
   const titleCol = colOf(ctx, 'title'), parentCol = colOf(ctx, 'parent'), depCol = colOf(ctx, 'dependsOn');
@@ -93,6 +96,10 @@ export function planDuplicate(ctx, tasks, rows, id, { children = 'none', firstId
   const map = new Map(order.map((x, i) => [x, firstId + i]));
   const rowOf = new Map(rows.map((r) => [r.id, r]));
   const taskOf = new Map(tasks.map((x) => [x.id, x]));
+  const roleId = (role) => ctx.roles[role] || null;
+  const shifted = new Set(['start', 'end', 'due', 'baselineStart', 'baselineEnd'].map(roleId).filter(Boolean));
+  const statusCol = colOf(ctx, 'status');
+  const firstOpen = statusCol?.kind === 'Choice' ? (statusCol.choices || []).find((x) => !isDoneStatus(x)) : undefined;
   const cols = ctx.columns.filter((c) => !c.isFormula && ['Text', 'Choice', 'ChoiceList', 'Bool', 'Numeric', 'Int', 'Date', 'DateTime', 'Ref', 'RefList', 'Attachments'].includes(c.kind));
   const values = Object.fromEntries(cols.map((c) => [c.id, []]));
   const copies = [];
@@ -109,6 +116,13 @@ export function planDuplicate(ctx, tasks, rows, id, { children = 'none', firstId
         if (parentCol && c.id === parentCol.id && src !== id) { const p = taskOf.get(src)?.parentId; input = map.get(p) ?? p ?? 0; }
         if (depCol && c.id === depCol.id) { const d = (taskOf.get(src)?.deps || []).map((x) => map.get(x) ?? x); input = depCol.kind === 'Ref' ? d[0] || 0 : d; }
         if (titleCol && c.id === titleCol.id && src === id) input = copyTitle(String(plain(row[c.id]) ?? ''));
+        if (shift && shifted.has(c.id) && typeof input === 'number') input += shift;
+        if (fresh) {
+          if (c.id === roleId('done')) input = false;
+          else if (c.id === roleId('progress')) input = 0;
+          else if (c.id === roleId('doneOn')) input = null;
+          else if (c.id === roleId('status') && firstOpen !== undefined) input = firstOpen;
+        }
         [value, cell] = encodeInput(c, input, row[c.id]);
       }
       values[c.id].push(value);
@@ -118,4 +132,53 @@ export function planDuplicate(ctx, tasks, rows, id, { children = 'none', firstId
   }
   const ids = order.map((x) => map.get(x));
   return { action: ['BulkAddRecord', ctx.tableId, ids, values], ids, rows: copies, map };
+}
+
+/**
+ * Several copies in one action: the original and (when asked) its sub-tasks, once for each shift in `deltas` (days). The
+ * copies of one round get the row numbers after those of the round before. One BulkAddRecord, so one step in Undo.
+ * @param opts   {children, firstId, deltas: number[], copyTitle, fresh}
+ * @returns {{action, ids, rows, rounds: number} | {error}}
+ */
+export function planSeries(ctx, tasks, rows, id, { children = 'none', firstId, deltas = [0], copyTitle = (s) => s, fresh = false } = {}) {
+  const ids = [], copies = [], values = {};
+  let next = firstId;
+  for (const shift of deltas) {
+    const part = planDuplicate(ctx, tasks, rows, id, { children, firstId: next, copyTitle, shift, fresh });
+    if (part.error) return part;
+    const [, , , vals] = part.action;
+    for (const [k, list] of Object.entries(vals)) (values[k] ||= []).push(...list);
+    ids.push(...part.ids);
+    copies.push(...part.rows);
+    next += part.ids.length;
+  }
+  return { action: ['BulkAddRecord', ctx.tableId, ids, values], ids, rows: copies, rounds: deltas.length };
+}
+
+/**
+ * Move a task one level in (it becomes a sub-task of the task above it at its own level) or one level out (it takes its
+ * parent's place, under the grandparent). Moving in never makes a loop; moving out never does either.
+ * @param dir  'in' | 'out'
+ * @returns {{fields, patch, parentId} | {error: 'gone' | 'noParentColumn' | 'parentFormula' | 'first' | 'top'}}
+ */
+export function planReparent(ctx, tasks, id, dir) {
+  const task = tasks.find((x) => x.id === id);
+  if (!task) return { error: 'gone' };
+  const col = colOf(ctx, 'parent');
+  if (!col) return { error: 'noParentColumn' };
+  if (col.isFormula) return { error: 'parentFormula' };
+  let parentId;
+  if (dir === 'in') {
+    // the task above it among its brothers and sisters, in the order of the rows
+    const same = tasks.filter((x) => (x.parentId ?? null) === (task.parentId ?? null)).sort((a, b) => a.index - b.index);
+    const at = same.findIndex((x) => x.id === id);
+    if (at <= 0) return { error: 'first' };
+    parentId = same[at - 1].id;
+  } else {
+    if (task.parentId == null) return { error: 'top' };
+    const up = tasks.find((x) => x.id === task.parentId);
+    parentId = up?.parentId ?? 0;
+  }
+  const [value, cell] = encodeInput(col, parentId);
+  return { fields: { [col.id]: value }, patch: { [col.id]: cell }, parentId };
 }

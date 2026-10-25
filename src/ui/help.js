@@ -77,6 +77,8 @@ export function helpFor(view) {
         t('Click ▸ or ▾ to fold a parent or a group. Double-click a task to open Grist’s own card.'),
         t('Drag the empty part of the chart to move across it. Ctrl and the wheel zoom around the pointer. Drag the edge of the names, in the heading, to widen them.'),
         t('Set baseline remembers today’s dates as the plan. A bar that later moves shows the plan as a thin line under it, and says by how many days.'),
+        t('Right-click a task for its menu: add a sub-task, indent it, mark it done, copy it to a later date or repeat it. [ and ] move it one level out or in.'),
+        t('More, in the toolbar, adds several tasks from a list, copies the plan as text or a CSV file, folds everything and prints.'),
       ],
     };
   }

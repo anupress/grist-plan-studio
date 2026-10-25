@@ -191,5 +191,34 @@ const plan = (row, ctx, mode, a, b) => { const t = taskOf(row, ctx); return E.pl
   eq('a formula column: no linking', E.canLink(formula), false);
 }
 
+// ---- done and open (M24)
+{
+  const spec = [{ id: 'T', type: 'Text' }, { id: 'S', type: 'Date' }, { id: 'E', type: 'Date' }, { id: 'Status', type: 'Choice', choices: ['To do', 'Doing', 'Done'] },
+    { id: 'Flag', type: 'Bool' }, { id: 'Pct', type: 'Numeric' }, { id: 'On', type: 'Date' }, { id: 'P', type: 'Ref:Tasks' }];
+  const roles = { title: 'T', start: 'S', end: 'E', status: 'Status', done: 'Flag', progress: 'Pct', doneOn: 'On', parent: 'P' };
+  const ctx = setup(spec, roles);
+  const row = { id: 1, T: 'a', S: D('2026-11-02'), E: D('2026-11-04'), Status: 'Doing', Flag: false, Pct: 0.4, On: null, P: null };
+  const task = taskOf(row, ctx);
+  const finish = E.doneFields(ctx, task, row, true, { today: day('2026-11-10'), full: 1 });
+  eq('done: the box, the status, full progress and the day', finish.fields, { Flag: true, Status: 'Done', Pct: 1, On: secs('2026-11-10') });
+  eq('…the patch is the encoded cells', [finish.patch.Flag, finish.patch.On], [true, ['d', secs('2026-11-10')]]);
+  const done = { ...row, Flag: true, Status: 'Done', Pct: 1, On: D('2026-11-10') };
+  const reopen = E.doneFields(ctx, taskOf(done, ctx), done, false);
+  eq('open again: the box off, the first open status, progress back to nothing, no day', reopen.fields, { Flag: false, Status: 'To do', Pct: 0, On: null });
+  eq('open again keeps a progress that was not full', E.doneFields(ctx, task, { ...row, Flag: true }, false).fields, { Flag: false });
+  eq('a percentage column on a scale of a hundred', E.doneFields(ctx, task, row, true, { full: 100 }).fields.Pct, 100);
+  eq('already done: nothing but the box needs a write', E.doneFields(ctx, taskOf(done, ctx), done, true, { today: day('2026-11-11') }).fields, { Flag: true, On: secs('2026-11-11') });
+  const onlyStatus = setup(spec, { title: 'T', start: 'S', end: 'E', status: 'Status' });
+  eq('with only a status: the done choice', E.doneFields(onlyStatus, task, row, true).fields, { Status: 'Done' });
+  const german = setup([{ id: 'T', type: 'Text' }, { id: 'S', type: 'Choice', choices: ['Offen', 'Erledigt'] }], { title: 'T', status: 'S' });
+  eq('a word for done in another language is found', E.doneFields(german, { id: 1 }, { id: 1, T: 'x', S: 'Offen' }, true).fields, { S: 'Erledigt' });
+  const none = setup([{ id: 'T', type: 'Text' }], { title: 'T' });
+  eq('a table with nothing that says done: nothing to write', E.doneFields(none, { id: 1 }, { id: 1, T: 'x' }, true).fields, {});
+  const formulas = setup(spec.map((c) => (c.id === 'Flag' || c.id === 'Status' ? { ...c, isFormula: true } : c)), roles);
+  eq('a formula column is left alone', Object.keys(E.doneFields(formulas, task, row, true, { today: day('2026-11-10') }).fields).sort(), ['On', 'Pct']);
+  eq('a new task under a parent', E.newTaskFields(ctx, { day: day('2026-11-03'), title: 'Sub', parentId: 7 }).fields, { T: 'Sub', S: secs('2026-11-03'), P: 7 });
+  eq('…and no parent column, no parent', E.newTaskFields(none, { day: day('2026-11-03'), title: 'Sub', parentId: 7 }).fields, { T: 'Sub' });
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

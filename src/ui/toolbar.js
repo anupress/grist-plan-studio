@@ -92,7 +92,6 @@ export function renderToolbar(host, s, on) {
         s.groupOptions?.length ? picker(t('Group'), t('Group rows by'), s.groupOptions, s.groupBy, on.onGroup, t('No groups')) : null,
         s.hasLinks ? el('button', { type: 'button', class: 'ps-btn' + (s.critical ? ' is-on' : ''), 'aria-pressed': s.critical ? 'true' : 'false',
           text: t('Critical path'), title: t('Show the tasks that decide the end date'), onclick: on.onCritical }) : null,
-        s.canBaseline ? button(t('Set baseline'), t('Remember today’s dates as the plan, to compare later moves with'), on.onBaseline) : null,
         ...zoomTools(),
       ];
     } else if (view === 'calendar') {
@@ -169,7 +168,7 @@ export function renderToolbar(host, s, on) {
         title: s.display.changed ? t('How rows and bars look: changed from the default') : t('How rows and bars look: row height, order, colours, names, columns'), onclick: on.onDisplay,
       }) : null,
       level === 'full' ? button(t('Views'), t('Saved views: a view as you set it up, under a name'), on.onViews) : null,
-      level === 'full' && view !== 'agenda' ? button(t('Print'), t('Print or save as PDF (Ctrl+P)'), on.onPrint, ' ps-hide-narrow') : null,
+      level === 'full' ? el('button', { type: 'button', class: 'ps-btn ps-more-btn', text: t('More'), 'aria-haspopup': 'menu', title: t('Add several tasks, set a baseline, fold everything, copy the plan as text, print'), onclick: (e) => on.onMore?.(e.currentTarget) }) : null,
       level === 'bare' ? null : el('button', { type: 'button', class: 'ps-btn ps-btn--key ps-hide-narrow', text: '?', title: t('Help and keyboard shortcuts (?)'), 'aria-label': t('Help'), onclick: on.onHelp }),
       level === 'bare' ? null : button(t('Settings'), t('Columns, how dates are read, and what each view shows'), on.onColumns, ' ps-columns-btn'),
     ]),

@@ -92,5 +92,48 @@ eq('a cycle in the data does not run forever', O.descendantsOf([{ id: 1, parentI
   eq('with no name column the copy is exact', noName.action[3].Task, ['Test']);
 }
 
+// ---- copies on later dates (M24)
+{
+  const sh = O.planDuplicate(ctx, tasks, rows, 2, { children: 'all', firstId: 100, shift: 7 });
+  eq('a shift moves the start and the end of the copy and of its sub-tasks', [sh.rows.map((r) => r.Start[1] / 86400 - day('2026-11-02')), sh.rows.map((r) => r.End[1] / 86400 - day('2026-11-04'))], [[7, 7, 7], [7, 7, 7]]);
+  eq('…and the original is untouched, a Stamp (not a role column) is copied as it was', [rows[1].Start[1] / 86400 - day('2026-11-02'), sh.rows[0].Stamp], [0, ['D', stamp[1], 'Europe/Berlin']]);
+  eq('a task with no date is copied without one', O.planDuplicate(ctx, tasks, [{ ...rows[2], Start: null, End: null }], 3, { firstId: 5, shift: 7 }).rows[0].Start, null);
+  const dated = { ...ctx, roles: { ...roles, due: 'Stamp' } };
+  eq('a column that is not shifted stays: Stamp is not a role in the plain case', O.planDuplicate(ctx, tasks, rows, 2, { firstId: 5, shift: 7 }).rows[0].Stamp, ['D', stamp[1], 'Europe/Berlin']);
+  const fresh = (rowSet, c = { ...ctx, roles: { ...roles, done: 'Flag', progress: 'Hours' } }) => O.planDuplicate(c, (() => { const b = buildTasks(rowSet, { roles: c.roles, columns }); return [...b.tasks, ...b.unscheduled]; })(), rowSet, 2, { firstId: 5, fresh: true }).rows[0];
+  const finished = rows.map((r) => (r.id === 2 ? { ...r, Status: 'Done', Flag: true, Hours: 8 } : r));
+  const f1 = fresh(finished);
+  eq('starting over: not done, no progress, the first open status', [f1.Flag, f1.Hours, f1.Status], [false, 0, 'To do']);
+  eq('without starting over a finished task is copied finished', O.planDuplicate(ctx, tasks, finished, 2, { firstId: 5 }).rows[0].Status, 'Done');
+}
+
+// ---- a series in one action
+{
+  const one = O.planSeries(ctx, tasks, rows, 3, { firstId: 100, deltas: [7, 14, 21], copyTitle: (s) => s });
+  eq('three weekly copies: three rows, numbered one after the other', [one.ids, one.rounds, one.action[0]], [[100, 101, 102], 3, 'BulkAddRecord']);
+  eq('…each a week after the one before, one column of values per field', one.action[3].Start.map((v) => v / 86400 - day('2026-11-02')), [7, 14, 21]);
+  const withKids = O.planSeries(ctx, tasks, rows, 2, { children: 'all', firstId: 100, deltas: [7, 14] });
+  eq('with sub-tasks: each round has the original and its two, parents point at their own round', [withKids.ids, withKids.action[3].Parent], [[100, 101, 102, 103, 104, 105], [1, 100, 100, 1, 103, 103]]);
+  eq('…and every column has one value for each row', Object.values(withKids.action[3]).every((v) => v.length === 6), true);
+  eq('a task that is not there', O.planSeries(ctx, tasks, rows, 99, { firstId: 1, deltas: [1] }), { error: 'gone' });
+}
+
+// ---- one level in or out (M24)
+{
+  // top level in row order: 1 Phase, 5 Ship, 6 Docs; under Phase: 2 Build, 3 Test; under Build: 4 Unit tests, 7 Review
+  const into = O.planReparent(ctx, tasks, 5, 'in');
+  eq('in: the task above it at its level becomes its parent', [into.fields, into.parentId], [{ Parent: 1 }, 1]);
+  eq('in, with a brother above: Test goes under Build', O.planReparent(ctx, tasks, 3, 'in').parentId, 2);
+  eq('in, with nothing above it at its level: not possible', O.planReparent(ctx, tasks, 1, 'in'), { error: 'first' });
+  eq('in, the first sub-task of a task has nothing above it either', O.planReparent(ctx, tasks, 4, 'in'), { error: 'first' });
+  const out = O.planReparent(ctx, tasks, 4, 'out');
+  eq('out: it takes the parent’s place, under the grandparent', [out.fields, out.parentId], [{ Parent: 1 }, 1]);
+  eq('out of a task one level below the top: parent 0, an empty Reference', [O.planReparent(ctx, tasks, 2, 'out').fields, O.planReparent(ctx, tasks, 2, 'out').patch], [{ Parent: 0 }, { Parent: null }]);
+  eq('out, already at the top', O.planReparent(ctx, tasks, 6, 'out'), { error: 'top' });
+  eq('a formula Parent column cannot be written', O.planReparent({ ...ctx, columns: columns.map((c) => (c.id === 'Parent' ? { ...c, isFormula: true } : c)) }, tasks, 5, 'in'), { error: 'parentFormula' });
+  eq('no Parent column at all', O.planReparent({ ...ctx, roles: { title: 'Task' } }, tasks, 5, 'in'), { error: 'noParentColumn' });
+  eq('not there', O.planReparent(ctx, tasks, 99, 'in'), { error: 'gone' });
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

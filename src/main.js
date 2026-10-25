@@ -20,9 +20,15 @@ import { arrange } from './model/tree.js';
 import { linksOf, isLate, pushPlan, criticalPath, wouldLoop } from './model/schedule.js';
 import { makeCalendar, holidaysBetween } from './model/calendar.js';
 import { todayDay, dateFromDay, plain, dayOf, num, isoFromDay, dayFromISO, progressScale } from './model/values.js';
-import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink, baselineFields, doneOnFields, canMoveDoneOn } from './model/edits.js';
+import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink, baselineFields, doneOnFields, canMoveDoneOn, doneFields, datesFields } from './model/edits.js';
 import { baselineSummary, baselineTargets, drifted } from './model/plan.js';
-import { planDelete, planDuplicate, descendantsOf } from './model/rowops.js';
+import { planDelete, planDuplicate, planSeries, planReparent, descendantsOf } from './model/rowops.js';
+import { parseOutline, planOutline } from './model/outline.js';
+import { deltasOf } from './model/series.js';
+import { wbsOf, tableRows, toTsv } from './model/tabletext.js';
+import { copyBox } from './ui/copy.js';
+import { outlineBox } from './ui/outline.js';
+import { openMenu } from './ui/menu.js';
 import { quickColumns } from './model/quickfields.js';
 import { slipText, slipShortText } from './ui/planwords.js';
 import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, storedMe, rememberMe, storedTab, rememberTab, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, TIME_DEFAULTS, VIEWS, snapshotView, withView, MAX_VIEWS } from './model/settings.js';
@@ -687,12 +693,22 @@ function displayProps(withList) {
 }
 /** The columns beside the names that are still in the table. */
 const hasPlan = () => !!(S.roles.baselineStart || S.roles.baselineEnd);
-/** The columns beside the names; '@slip' is not a column but what the plan says about each task (M18). */
-const listCols = () => disp().cols.map((id) => (id === '@slip' ? (hasPlan() ? { id: '@slip', label: t('Against the plan') } : null) : colById(id))).filter(Boolean);
+/** The columns beside the names; '@slip' (what the plan says about each task, M18) and '@wbs' (the outline number, 1.2.3) are not columns of the table. */
+const listCols = () => disp().cols.map((id) => (id === '@slip' ? (hasPlan() ? { id: '@slip', label: t('Against the plan') } : null) : id === '@wbs' ? { id: '@wbs', label: t('No.') } : colById(id))).filter(Boolean);
+/** Outline numbers for every task, in the order the Gantt chart draws them with nothing folded; remembered until the rows or the order change. */
+let wbsMemo = { rows: null, sort: '', map: new Map() };
+function wbsMap() {
+  const sort = JSON.stringify(disp().sort);
+  if (wbsMemo.rows !== S.rows || wbsMemo.sort !== sort) {
+    const { entries } = arrange(allTasks(), { group: null, collapsed: new Set(), sort: taskSorter(disp().sort, { columns: S.columns, rowOf: rowById, labels: S.labels }) });
+    wbsMemo = { rows: S.rows, sort, map: wbsOf(entries) };
+  }
+  return wbsMemo.map;
+}
 /** A task's text in each of them. */
 function listTexts(task) {
   const row = rowById(task.id);
-  return listCols().map((c) => (c.id === '@slip' ? slipShortText(task) || '' : row ? cellText(row, c, S.labels, fmtShort) || '' : ''));
+  return listCols().map((c) => (c.id === '@slip' ? slipShortText(task) || '' : c.id === '@wbs' ? wbsMap().get(task.id) || '' : row ? cellText(row, c, S.labels, fmtShort) || '' : ''));
 }
 let displayPanel = null;
 function displayState() {
@@ -701,7 +717,7 @@ function displayState() {
   const colourable = S.columns.filter((c) => (c.kind === 'Choice' || c.kind === 'ChoiceList' || c.kind === 'Ref' || c.kind === 'RefList' || c.kind === 'Text' || c.kind === 'Bool') && c.id !== S.roles.title && c.refTable !== S.tableId).map((c) => ({ id: c.id, label: c.label }));
   // the dates are said by the bars and by the list already: sorting by start or end has its own entries, and the list shows both
   const dates = new Set([S.roles.start, S.roles.end, S.roles.due]);
-  return { mode: S.mode, display: d, sortOptions: cand.filter((c) => !dates.has(c.id)), colourOptions: colourable, colOptions: [...(hasPlan() && S.mode === 'gantt' ? [{ id: '@slip', label: t('Against the plan') }] : []), ...cand.filter((c) => c.id !== S.roles.start && c.id !== S.roles.end && c.id !== S.roles.baselineStart && c.id !== S.roles.baselineEnd && c.id !== S.roles.doneOn)],
+  return { mode: S.mode, display: d, sortOptions: cand.filter((c) => !dates.has(c.id)), colourOptions: colourable, colOptions: [...(S.mode === 'gantt' ? [{ id: '@wbs', label: t('No.') }] : []), ...(hasPlan() && S.mode === 'gantt' ? [{ id: '@slip', label: t('Against the plan') }] : []), ...cand.filter((c) => c.id !== S.roles.start && c.id !== S.roles.end && c.id !== S.roles.baselineStart && c.id !== S.roles.baselineEnd && c.id !== S.roles.doneOn)],
     hasPlan: hasPlan(), maxCols: MAX_LIST_COLS, isDefault: isDefaultDisplay(d) };
 }
 function setDisplay(next) {
@@ -784,7 +800,7 @@ function drawToolbar(model = null, level = 'full') {
   }, {
     onMode: setMode,
     onZoom: (z) => setZoom(z), onFit: fit, onToday: () => current()?.scrollToToday?.(), onColumns: openColumns,
-    onNew: newTask, onUndated: () => view?.scrollToUndated(), onBaseline: setBaseline,
+    onNew: () => newTask(), onMore: (btn) => openMore(btn), onUndated: () => view?.scrollToUndated(), onBaseline: setBaseline,
     onOverBy0: (id) => { S.view.ovBy0 = id || null; saveView(); S.signature = ''; recompute(); },
     onOverBy1: (id) => { S.view.ovBy1 = id || '-'; saveView(); S.signature = ''; recompute(); },
     onGroup: (id) => { S.view.groupBy = id || null; saveView(); S.signature = ''; recompute(); },
@@ -2410,12 +2426,14 @@ function printNode({ paper, fit }) {
       lanes: S.boardModel.lanes.map((l) => ({
         name: l.none ? t('No {col}', { col: lane.label }) : String(l.label), colour: l.colour, over: l.over,
         count: l.limit != null ? `${l.open}/${l.limit}` : String(l.cards.length),
-        cards: l.cards.map((c) => ({
-          title: c.title || t('(no name)'), done: c.done, colour: c.colour, fields: c.fields, people: c.people.join(', '), late: c.late > 0,
-          when: [c.due != null ? t('Due {date}', { date: fmtShort(c.due) }) : c.span ? fmtShortRange(c.span[0], c.span[1]) : null,
-            c.late > 0 ? tn(c.late, '{n} day late', '{n} days late') : null].filter(Boolean).join(' · '),
-        })),
+        cards: l.cards.map(printCard),
       })),
+      // swimlanes: each band's cards under the lanes, the band's name above them
+      bands: S.boardModel.swimmed ? S.boardModel.swims.map((band) => ({
+        name: band.none ? t('No {col}', { col: swimCol()?.label || '' }) : String(band.label),
+        count: tn(band.lanes.reduce((n, l) => n + l.cards.length, 0), '{n} card', '{n} cards'),
+        cells: band.lanes.map((l) => l.cards.map(printCard)),
+      })) : null,
     });
   }
   if (S.mode === 'booking' && S.bookModel) {
@@ -2530,6 +2548,11 @@ function printNow(o) {
   window.addEventListener('afterprint', () => clear(root), { once: true });
   setTimeout(() => window.print(), 60);
 }
+const printCard = (c) => ({
+  title: c.title || t('(no name)'), done: c.done, colour: c.colour, fields: c.fields, people: c.people.join(', '), late: c.late > 0,
+  when: [c.due != null ? t('Due {date}', { date: fmtShort(c.due) }) : c.span ? fmtShortRange(c.span[0], c.span[1]) : null,
+    c.late > 0 ? tn(c.late, '{n} day late', '{n} days late') : null].filter(Boolean).join(' · '),
+});
 // Ctrl+P in the widget opens this panel: the browser's own would print the screen, cut off and dark.
 // ? lists the keys, from anywhere but a text box.
 document.addEventListener('keydown', (e) => {
@@ -2543,6 +2566,8 @@ document.addEventListener('keydown', (e) => {
   // / goes to the search, D opens or closes Display, Delete asks to delete the selected task: from anywhere but a text box or a dialog
   if (!e.ctrlKey && !e.metaKey && !e.altKey && !typing && !shell.querySelector('.ps-dialog, .ps-drawer')) {
     if (e.key === 'Delete' && S.selectedId != null && canEdit() && S.mode !== 'workload' && S.mode !== 'overview') { e.preventDefault(); deleteTask(S.selectedId); }
+    else if ((e.key === '[' || e.key === ']') && S.selectedId != null && canEdit() && S.mode === 'gantt') { e.preventDefault(); reparent(S.selectedId, e.key === ']' ? 'in' : 'out'); }
+    else if ((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && S.selectedId != null) { e.preventDefault(); openTaskMenuAtSelection(); }
     else if (e.key === '/') {
       const box = document.querySelector('.ps-find__input');
       if (box && !box.closest('[hidden]')) { e.preventDefault(); box.focus(); box.select?.(); }
@@ -2565,7 +2590,7 @@ function openQuick(id, note = null) {
   const labels = { ...S.labels };
   for (const role of ['parent', 'dependsOn']) if (S.roles[role]) labels[S.roles[role]] = names;
   openQuickEdit(shell, {
-    row, roles: S.roles, columns: S.columns, labels, extra: quickCols(), editable: canEdit(), canOpenCard: S.live, canCopy: canEdit(), note, booking: S.mode === 'booking',
+    row, roles: S.roles, columns: S.columns, labels, extra: quickCols(), editable: canEdit(), canOpenCard: S.live, canCopy: canEdit(), canSub: canEdit() && canNest() && S.mode !== 'booking', note, booking: S.mode === 'booking',
     calendar: calendarWords(id),
     plan: slipText(taskById(id) || {}),
     time: {
@@ -2575,6 +2600,8 @@ function openQuick(id, note = null) {
   }, {
     onCalendar: () => exportCalendar([id]),
     onDuplicate: () => duplicateTask(id),
+    onCopy: () => copyTask(id),
+    onAddSub: () => newTask(null, id),
     onDelete: () => deleteTask(id),
     onStartTimer: () => startTimer(id),
     onStopTimer: () => stopTimer(),
@@ -2645,12 +2672,15 @@ function assignToMe() {
   if (!lane) return null;
   return { col, value: col.kind === 'RefList' || col.kind === 'ChoiceList' ? [lane.value] : lane.value };
 }
-async function newTask(onDay) {
+async function newTask(onDay, parentId = 0) {
   if (!canEdit()) return;
   // a click handler passes its event: only a day number is a day
-  const day = typeof onDay === 'number' ? onDay : todayDay();
+  const parent = typeof parentId === 'number' && parentId ? taskById(parentId) : null;
+  const day = typeof onDay === 'number' ? onDay : parent?.start ?? todayDay();
   const link = await linkForNewTask();
-  const plan = newTaskFields(ctx(), { day, title: t('New task'), link: link && !link.unknown ? link : null, assign: assignToMe() });
+  const plan = newTaskFields(ctx(), { day, title: parent ? t('New sub-task') : t('New task'), link: link && !link.unknown ? link : null, assign: assignToMe(), parentId: parent ? parent.id : 0 });
+  // the new task is shown under its parent, so the parent must be open
+  if (parent && S.view.collapsed.delete('p:' + parent.id)) saveView();
   const note = link?.unknown ? t('This task will show here once its {col} matches the row selected in the linked widget.', { col: link.unknown.label }) : null;
   if (S.demo) {
     const id = Math.max(0, ...S.rows.map((r) => r.id)) + 1;
@@ -2766,12 +2796,268 @@ async function duplicateTask(id) {
   } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
 }
 
+// ---- copy, several tasks at once, sub-tasks, done (M24) ------------------------------------------------------
+/** Can a task be put under another (a Parent column that is data)? */
+const canNest = () => { const c = colById(S.roles.parent); return !!(c && !c.isFormula && S.roles.title); };
+const allTasks = () => { const all = everyTask(); return [...all.tasks, ...all.unscheduled]; };
+const ctxRows = () => ({ tableId: S.tableId, roles: S.roles, columns: S.columns });
+const progressFullOf = () => { const c = colById(S.roles.progress); return c ? progressScale(S.rows.map((r) => num(r[c.id]))) : 1; };
+
+/** The row number the next new row gets: the highest in the whole table (the widget may only see the rows Grist's filters leave), plus one. */
+async function nextRowId() {
+  if (S.demo) return Math.max(0, ...S.rows.map((r) => r.id)) + 1;
+  return Math.max(0, ...((await loadTable(S.tableId))?.rows || []).map((r) => r.id)) + 1;
+}
+
+/** Add rows made by a plan ({action, ids, rows}) as one step, select the first, and say so with an Undo. */
+async function commitRows(plan, message) {
+  const first = plan.ids[0];
+  for (const x of plan.ids) S.pinned.add(x);
+  S.selectedId = first;
+  if (S.demo) {
+    S.rows = [...S.rows, ...plan.rows];
+    demoHistory.undo.push(plan.rows.map((row) => ({ table: 'rows', add: row }))); demoHistory.redo.length = 0;
+    S.signature = '';
+    recompute();
+    current()?.reveal(first);
+    toast(message, { label: t('Undo'), run: undo });
+    return true;
+  }
+  try {
+    await apply([plan.action]);
+    S.pendingEdit = { id: first, note: null, quiet: true };
+    moveCursor(first).catch(() => {});
+    if (rowById(first)) openPending();
+    toast(message, { label: t('Undo'), run: undo });
+    return true;
+  } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); return false; }
+}
+
+/** Copy a task: on a later day, or every few days, weeks or months, with its sub-tasks when it has some. One step in Undo. */
+async function copyTask(id) {
+  if (!canEdit()) return;
+  const task = taskById(id);
+  const list = allTasks();
+  if (!task || !list.some((x) => x.id === id)) return;
+  const below = descendantsOf(list, id);
+  // the day the copies are measured from: the task's own start, else the first start below it
+  const starts = [task.start, ...below.map((b) => list.find((x) => x.id === b)?.start)].filter((x) => x != null);
+  const anchor = starts.length ? Math.min(...starts) : null;
+  const name = task.title || t('(no name)');
+  const pick = await copyBox(shell, {
+    title: t('Copy “{name}”', { name }), name: task.title || '', hasDates: anchor != null, anchor: anchor ?? 0, childCount: below.length,
+    fmt: fmtShort, isoOf: isoFromDay, dayOf: (iso) => (iso ? dayFromISO(iso) : null),
+  });
+  if (!pick) return;
+  const deltas = pick.starts ? deltasOf(anchor, pick.starts) : Array(pick.times).fill(0);
+  let firstId;
+  try { firstId = await nextRowId(); } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); return; }
+  const plan = planSeries(ctxRows(), list, S.rows, id, { children: pick.children, firstId, deltas, copyTitle: () => pick.name, fresh: pick.fresh });
+  if (plan.error) return;
+  const n = deltas.length;
+  await commitRows(plan, n === 1 ? t('Made a copy of “{name}”.', { name }) : t('Made {n} copies of “{name}”.', { n, name }));
+}
+
+/** A list typed or pasted, one task a line, indented lines being sub-tasks (of `underId` for the top lines, when given). */
+async function addSeveral(underId = 0) {
+  if (!canEdit()) return;
+  const titleCol = colById(S.roles.title);
+  if (!titleCol || titleCol.isFormula || titleCol.kind === 'Ref') { toast(t('The column that holds the task names can’t be written here.')); return; }
+  const under = underId ? taskById(underId) : null;
+  const link = await linkForNewTask();
+  const useLink = link && !link.unknown ? link : null;
+  const assign = assignToMe();
+  const planCtx = () => ({ ...ctx(), tableId: S.tableId });
+  const hasDates = Object.keys(datesFields(ctx(), 1, 1).fields).length > 0;
+  const cal = calendar();
+  const pick = await outlineBox(shell, {
+    title: under ? t('Add sub-tasks to “{name}”', { name: under.title || t('(no name)') }) : t('Add several tasks'),
+    body: under ? t('One task on each line. They become sub-tasks of “{name}”.', { name: under.title || t('(no name)') }) : t('One task on each line. A line indented under another becomes its sub-task. Paste a list from a mail or a spreadsheet if you have one.'),
+    hasDates, today: todayDay(), isoOf: isoFromDay, dayOf: (iso) => (iso ? dayFromISO(iso) : null), fmt: fmtShort,
+    unitWord: cal.workdays ? t('working days each') : t('days each'),
+    preview: (items, o) => planOutline(planCtx(), items, { firstId: 1, underId, ...o, link: useLink, assign }),
+  });
+  if (!pick) return;
+  let firstId;
+  try { firstId = await nextRowId(); } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); return; }
+  const plan = planOutline(planCtx(), pick.items, { firstId, underId, start: pick.start, days: pick.days, chain: pick.chain, link: useLink, assign });
+  if (plan.error) return;
+  if (underId && S.view.collapsed.delete('p:' + underId)) saveView();
+  await commitRows(plan, tn(plan.ids.length, 'Added {n} task.', 'Added {n} tasks.'));
+}
+
+/** Move a task one level in (under the task above it) or out (to its parent's place). */
+function reparent(id, dir) {
+  if (!canEdit()) return;
+  const list = allTasks();
+  const task = list.find((x) => x.id === id);
+  const plan = planReparent(ctxRows(), list, id, dir);
+  if (plan.error) {
+    const why = {
+      first: t('Nothing above it to go under: a task goes under the one above it, at its own level.'),
+      top: t('It is already at the top level.'),
+      parentFormula: t('The column for parent tasks is a formula, so tasks can’t be moved under others here.'),
+      noParentColumn: t('This table has no column for parent tasks that can be written.'),
+    }[plan.error];
+    if (why) toast(why);
+    return;
+  }
+  const name = task?.title || t('(no name)');
+  const newParent = plan.parentId ? list.find((x) => x.id === plan.parentId) : null;
+  const was = task?.parentId != null ? list.find((x) => x.id === task.parentId) : null;
+  if (newParent && S.view.collapsed.delete('p:' + newParent.id)) saveView();
+  write(id, plan, dir === 'in'
+    ? t('“{name}” is now a sub-task of “{parent}”.', { name, parent: newParent?.title || t('(no name)') })
+    : t('“{name}” moved out of “{parent}”.', { name, parent: was?.title || t('(no name)') }));
+}
+
+/** Mark tasks finished, or open them again, through whatever the table has for it (Done, Status, Progress, the day it was done). */
+function markDone(ids, done) {
+  if (!canEdit()) return;
+  const items = [];
+  for (const id of ids) {
+    const task = taskById(id), row = rowById(id);
+    if (!task || !row) continue;
+    const plan = doneFields(ctx(), task, row, done, { today: todayDay(), full: progressFullOf() });
+    if (Object.keys(plan.fields).length) items.push({ id, plan });
+  }
+  if (!items.length) { toast(t('Nothing in this table can say “done”: it has no Done, Status or Progress column that can be written.')); return; }
+  const first = taskById(items[0].id)?.title || t('(no name)');
+  writeMany(items, items.length === 1
+    ? (done ? t('“{name}” is done.', { name: first }) : t('“{name}” is open again.', { name: first }))
+    : (done ? tn(items.length, '{n} task is done.', '{n} tasks are done.') : tn(items.length, '{n} task is open again.', '{n} tasks are open again.')));
+}
+
+// ---- the menu on a task (right-click, or Shift+F10) and the More menu -------------------------------------------------
+function taskMenuItems(id) {
+  const task = taskById(id);
+  if (!task) return [];
+  const edit = canEdit();
+  const booking = S.mode === 'booking';
+  const list = allTasks();
+  const nest = edit && canNest() && S.mode === 'gantt';
+  const inn = nest ? planReparent(ctxRows(), list, id, 'in') : null;
+  const out = nest ? planReparent(ctxRows(), list, id, 'out') : null;
+  const finished = !!task.finished;
+  const canDone = edit && !booking && Object.keys(doneFields(ctx(), task, rowById(id) || {}, !finished, { today: todayDay(), full: progressFullOf() }).fields).length > 0;
+  return [
+    { label: edit ? t('Edit…') : t('Open'), hint: t('Enter'), onClick: () => openQuick(id) },
+    S.live ? { label: t('Open Grist’s card'), onClick: () => openCard(id) } : null,
+    { separator: true },
+    edit && !booking && canNest() ? { label: t('Add sub-task'), onClick: () => newTask(null, id) } : null,
+    edit && !booking && S.roles.title ? { label: t('Add several sub-tasks…'), onClick: () => addSeveral(id) } : null,
+    nest ? { label: t('Indent'), hint: ']', disabled: !!inn.error, onClick: () => reparent(id, 'in') } : null,
+    nest ? { label: t('Outdent'), hint: '[', disabled: !!out.error, onClick: () => reparent(id, 'out') } : null,
+    canDone ? { label: finished ? t('Mark as not done') : t('Mark as done'), onClick: () => markDone([id], !finished) } : null,
+    edit ? { separator: true } : null,
+    edit ? { label: t('Duplicate'), onClick: () => duplicateTask(id) } : null,
+    edit && !booking ? { label: t('Copy…'), onClick: () => copyTask(id) } : null,
+    edit ? { label: t('Delete…'), hint: t('Del'), danger: true, onClick: () => deleteTask(id) } : null,
+  ];
+}
+
+const MENU_TARGETS = '.ps-bar[data-id], .ps-ms[data-id], .ps-sum[data-id], .ps-row[data-id], .ps-card[data-id], .ps-ag__row[data-id], .ps-cal__chip[data-id], .ps-blk[data-id], .ps-bar__out[data-id]';
+shell.addEventListener('contextmenu', (e) => {
+  if (e.target.closest('input, textarea, select, .ps-dialog, .ps-drawer, .ps-menu, .ps-pop')) return;
+  const n = e.target.closest(MENU_TARGETS);
+  if (!n || S.mode === 'workload' || S.mode === 'overview') return;
+  const id = Number(n.dataset.id);
+  if (!taskById(id)) return;
+  e.preventDefault();
+  select(id, { tellGrist: true });
+  openMenu(shell, { x: e.clientX, y: e.clientY, items: taskMenuItems(id), label: taskById(id)?.title || '' });
+});
+
+/** The same menu from the keyboard: the key beside the space bar, or Shift+F10, on the selected task. */
+function openTaskMenuAtSelection() {
+  const id = S.selectedId;
+  if (id == null || !taskById(id)) return;
+  const node = stage.querySelector(`[data-id="${id}"]`);
+  const r = (node || stage).getBoundingClientRect();
+  openMenu(shell, { x: r.left + Math.min(r.width / 2, 120), y: r.top + r.height, items: taskMenuItems(id), label: taskById(id)?.title || '' });
+}
+
+function foldAll(fold) {
+  const keys = S.view.collapsed;
+  for (const k of [...keys]) if (k.startsWith('p:') || k.startsWith('g:')) keys.delete(k);
+  if (fold) {
+    for (const x of new Set(allTasks().map((y) => y.parentId).filter((y) => y != null))) keys.add('p:' + x);
+    for (const e of S.model?.entries || []) if (e.kind === 'group') keys.add('g:' + e.key);
+  }
+  saveView();
+  S.signature = '';
+  recompute();
+}
+
+/** The tasks on show as a table of text: outline number, name, dates, days, status, people, progress. */
+function planTable() {
+  if (!S.built) return null;
+  const list = [...S.built.tasks, ...S.built.unscheduled];
+  const { entries } = arrange(list, { group: null, collapsed: new Set(), sort: taskSorter(disp().sort, { columns: S.columns, rowOf: rowById, labels: S.labels }) });
+  return {
+    head: [t('No.'), t('Task'), t('Start'), t('End'), t('Days'), t('Status'), t('Assigned to'), t('Progress %')],
+    rows: tableRows(entries, { iso: isoFromDay, length: calendar().length }),
+  };
+}
+
+async function copyPlanText() {
+  const table = planTable();
+  if (!table || !table.rows.length) { toast(t('There are no tasks to copy.')); return; }
+  const text = toTsv(table.head, table.rows);
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch { /* a frame without clipboard access */ }
+  if (!ok) {
+    const box = el('textarea', { style: { position: 'fixed', left: '-9999px', top: '0' } });
+    box.value = text;
+    document.body.appendChild(box);
+    box.select();
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    box.remove();
+  }
+  toast(ok ? tn(table.rows.length, 'Copied {n} task. Paste it into a mail or a spreadsheet.', 'Copied {n} tasks. Paste them into a mail or a spreadsheet.') : t('Your browser did not allow copying. Use Download as CSV instead.'));
+}
+
+function downloadPlanCsv() {
+  const table = planTable();
+  if (!table || !table.rows.length) { toast(t('There are no tasks to download.')); return; }
+  const url = URL.createObjectURL(new Blob([toCsv([table.head, ...table.rows], dateLocale(gristCulture()))], { type: 'text/csv;charset=utf-8' }));
+  const a = el('a', { href: url, download: fileName([printTitle(), t('Plan')].filter(Boolean).join(' ')) + '.csv' });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast(tn(table.rows.length, 'Downloaded {n} task.', 'Downloaded {n} tasks.'));
+}
+
+function openMore(btn) {
+  const r = btn.getBoundingClientRect();
+  const edit = canEdit();
+  const tasky = !['booking', 'workload', 'overview'].includes(S.mode);
+  const gantt = S.mode === 'gantt';
+  const hasParents = gantt && allTasks().some((x) => x.parentId != null);
+  const folded = hasParents && [...S.view.collapsed].some((k) => k.startsWith('p:') || k.startsWith('g:'));
+  openMenu(shell, {
+    x: r.left, y: r.bottom + 4, label: t('More'), anchor: btn,
+    items: [
+      edit && tasky && S.roles.title ? { label: t('Add several tasks…'), onClick: () => addSeveral(0) } : null,
+      gantt && edit && ganttReady(S.roles) && S.built?.tasks.length ? { label: t('Set baseline'), onClick: () => setBaseline() } : null,
+      hasParents ? { label: t('Fold all'), onClick: () => foldAll(true) } : null,
+      folded ? { label: t('Unfold all'), onClick: () => foldAll(false) } : null,
+      { separator: true },
+      tasky ? { label: t('Copy as text'), onClick: () => copyPlanText() } : null,
+      tasky ? { label: t('Download as CSV'), onClick: () => downloadPlanCsv() } : null,
+      S.mode !== 'agenda' ? { separator: true } : null,
+      S.mode !== 'agenda' ? { label: t('Print…'), hint: t('Ctrl+P'), onClick: () => startPrint() } : null,
+    ],
+  });
+}
+
 function openPending() {
   const p = S.pendingEdit;
   if (!p) return;
   S.pendingEdit = null;
   current()?.reveal(p.id);
-  openQuick(p.id, p.note);
+  if (!p.quiet) openQuick(p.id, p.note);
 }
 
 // ---- Columns panel --------------------------------------------------------------------------------------

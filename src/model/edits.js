@@ -15,6 +15,7 @@
 import { dayToEpochSeconds } from '../core/grist/dates.js';
 import { dayOf, refId, listOf } from './values.js';
 import { makeCalendar } from './calendar.js';
+import { isDoneStatus } from './tasks.js';
 
 const PLAIN = makeCalendar();
 const calOf = (ctx) => ctx.calendar || PLAIN;
@@ -197,14 +198,16 @@ export function linkValue(rows, col) {
   return vals.size === 1 && v != null && v !== '' && !Array.isArray(v) ? { col, value: v, cell: v } : null;
 }
 
-/** The fields of a new task dated `day`: its name, the first date column that can be written, the link value. */
-export function newTaskFields(ctx, { day, title, link = null, assign = null }) {
+/** The fields of a new task dated `day`: its name, the first date column that can be written, the link value, the task it is under. */
+export function newTaskFields(ctx, { day, title, link = null, assign = null, parentId = 0 }) {
   const out = { fields: {}, patch: {} };
   const titleCol = writableCol(ctx, 'title');
   if (titleCol && titleCol.kind !== 'Ref') put(out, titleCol, title);
   const dateCol = writableCol(ctx, 'start') || writableCol(ctx, 'due') || writableCol(ctx, 'end');
   if (dateCol) putDay(out, dateCol, dateCol === colFor(ctx, 'end') ? storedEnd(ctx, day) : day, null);
   if (link && !link.col.isFormula) put(out, link.col, link.value, link.cell);
+  const parentCol = parentId ? writableCol(ctx, 'parent') : null;
+  if (parentCol) { const [v, cell] = encodeInput(parentCol, parentId, null); put(out, parentCol, v, cell); }
   // a task added in someone's own list belongs to them, or it would vanish from the list the moment it is made
   if (assign && !assign.col.isFormula && (!link || link.col.id !== assign.col.id)) { const [v, cell] = encodeInput(assign.col, assign.value, null); put(out, assign.col, v, cell); }
   return out;
@@ -290,3 +293,34 @@ export function doneOnFields(ctx, day, oldRow = null) {
 
 /** Can the marker be dragged: the column is there and is not a formula. */
 export const canMoveDoneOn = (ctx) => !!ctx.editable && !!writableCol(ctx, 'doneOn');
+
+// ---- done and open (M24) -------------------------------------------------------------------------------
+
+/**
+ * Mark a task finished, or open it again, through every column the table gives for it: the Done box, the status (the first
+ * choice that means finished, or the first that does not), the progress (full, or back to nothing when it was full) and the
+ * day it was done. Only columns Plan Studio may write are touched.
+ * @param opts {today: the day to write as the day it was done, full: what a full progress is (1 or 100)}
+ * @returns {{fields, patch}}  empty when the table has nothing that says "done" and can be written
+ */
+export function doneFields(ctx, task, row, done, { today = null, full = 1 } = {}) {
+  const out = { fields: {}, patch: {} };
+  const box = writableCol(ctx, 'done'), status = writableCol(ctx, 'status'), progress = writableCol(ctx, 'progress'), on = writableCol(ctx, 'doneOn');
+  if (box && box.kind === 'Bool') put(out, box, !!done);
+  if (status && status.kind === 'Choice') {
+    const choices = status.choices || [];
+    const now = row[status.id];
+    if (done && !isDoneStatus(now)) { const pick = choices.find((x) => isDoneStatus(x)); if (pick !== undefined) put(out, status, pick); }
+    if (!done && isDoneStatus(now)) { const pick = choices.find((x) => !isDoneStatus(x)); if (pick !== undefined) put(out, status, pick); }
+  }
+  if (progress && (progress.kind === 'Numeric' || progress.kind === 'Int')) {
+    const now = typeof row[progress.id] === 'number' ? row[progress.id] : 0;
+    if (done && now < full) put(out, progress, full);
+    if (!done && now >= full) put(out, progress, 0);
+  }
+  if (on) {
+    if (done && today != null) putDay(out, on, today, row[on.id]);
+    else if (!done && row[on.id] != null) put(out, on, null, null);
+  }
+  return out;
+}
