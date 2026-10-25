@@ -15,6 +15,7 @@ export const ROLE_VIEWS = {
   colour: ['gantt', 'timeline', 'board', 'calendar'],
   parent: ['gantt', 'agenda', 'workload', 'overview'],
   dependsOn: ['gantt', 'workload'],
+  lag: ['gantt', 'workload'], linkType: ['gantt', 'workload'],
   order: ['board'],
   resource: ['booking', 'timeline'],
   period: ['booking'],

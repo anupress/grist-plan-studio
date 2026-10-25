@@ -11,7 +11,7 @@
 //   drag a bar            move it            drag its left or right edge   change the start or end
 //   drag a milestone      move it            drag across an undated row     give that task dates
 //   drag the dot at a bar's end onto another bar                            link them (finish -> start)
-//   click an arrow        remove the link    click a ▸ / ▾                  fold or unfold a parent or group
+//   click an arrow        its type and lag, or remove the link    click a ▸ / ▾                  fold or unfold a parent or group
 //   Alt+←/→               move by a day      Alt+Shift+←/→                  change the end by a day
 //   drag the ✓ at the day a task was really done                       move that day (M18)
 //   drag the empty chart, Ctrl+wheel, drag the edge of the names        move across, zoom, widen the names (navigate.js, M21)
@@ -252,7 +252,7 @@ export function createGantt(host, on = {}) {
   }
 
   // ---- arrows ------------------------------------------------------------------------------------------
-  /** Where a link leaves a task (its end) and arrives (its start), in chart coordinates. */
+  /** The start or the end of a task, where a link leaves or arrives, in chart coordinates. */
   function anchor(id, side) {
     const i = indexOf.get(id);
     if (i == null) return null;
@@ -262,12 +262,19 @@ export function createGantt(host, on = {}) {
     const ms = !e.summary && e.task.kind === 'milestone';
     const box = barBox(frame, { kind: ms ? 'milestone' : 'bar', start: span.start, end: span.end }, i, RH, BH);
     const y = i * RH + RH / 2;
-    if (ms) return { x: side === 'out' ? box.cx + 8 : box.cx - 8, y };
-    return { x: side === 'out' ? box.x + box.w : box.x, y };
+    if (ms) return { x: side === 'end' ? box.cx + 8 : box.cx - 8, y };
+    return { x: side === 'end' ? box.x + box.w : box.x, y };
   }
 
-  function arrowPath(a, b) {
+  /** The line from the end of one task to the start of another (finish to start), or between the other ends (start to start, finish to finish, start to finish). */
+  function arrowPath(a, b, from = 'end', to = 'start') {
     const r = 6;
+    if (from === 'start' && to === 'start') return `M${a.x},${a.y} H${Math.min(a.x, b.x) - r - 2} V${b.y} H${b.x - 1}`;
+    if (from === 'end' && to === 'end') return `M${a.x},${a.y} H${Math.max(a.x, b.x) + r + 2} V${b.y} H${b.x + 1}`;
+    if (from === 'start' && to === 'end') {
+      const mid = b.y > a.y ? a.y + RH / 2 : a.y - RH / 2;
+      return `M${a.x},${a.y} H${a.x - r} V${mid} H${b.x + 2 * r} V${b.y} H${b.x + 1}`;
+    }
     if (b.x - a.x >= 2 * r + 4) return `M${a.x},${a.y} H${a.x + r} V${b.y} H${b.x - 1}`;
     // The successor starts before the predecessor ends (or too close): go round, between the rows.
     const mid = b.y > a.y ? a.y + RH / 2 : a.y - RH / 2;
@@ -288,13 +295,21 @@ export function createGantt(host, on = {}) {
     for (const l of model.links) {
       const ia = indexOf.get(l.from), ib = indexOf.get(l.to);
       if (ia == null || ib == null || Math.max(ia, ib) < lo || Math.min(ia, ib) > hi) continue;
-      const a = anchor(l.from, 'out'), b = anchor(l.to, 'in');
+      // the ends a link joins: finish to start leaves the end and arrives at the start; the others join the ends their names say
+      const fromSide = l.type === 'ss' || l.type === 'sf' ? 'start' : 'end';
+      const toSide = l.type === 'ff' || l.type === 'sf' ? 'end' : 'start';
+      const a = anchor(l.from, fromSide), b = anchor(l.to, toSide);
       if (!a || !b) continue;
       const crit = model.showCritical && model.criticalLinks?.has(l.from + '>' + l.to);
       const cls = 'ps-arrow' + (l.late ? ' is-late' : '') + (crit ? ' is-critical' : '');
-      const d = arrowPath(a, b);
+      const d = arrowPath(a, b, fromSide, toSide);
       arrows.appendChild(svgEl('path', { d, class: cls, 'marker-end': `url(#${l.late ? 'ps-head-late' : crit ? 'ps-head-crit' : 'ps-head'})` }));
-      if (model.editable) arrows.appendChild(svgEl('path', { d, class: 'ps-arrow__hit', 'data-from': String(l.from), 'data-to': String(l.to) }));
+      if (model.editable) {
+        const hit = svgEl('path', { d, class: 'ps-arrow__hit', 'data-from': String(l.from), 'data-to': String(l.to) });
+        const say = model.linkTitle?.(l);
+        if (say) { const tip = svgEl('title'); tip.textContent = say; hit.appendChild(tip); }
+        arrows.appendChild(hit);
+      }
     }
   }
 
@@ -404,7 +419,7 @@ export function createGantt(host, on = {}) {
       outLabel: node ? bars.querySelector(`.ps-bar__out[data-id="${task.id}"]`) : null,
     };
     if (mode === 'link') {
-      drag.from = anchor(task.id, 'out');
+      drag.from = anchor(task.id, 'end');
       drag.line = svgEl('path', { class: 'ps-arrow ps-arrow--draft' });
       arrows.appendChild(drag.line);
     }

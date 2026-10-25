@@ -18,6 +18,7 @@
 // Pure: tested in tests/tasks.test.mjs.
 
 import { dayOf, refId, listOf, plain, num, progressScale } from './values.js';
+import { linkTypeOf } from './links.js';
 import { makeCalendar } from './calendar.js';
 import { getPalette } from '../core/theme/palettes.js';
 
@@ -55,7 +56,7 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
   const byId = (id) => (id ? columns.find((c) => c.id === id) || null : null);
   const col = (role) => byId(roles[role]);
   const C = Object.fromEntries(['title', 'start', 'end', 'due', 'duration', 'status', 'progress', 'done', 'milestone',
-    'assignee', 'project', 'colour', 'parent', 'dependsOn', 'baselineStart', 'baselineEnd', 'doneOn'].map((r) => [r, col(r)]));
+    'assignee', 'project', 'colour', 'parent', 'dependsOn', 'lag', 'linkType', 'baselineStart', 'baselineEnd', 'doneOn'].map((r) => [r, col(r)]));
   const colourBy = byId(S.colourBy);
   const groupBy = byId(S.groupBy);
   const cell = (row, role) => (C[role] ? row[C[role].id] : undefined);
@@ -133,6 +134,9 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
       index: tasks.length + unscheduled.length,
       parentId: C.parent ? refId(cell(row, 'parent')) : null,
       deps: C.dependsOn ? listOf(cell(row, 'dependsOn')).filter((x) => typeof x === 'number' && x > 0) : [],
+      // how it waits for them: the days between, and which ends are linked (one setting for all of them)
+      lag: C.lag ? Math.round(num(cell(row, 'lag')) || 0) : 0,
+      linkType: C.linkType ? linkTypeOf(plain(cell(row, 'linkType'))) : 'fs',
       group: groupBy ? textOf(row, groupBy, true) : null,
       title: text(row, 'title') || '',
       start: null, end: null, kind: 'bar', fromDue: false, flag: null,
@@ -171,7 +175,7 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
     }
     // What a redraw compares: the drawn facts of this task, nothing else.
     t.hash = [t.title, t.start, t.end, t.kind, t.flag, t.status, t.project, t.colour, t.progress, t.people.join('|'),
-      t.parentId, t.deps.join(','), t.group, t.baseStart, t.baseEnd, t.doneOn].join('\u0001');
+      t.parentId, t.deps.join(','), t.lag, t.linkType, t.group, t.baseStart, t.baseEnd, t.doneOn].join('\u0001');
     tasks.push(t);
   }
   return { tasks, unscheduled, flagged };

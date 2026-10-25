@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.16.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.17.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -283,6 +283,18 @@ and the **Del** key deletes the selected task. Both are one step in Grist's Undo
   spreadsheet), **Download as CSV** and Print. Both exports are the tasks on show with their outline number, dates, days, status,
   people and progress.
 - **Outline numbers** (1, 1.1, 1.2.1) are a column beside the names in Display, in the Gantt chart.
+
+## Links: which ends, and how many days between
+
+A link has more than "finish to start". Click an arrow in the Gantt chart to say how the task that waits is tied to the one it
+waits for: **finish to start** (the default), **start to start**, **finish to finish** or **start to finish**, and a **lag** in
+days (working days when the plan counts working days), which may be negative to let them overlap. The sentence in the dialog
+follows what you choose ("“B” starts 2 days after “A” starts."); arrows run between the ends they join, a link that is not kept turns
+red, and the push that moves the tasks that wait, Level, and the critical path all follow the type and the lag.
+
+The type and the lag are two columns of the task that waits (**Link type** and **Lag (days)**, found by name, or added after asking when
+you save the dialog) and hold for everything it waits for: one setting a task. Without the columns every link is finish to start
+with no lag, as before. The demo has three such links.
 
 ## Search and filters
 

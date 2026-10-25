@@ -7,7 +7,7 @@
     "accessLevel": "full",
     "description": "Gantt chart, timeline, board, booking grid and workload over the tables you already keep. Drag a task, a card or a booking and the change is written straight back to your table; level an overloaded plan in one step; search and filter by person, status or any column; choose row height, order, colours and columns; time your tasks, keep a weekly timesheet and see the hours still to do; an agenda for your phone, a month and week calendar, saved views, a calendar file and morning email reminders. A guided setup, a tip for each view and a help panel for first use. Prints to PDF or saves a PNG, in English, German or French. Runs entirely in the browser: no server, nothing leaves your document.",
     "authors": [{ "name": "ANUPRESS", "url": "https://anupress.com" }],
-    "lastUpdatedAt": "2026-10-25T20:09:38+00:00"
+    "lastUpdatedAt": "2026-10-25T20:21:20+00:00"
   },
   {
     "widgetId": "@anupress/widget-advanced-charts",

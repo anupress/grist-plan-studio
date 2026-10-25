@@ -8,6 +8,7 @@ import { dirname, resolve } from 'node:path';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const imp = (p) => import(pathToFileURL(resolve(HERE, '..', p)).href);
 const W = await imp('src/model/workload.js');
+const { latestEnd } = await imp('src/model/links.js');
 const { buildTasks } = await imp('src/model/tasks.js');
 const { makeCalendar } = await imp('src/model/calendar.js');
 const { calendarPeriods } = await imp('src/model/booking.js');
@@ -136,7 +137,8 @@ const lv = (rows, extra = {}) => {
     rows, { title: 'Task', start: 'Start', end: 'End', assignee: 'Who', effort: 'Hours', dependsOn: 'After' });
   const r = W.levelPlan(tasks, rows, {
     personCol: col('Who'), labels: { Who: people }, isWork, effortCol: col('Hours'), effortUnit: 'hours',
-    links: linksOf(tasks), today: extra.today ?? MON, shiftEnd: (task, s) => s + (task.end - task.start), beforeDay: (x) => x - 1,
+    links: linksOf(tasks).map((l) => ({ ...l, type: extra.type || 'fs', lag: extra.lag || 0 })), today: extra.today ?? MON, shiftEnd: (task, s) => s + (task.end - task.start), beforeDay: (x) => x - 1,
+    latestEndOf: (link, p, q) => latestEnd(link, p, q, makeCalendar()),
     canMove: extra.canMove || (() => true), dueOf: (task) => { const row = rows.find((x) => x.id === task.id); return row?.Due ? row.Due[1] / 86400 : null; },
   });
   return { ...r, said: r.moves.map((m) => `${tasks.find((x) => x.id === m.id).title} ${iso(m.start)}–${iso(m.end)}`) };
@@ -155,6 +157,10 @@ const lv = (rows, extra = {}) => {
   const linked = lv([...base, { id: 4, Task: 'D', Start: d(3), End: d(3), Who: P(2), Hours: 8, After: ['L', 2] }]);
   eq('a task waiting for B (Thursday) leaves it no room', [linked.said, linked.stuck.map((s) => s.reason)], [[], ['slack']]);
   eq('…so the overload stays', linked.after, 2);
+
+  const dep = [...base, { id: 4, Task: 'D', Start: d(3), End: d(3), Who: P(2), Hours: 8, After: ['L', 2] }];
+  const startsTogether = lv(dep, { type: 'ss' });
+  eq('start to start: D only needs B to have started by Thursday, so B can run Thursday and Friday', [startsTogether.said, startsTogether.after], [['B 2026-11-05–2026-11-06'], 0]);
 
   const due = lv(base.map((x) => (x.id === 2 ? { ...x, Due: d(3) } : x)));
   eq('B due on Thursday cannot end on Friday', [due.said, due.stuck.map((s) => s.reason)], [[], ['slack']]);

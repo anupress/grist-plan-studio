@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.17.0
+
+Links with a type and a lag. Tested in Grist 1.7.20.
+
+- **Link types**: finish to start (as before), start to start, finish to finish, start to finish, and a **lag** in days (negative lets the
+  two overlap). Click an arrow: a dialog with the two settings and a sentence that follows them, or remove the link. Two columns on the
+  task that waits hold them (found by name, or added when the dialog is saved); one setting a task.
+- Arrows run between the ends a link joins; the late check, the push (with its preview), Level and the critical path all follow the type and the lag.
+- **Critical path** is in the More menu, so the Gantt toolbar fits two rows at 1070 px with or without links.
+- German and French for every new word.
+
 ## 1.16.0
 
 Copy, repeat, several tasks at once, and a menu on every task. Tested in Grist 1.7.20 (every write read back from the table, every one undone with Grist's Undo and the steps counted).

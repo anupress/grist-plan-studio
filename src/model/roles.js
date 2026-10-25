@@ -102,6 +102,13 @@ export const ROLES = [
   { id: 'dependsOn', kinds: ['RefList', 'Ref'], sameTable: true, panel: true,
     strong: ['depends on', 'depends', 'dependencies', 'predecessors', 'predecessor', 'blocked by', 'after', 'depend de',
       'abhangig von', 'abhaengig von', 'vorganger', 'vorgaenger', 'nach', 'depend', 'predecesseurs', 'apres'], weak: [] },
+  // How a task waits for the ones it depends on (M25): the days between, and which ends are linked. On the task that waits.
+  { id: 'lag', kinds: NUM, panel: true,
+    strong: ['lag', 'lag days', 'lag time', 'delay', 'delay days', 'wait', 'wait days', 'waiting days', 'buffer', 'buffer days', 'verzogerung',
+      'verzogerung tage', 'verzogerung in tagen', 'wartezeit', 'puffer', 'pufferzeit', 'versatz', 'decalage', 'delai', 'delai d attente', 'jours d attente'], weak: [] },
+  { id: 'linkType', kinds: ['Choice', 'Text'], panel: true,
+    strong: ['link type', 'dependency type', 'type of link', 'type of dependency', 'relation type', 'verknupfungstyp', 'abhangigkeitstyp', 'beziehungstyp',
+      'type de lien', 'type de dependance', 'type de relation'], weak: [] },
   { id: 'resource', kinds: ['Ref', 'Choice', 'Text'], panel: true,
     strong: ['resource', 'room', 'desk', 'equipment', 'vehicle', 'stall', 'apartment', 'venue', 'store', 'shop', 'hut', 'booth',
       'pitch', 'unit', 'ressource', 'raum', 'saal', 'stand', 'fahrzeug', 'wohnung', 'laden', 'hutte', 'huette', 'salle', 'vehicule',
@@ -320,7 +327,7 @@ export function fromStored(stored, columns, tableId) {
 // ---- columns added after the mapping was saved --------------------------------------------------------------
 
 /** The roles of the plan against actual: columns a person adds later, by their names, without a visit to Settings. */
-export const PLAN_ROLES = ['baselineStart', 'baselineEnd', 'doneOn'];
+export const PLAN_ROLES = ['baselineStart', 'baselineEnd', 'doneOn', 'lag', 'linkType'];
 
 /**
  * A saved mapping, plus the plan roles it does not name, found by column name among the columns it does not use.

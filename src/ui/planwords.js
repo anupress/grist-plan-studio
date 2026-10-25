@@ -33,3 +33,33 @@ export function doneText(task, fmt) {
   if (!d) return when;
   return when + ', ' + (d > 0 ? tn(d, '{n} day after its end', '{n} days after its end') : tn(-d, '{n} day before its end', '{n} days before its end'));
 }
+
+/** What a link says, in a sentence: "“B” starts 2 days after “A” ends." `link` is {type, lag}; a and b are the names of the tasks. */
+export function linkText(link, a, b) {
+  const lag = Number.isFinite(link.lag) ? Math.round(link.lag) : 0;
+  const n = Math.abs(lag);
+  let text;
+  switch (link.type) {
+    case 'ss':
+      if (lag === 0) text = t('“{b}” starts when “{a}” starts.');
+      else if (lag > 0) text = tn(n, '“{b}” starts {n} day after “{a}” starts.', '“{b}” starts {n} days after “{a}” starts.');
+      else text = tn(n, '“{b}” starts {n} day before “{a}” starts.', '“{b}” starts {n} days before “{a}” starts.');
+      break;
+    case 'ff':
+      if (lag === 0) text = t('“{b}” ends when “{a}” ends.');
+      else if (lag > 0) text = tn(n, '“{b}” ends {n} day after “{a}” ends.', '“{b}” ends {n} days after “{a}” ends.');
+      else text = tn(n, '“{b}” ends {n} day before “{a}” ends.', '“{b}” ends {n} days before “{a}” ends.');
+      break;
+    case 'sf':
+      if (lag === 0) text = t('“{b}” ends when “{a}” starts.');
+      else if (lag > 0) text = tn(n, '“{b}” ends {n} day after “{a}” starts.', '“{b}” ends {n} days after “{a}” starts.');
+      else text = tn(n, '“{b}” ends {n} day before “{a}” starts.', '“{b}” ends {n} days before “{a}” starts.');
+      break;
+    default:
+      if (lag === 0) text = t('“{b}” starts after “{a}” ends.');
+      else if (lag > 0) text = tn(n, '“{b}” starts {n} day after “{a}” ends.', '“{b}” starts {n} days after “{a}” ends.');
+      else text = tn(n, '“{b}” starts {n} day before “{a}” ends.', '“{b}” starts {n} days before “{a}” ends.');
+      break;
+  }
+  return text.replace('{a}', a).replace('{b}', b);
+}

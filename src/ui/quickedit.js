@@ -12,7 +12,7 @@ import { trapFocus } from './dialog.js';
 const FIELD_LABELS = {
   title: 'Name', start: 'Start date', end: 'End date', due: 'Due date', duration: 'Duration in days',
   status: 'Status', progress: 'Progress', done: 'Done', milestone: 'Milestone', assignee: 'Assigned to', project: 'Project',
-  parent: 'Parent task', dependsOn: 'Depends on', baselineStart: 'Planned start', baselineEnd: 'Planned end', doneOn: 'Done on',
+  parent: 'Parent task', dependsOn: 'Depends on', lag: 'Lag (days)', linkType: 'Link type', baselineStart: 'Planned start', baselineEnd: 'Planned end', doneOn: 'Done on',
 };
 
 const sortedLabels = (map) => [...(map || new Map()).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])));

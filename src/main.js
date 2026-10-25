@@ -30,7 +30,9 @@ import { copyBox } from './ui/copy.js';
 import { outlineBox } from './ui/outline.js';
 import { openMenu } from './ui/menu.js';
 import { quickColumns } from './model/quickfields.js';
-import { slipText, slipShortText } from './ui/planwords.js';
+import { slipText, slipShortText, linkText } from './ui/planwords.js';
+import { linkTypeOf, latestEnd as latestEndOfLink } from './model/links.js';
+import { linkBox } from './ui/linkbox.js';
 import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, storedMe, rememberMe, storedTab, rememberTab, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, TIME_DEFAULTS, VIEWS, snapshotView, withView, MAX_VIEWS } from './model/settings.js';
 import { buildBoard, planCardMove, newCardFields, cellText, LANE_KINDS, FIELD_KINDS } from './model/board.js';
 import { LANE_KINDS as TL_KINDS, planLaneChange, lanesOf } from './model/lanes.js';
@@ -170,7 +172,7 @@ function ensureView() {
     onDoneOn: (e) => moveDoneOn(e),
     onListWidth: (w) => setDisplay({ ...disp(), listW: w }),
     onLink: (l) => addLink(l),
-    onArrow: (l) => removeLink(l),
+    onArrow: (l) => editLink(l),
     onToggle: (key) => toggleFold(key),
     onZoomStep: (dir) => setZoom(ZOOM_ORDER[Math.max(0, Math.min(ZOOM_ORDER.length - 1, ZOOM_ORDER.indexOf(S.zoom) + dir))]),
     onToday: () => view.scrollToToday(),
@@ -916,12 +918,14 @@ function recompute() {
     [...S.view.collapsed].join(','), groupCol()?.id, JSON.stringify(disp()),
     ...(disp().cols.length ? m.entries.map((e) => (e.kind === 'task' ? listTexts(e.task).join('\u0003') : '')) : []),
     ...m.entries.map((e) => (e.kind === 'group' ? 'g' + e.key + e.collapsed : e.task.id + '\u0002' + e.task.hash + (e.summary ? `${e.summary.start}-${e.summary.end}` : ''))),
-    ...m.links.map((l) => `${l.from}>${l.to}${l.late ? '!' : ''}`), ...m.crit.tasks].join('\n');
+    ...m.links.map((l) => `${l.from}>${l.to}${l.type}${l.lag}${l.late ? '!' : ''}`), ...m.crit.tasks].join('\n');
   if (sig === S.signature && !fitNow) return;
   S.signature = sig;
   const c = ctx();
+  const names = new Map(m.dated.map((x) => [x.id, x.title || t('(no name)')]));
   v.update({
     entries: m.entries, span: m.span, links: m.links, critical: m.crit.tasks, criticalLinks: m.crit.links,
+    linkTitle: (l) => linkText(l, names.get(l.from) || '', names.get(l.to) || ''),
     holidays: m.cal.holidays, length: m.cal.length, workdays: m.cal.workdays,
     caps: (task) => capabilities(task, c), linkable: canLink(c), editable, showCritical: S.view.critical,
     today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), selectedId: S.selectedId,
@@ -1542,6 +1546,7 @@ async function levelNow() {
     ...wlContext(person, S.wlModel.measure === 'remaining' ? 'remaining' : 'planned'), links: linksOf(S.built.tasks), today: todayDay(),
     shiftEnd: (task, start) => (cal.workdays ? cal.endAfter(start, cal.length(task.start, task.end)) : start + (task.end - task.start)),
     beforeDay: (day) => cal.shift(day, -1),
+    latestEndOf: (link, p, s) => latestEndOfLink(link, p, s, cal),
     canMove: (task) => capabilities(task, c).move,
     dueOf: (task) => (dueCol && task.endFrom === 'end' ? dayOf(rowById(task.id)?.[dueCol.id], dueCol.type) : null),
   });
@@ -1658,10 +1663,11 @@ const write = (id, plan, message) => writeMany([{ id, plan }], message);
  * depends on ends. Asked once, then written with the change itself as one action.
  * @returns {Promise<Array<{id, plan}>>} the extra writes ([] when nothing has to move or the answer is no)
  */
-async function pushedAlong(changed, extraLinks = []) {
+async function pushedAlong(changed, extraLinks = [], replaceInto = null) {
   const m = pushModel();
   if (!m || (!m.links.length && !extraLinks.length)) return [];
-  const links = [...m.links, ...extraLinks];
+  // `replaceInto`: a task whose type or lag is being changed, so the links into it as they are now are no longer true
+  const links = [...(replaceInto != null ? m.links.filter((l) => l.to !== replaceInto) : m.links), ...extraLinks];
   const tasks = m.dated.filter((x) => !x.summary);
   const push = pushPlan(tasks, links, changed, m.cal);
   if (!push.length) return [];
@@ -1717,22 +1723,70 @@ async function addLink({ from, to }) {
   if (plan.error === 'already') { toast(t('“{b}” already waits for “{a}”.', { a: a.title, b: b.title })); return; }
   if (plan.error) { toast(t('The “Depends on” column can’t be written here.')); return; }
   const span = (x) => { const s = m.summaries.get(x.id); return s ? { start: s.start, end: s.end } : { start: x.start, end: x.end }; };
-  const extra = await pushedAlong({ id: from, ...span(a) }, [{ from, to }]);
+  // a task waits for all its links in the same way: its own type and lag
+  const extra = await pushedAlong({ id: from, ...span(a) }, [{ from, to, type: b.linkType || 'fs', lag: b.lag || 0 }]);
   const message = t('“{b}” now starts after “{a}” ends.', { a: a.title, b: b.title })
     + (extra.length ? ' ' + tn(extra.length, '{n} task moved along.', '{n} tasks moved along.') : '');
   writeMany([{ id: to, plan }, ...extra], message);
 }
 
-async function removeLink({ from, to }) {
-  const a = taskById(from), b = taskById(to);
-  if (!a || !b || !canEdit()) return;
-  const yes = await confirmBox(shell, {
-    title: t('Remove this link?'), body: t('“{b}” will no longer wait for “{a}”. No dates change.', { a: a.title, b: b.title }), ok: t('Remove link'),
-  });
-  if (!yes) return;
+/** Take a link away: the task no longer waits for the other, and no date changes. */
+function unlink(from, to, a, b) {
   const plan = planUnlink(rowById(to), ctx(), from);
   if (plan.error) { toast(t('The “Depends on” column can’t be written here.')); return; }
   write(to, plan, t('“{b}” no longer waits for “{a}”.', { a: a.title, b: b.title }));
+}
+
+/**
+ * A click on an arrow (M25): which ends are linked and how many days lie between them, or take the link away. The type and the lag
+ * are columns of the task that waits and hold for everything it waits for; a table without them gets them added when this is saved.
+ */
+async function editLink({ from, to }) {
+  const a = taskById(from), b = taskById(to);
+  if (!a || !b || !canEdit()) return;
+  const model = pushModel();
+  const link = model.links.find((l) => l.from === from && l.to === to) || { from, to, type: b.linkType || 'fs', lag: b.lag || 0 };
+  const typeCol = colById(S.roles.linkType), lagCol = colById(S.roles.lag);
+  const canAdd = S.live;
+  const showType = !!(typeCol ? !typeCol.isFormula : canAdd), showLag = !!(lagCol ? !lagCol.isFormula : canAdd);
+  const names = [!typeCol && showType ? columnForRole('linkType', t, S.tableId)?.label : null, !lagCol && showLag ? columnForRole('lag', t, S.tableId)?.label : null].filter(Boolean);
+  const others = (b.deps || []).length - 1;
+  const note = [names.length ? t('Plan Studio adds the columns {cols} to {table} when you save.', { cols: names.join(', '), table: S.tableId }) : null,
+    others > 0 ? tn(others, 'The type and the number of days hold for the {n} other task “{b}” waits for too.', 'The type and the number of days hold for the {n} other tasks “{b}” waits for too.').replace('{b}', b.title || t('(no name)')) : null].filter(Boolean).join(' ') || null;
+  const res = await linkBox(shell, {
+    title: t('How “{b}” waits for “{a}”', { a: a.title || t('(no name)'), b: b.title || t('(no name)') }),
+    type: link.type || 'fs', lag: link.lag || 0, showType, showLag, unitWord: calendar().workdays ? t('Working days') : t('Days'),
+    sentence: (type, lag) => linkText({ type, lag }, a.title || t('(no name)'), b.title || t('(no name)')), note,
+  });
+  if (!res) return;
+  if (res.action === 'remove') { unlink(from, to, a, b); return; }
+  const typeChanged = showType && res.type !== (link.type || 'fs'), lagChanged = showLag && res.lag !== (link.lag || 0);
+  if (!typeChanged && !lagChanged) return;
+  try {
+    const need = [typeChanged && !colById(S.roles.linkType) ? 'linkType' : null, lagChanged && !colById(S.roles.lag) ? 'lag' : null].filter(Boolean);
+    if (need.length) { if (!S.live) { toast(t('The demo has no table to add columns to.')); return; } await addRoleColumns(need); }
+  } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); return; }
+  const fields = {}, patch = {};
+  if (typeChanged) {
+    const col = colById(S.roles.linkType);
+    // a Choice column holds its own words: the choice that says this type; a Text column gets the words of the interface
+    const words = { fs: t('Finish to start'), ss: t('Start to start'), ff: t('Finish to finish'), sf: t('Start to finish') };
+    const word = col?.kind === 'Choice' ? (col.choices || []).find((x) => linkTypeOf(x) === res.type) : words[res.type];
+    if (!col || col.isFormula || word === undefined) { toast(t('The “Link type” column has no choice for “{type}”.', { type: words[res.type] })); return; }
+    fields[col.id] = word; patch[col.id] = word;
+  }
+  if (lagChanged) {
+    const col = colById(S.roles.lag);
+    if (!col || col.isFormula) return;
+    fields[col.id] = res.lag; patch[col.id] = res.lag;
+  }
+  // the successor may now start too early for the new rule: ask whether to move it (the push looks at the links as they will be)
+  const span = (x) => { const s = model.summaries?.get(x.id); return s ? { start: s.start, end: s.end } : { start: x.start, end: x.end }; };
+  const newType = typeChanged ? res.type : link.type || 'fs', newLag = lagChanged ? res.lag : link.lag || 0;
+  const into = model.links.filter((l) => l.to === to).map((l) => ({ ...l, type: newType, lag: newLag }));
+  const extra = a.start != null ? await pushedAlong({ id: from, ...span(a) }, into, to) : [];
+  writeMany([{ id: to, plan: { fields, patch } }, ...extra], linkText({ type: newType, lag: newLag }, a.title || t('(no name)'), b.title || t('(no name)'))
+    + (extra.length ? ' ' + tn(extra.length, '{n} task moved along.', '{n} tasks moved along.') : ''));
 }
 
 // ---- the board's gestures -------------------------------------------------------------------------------
@@ -3041,6 +3095,7 @@ function openMore(btn) {
     items: [
       edit && tasky && S.roles.title ? { label: t('Add several tasks…'), onClick: () => addSeveral(0) } : null,
       gantt && edit && ganttReady(S.roles) && S.built?.tasks.length ? { label: t('Set baseline'), onClick: () => setBaseline() } : null,
+      gantt && S.model?.links.length ? { label: t('Critical path'), checked: !!S.view.critical, onClick: () => { S.view.critical = !S.view.critical; saveView(); S.signature = ''; recompute(); } } : null,
       hasParents ? { label: t('Fold all'), onClick: () => foldAll(true) } : null,
       folded ? { label: t('Unfold all'), onClick: () => foldAll(false) } : null,
       { separator: true },

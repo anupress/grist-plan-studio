@@ -90,8 +90,6 @@ export function renderToolbar(host, s, on) {
       tools = [
         s.canAdd ? button(t('+ New task'), null, on.onNew, ' ps-btn--primary') : null,
         s.groupOptions?.length ? picker(t('Group'), t('Group rows by'), s.groupOptions, s.groupBy, on.onGroup, t('No groups')) : null,
-        s.hasLinks ? el('button', { type: 'button', class: 'ps-btn' + (s.critical ? ' is-on' : ''), 'aria-pressed': s.critical ? 'true' : 'false',
-          text: t('Critical path'), title: t('Show the tasks that decide the end date'), onclick: on.onCritical }) : null,
         ...zoomTools(),
       ];
     } else if (view === 'calendar') {

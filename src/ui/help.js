@@ -73,7 +73,7 @@ export function helpFor(view) {
       can: [
         t('Drag a bar to move the task, or its left or right edge to change its start or end.'),
         t('Drag across an empty row to give a task with no dates its dates.'),
-        t('Drag the dot at the end of a bar onto another bar: that task then starts after this one ends. Click an arrow to remove the link.'),
+        t('Drag the dot at the end of a bar onto another bar: that task then starts after this one ends. Click an arrow to set how they are linked (which ends, and a lag in days) or to remove the link.'),
         t('Click ▸ or ▾ to fold a parent or a group. Double-click a task to open Grist’s own card.'),
         t('Drag the empty part of the chart to move across it. Ctrl and the wheel zoom around the pointer. Drag the edge of the names, in the heading, to widen them.'),
         t('Set baseline remembers today’s dates as the plan. A bar that later moves shows the plan as a thin line under it, and says by how many days.'),

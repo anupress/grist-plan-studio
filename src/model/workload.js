@@ -279,7 +279,7 @@ export function tasksIn(person, period) {
  * Never moved: tasks already started, done tasks, milestones, parents, and tasks canMove() refuses
  * (dates from formulas). Tasks with the least slack keep their place; those with more give way.
  *
- * @param ctx  buildWorkload's ctx, plus {links: [{from, to}], today, shiftEnd(task, start) -> end,
+ * @param ctx  buildWorkload's ctx, plus {links: [{from, to, type?, lag?}], latestEndOf(link, task, successor) -> day (default: the day before it starts), today, shiftEnd(task, start) -> end,
  *             canMove(task) -> boolean, dueOf(task) -> day | null}
  * @returns {{moves: Array<{id, start, end, was: {start, end}}>, before: number, after: number, stuck: Array<{id, reason}>}}
  *   before / after: person-days over capacity from today on; stuck reasons: 'slack' (no room before it
@@ -315,10 +315,11 @@ export function levelPlan(tasks, rows, ctx) {
   // Latest end: before the earliest successor starts, by its own due date, by the end of the plan.
   const succ = new Map();
   const byId = new Map(dated.map((x) => [x.id, x]));
-  for (const l of links) if (byId.has(l.to)) { if (!succ.has(l.from)) succ.set(l.from, []); succ.get(l.from).push(byId.get(l.to)); }
+  for (const l of links) if (byId.has(l.to)) { if (!succ.has(l.from)) succ.set(l.from, []); succ.get(l.from).push({ link: l, task: byId.get(l.to) }); }
   const latestEnd = (task) => {
     let e = planEnd;
-    for (const s of succ.get(task.id) || []) e = Math.min(e, ctx.beforeDay ? ctx.beforeDay(s.start) : s.start - 1);
+    // the latest the task may end without a task that waits for it having to move: its link's own rule (type and lag), else the day before it starts
+    for (const { link, task: s } of succ.get(task.id) || []) e = Math.min(e, ctx.latestEndOf ? ctx.latestEndOf(link, task, s) : ctx.beforeDay ? ctx.beforeDay(s.start) : s.start - 1);
     const due = dueOf(task);
     if (due != null && due >= task.end) e = Math.min(e, due);
     return e;

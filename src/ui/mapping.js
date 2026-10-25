@@ -35,6 +35,8 @@ const ROLE_TEXT = {
   colour: ['Colour', 'A choice column, or text such as #2563eb.'],
   parent: ['Parent task', 'A Reference to this same table: the task sits under its parent, whose bar spans its subtasks.'],
   dependsOn: ['Depends on', 'References to tasks in this table that must finish first. Drawn as arrows.'],
+  lag: ['Lag (days)', 'Days between the task it waits for and its own start; a negative number lets them overlap. One number for everything the task waits for.'],
+  linkType: ['Link type', 'Finish to start (the default), start to start, finish to finish or start to finish. One setting for everything the task waits for.'],
   order: ['Order in a lane', 'A number column. Dragging a card up or down on the board writes it.'],
   resource: ['Resource', 'A room, store, flat or vehicle: the booking grid has a row for each.'],
   period: ['Period', 'A column that names when, such as Weekend 1, 2, 3: the booking grid has a column for each. Not needed when bookings have dates.'],

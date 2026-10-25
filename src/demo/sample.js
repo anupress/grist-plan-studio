@@ -35,6 +35,9 @@ export const SAMPLE_COLUMNS = [
   col(14, 'Planned_start', 'Date'),
   col(15, 'Planned_end', 'Date'),
   col(16, 'Done_on', 'Date'),
+  // how a task waits for the ones it depends on: the days between, and which ends are linked
+  col(17, 'Lag_days', 'Int'),
+  col(18, 'Link_type', 'Choice', { choices: ['Finish to start', 'Start to start', 'Finish to finish', 'Start to finish'] }),
 ];
 
 /** The people, with their hours a week (Dieter works part-time): the workload reads their capacity here. */
@@ -91,6 +94,9 @@ export function sampleRows(today = todayDay()) {
   const PLAN = { 6: [1, 3], 7: [1, 4], 8: [7, 10], 9: [11, 18], 10: [8, 18], 11: [25, 25], 12: [9, 21], 13: [28, 35], 14: [29, 35], 15: [29, 36], 18: [42, 46] };
   // The day the finished tasks were really done: the audit ran a day over its end.
   const DONE = { 5: 0, 6: 4, 7: 9, 8: 11 };
+  // The links that are not plain finish to start: Shop setup starts three weeks after the contract work starts, Migrate content ends
+  // with the copywriting it follows, the accessibility review waits two days after the build.
+  const LINKS = { 14: ['Start to start', 21], 15: ['Finish to finish', 0], 16: ['Finish to start', 2] };
 
   return Object.entries(T).map(([id, [task, s, e, due, status, owner, progress, ms, project, phase, deps, hours]]) => ({
     id: Number(id), Task: task, Start: s == null ? null : d(s), End: e == null ? null : d(e), Due: due == null ? null : d(due),
@@ -101,6 +107,7 @@ export function sampleRows(today = todayDay()) {
     Hours: hours,
     Planned_start: PLAN[id] ? d(PLAN[id][0]) : null, Planned_end: PLAN[id] ? d(PLAN[id][1]) : null,
     Done_on: DONE[id] != null ? d(DONE[id]) : null,
+    Lag_days: LINKS[id] ? LINKS[id][1] : 0, Link_type: LINKS[id] ? LINKS[id][0] : '',
   }));
 }
 

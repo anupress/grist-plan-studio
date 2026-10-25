@@ -10,7 +10,7 @@ export function closeMenu() { if (open) open(); }
 
 /**
  * @param host   the element the menu is drawn in (the app; its box is the frame the point is measured against)
- * @param opts   {x, y: a point in the window (clientX/clientY), items: [{label, onClick, hint?, disabled?, danger?} | {separator: true}],
+ * @param opts   {x, y: a point in the window (clientX/clientY), items: [{label, onClick, hint?, disabled?, danger?, checked? (true or false makes it a switch)} | {separator: true}],
  *                label: what the menu is for (read by a screen reader), anchor: the button that opened it (focus goes back to it)}
  */
 export function openMenu(host, { x, y, items, label = '', anchor = null }) {
@@ -28,7 +28,8 @@ export function openMenu(host, { x, y, items, label = '', anchor = null }) {
   const menu = el('div', { class: 'ps-menu', role: 'menu', 'aria-label': label || null }, list.map((it) => {
     if (it.separator) return el('div', { class: 'ps-menu__sep', role: 'separator' });
     const node = el('button', {
-      type: 'button', role: 'menuitem', class: 'ps-menu__item' + (it.danger ? ' is-danger' : ''), disabled: it.disabled ? true : null, tabindex: '-1',
+      type: 'button', role: it.checked == null ? 'menuitem' : 'menuitemcheckbox', 'aria-checked': it.checked == null ? null : it.checked ? 'true' : 'false',
+      class: 'ps-menu__item' + (it.danger ? ' is-danger' : '') + (it.checked ? ' is-checked' : ''), disabled: it.disabled ? true : null, tabindex: '-1',
       onclick: () => { done(false); it.onClick?.(); },
     }, [el('span', { class: 'ps-menu__text', text: it.label }), it.hint ? el('span', { class: 'ps-menu__hint', text: it.hint }) : null]);
     nodes.push(node);
