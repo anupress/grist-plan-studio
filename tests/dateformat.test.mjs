@@ -37,6 +37,8 @@ eq('German: a full stop', F.ordinal(7, 'de-DE'), '7.');
 // the names follow the language
 eq('German names', fmt(day, 'dddd, D. MMMM YYYY', 'de'), 'Samstag, 7. März 2026');
 eq('French names', fmt(day, 'dddd D MMMM YYYY', 'fr'), 'samedi 7 mars 2026');
+eq('English is the plain English whatever the region: Sep, not Sept', [fmt(on(2026, 9, 7), 'DD MMM YYYY', 'en-GB'), fmt(on(2026, 9, 7), 'DD MMM YYYY', 'en-US')], ['07 Sep 2026', '07 Sep 2026']);
+eq('German and French abbreviations carry their full stops, as beside a day', [fmt(day, 'dd, D. MMM', 'de'), fmt(on(2026, 10, 26), 'ddd D MMM', 'fr')], ['Sa, 7. März', 'lun. 26 oct.']);
 eq('the first day of the year', fmt(on(2027, 1, 1), 'ddd D MMM', 'en'), 'Fri 1 Jan');
 eq('the last day of the year', fmt(on(2026, 12, 31), 'dddd', 'en'), 'Thursday');
 eq('weekday number and the two letters', [fmt(day, 'd'), fmt(day, 'dd')], ['6', 'Sa']);
@@ -53,9 +55,11 @@ eq('a formatter formats a day', F.patternFormatter('DD.MM.YYYY', 'de').format(on
 const cols = S.tableColumns('Tasks', [{ id: 1, tableId: 'Tasks' }], [
   { id: 10, parentId: 1, colId: 'Start', label: 'Start', type: 'Date', widgetOptions: JSON.stringify({ dateFormat: 'DD/MM/YYYY', isCustomDateFormat: false }) },
   { id: 11, parentId: 1, colId: 'End', label: 'End', type: 'Date', widgetOptions: '' },
+  { id: 13, parentId: 1, colId: 'Stamp', label: 'Stamp', type: 'DateTime:Europe/Berlin', widgetOptions: JSON.stringify({ dateFormat: 'D. MMMM YYYY', timeFormat: 'HH:mm' }) },
   { id: 12, parentId: 1, colId: 'Notes', label: 'Notes', type: 'Text', widgetOptions: JSON.stringify({ dateFormat: 'YYYY' }) },
 ]);
 eq('a Date column keeps its format', cols.find((c) => c.id === 'Start').dateFormat, 'DD/MM/YYYY');
+eq('a DateTime column keeps the date part of its format', cols.find((c) => c.id === 'Stamp').dateFormat, 'D. MMMM YYYY');
 eq('a Date column with no format has none', cols.find((c) => c.id === 'End').dateFormat, null);
 eq('another kind of column has none', cols.find((c) => c.id === 'Notes').dateFormat, null);
 

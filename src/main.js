@@ -33,7 +33,7 @@ import { openMenu } from './ui/menu.js';
 import { createBulkBar } from './ui/bulkbar.js';
 import { setBox, daysBox } from './ui/bulkset.js';
 import { quickColumns } from './model/quickfields.js';
-import { slipText, slipShortText, linkText } from './ui/planwords.js';
+import { slipText, slipShortText, linkText, deadlineText } from './ui/planwords.js';
 import { linkTypeOf, latestEnd as latestEndOfLink } from './model/links.js';
 import { linkBox } from './ui/linkbox.js';
 import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, storedMe, rememberMe, storedTab, rememberTab, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, TIME_DEFAULTS, VIEWS, snapshotView, withView, MAX_VIEWS } from './model/settings.js';
@@ -2533,8 +2533,11 @@ function printNode({ paper, fit }) {
         kind: e.summary ? 'summary' : x.kind, start: span.start, end: span.end, colour: x.colour, title: x.title || t('(no name)'),
         progress: x.progress, critical: S.view.critical && m.crit.tasks.has(x.id),
         plan: disp().plan && hasPlan() && drifted(x) ? { start: x.baseStart, end: x.baseEnd } : null, doneOn: x.doneOn,
+        blocked: !e.summary && !!x.blocked, deadline: e.summary ? null : x.deadline, overDeadline: x.overDeadline || 0,
       }];
-      return { label: x.title || t('(no name)'), depth: e.depth, kind: 'task', sub: e.undated ? t('No dates') : fmtShortRange(span.start, span.end), bars };
+      // colour is never the only word: a blocked task and a deadline are said under the name
+      const sub = [e.undated ? t('No dates') : fmtShortRange(span.start, span.end), !e.summary && x.blocked ? t('Blocked') : null, e.summary ? null : deadlineText(x, fmtShort)].filter(Boolean).join(' · ');
+      return { label: x.title || t('(no name)'), depth: e.depth, kind: 'task', sub, bars };
     });
     return renderTimePrint({
       title: printTitle(), subtitle: subtitleFor(view, count('{n} task', '{n} tasks'), locale, today),

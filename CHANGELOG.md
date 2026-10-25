@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.21.1
+
+Small fixes found by checking the published 1.21.0.
+
+- **Display › Dates** writes English month names the way Grist does ("Sep", not "Sept"), German and French abbreviations with their full stops ("Mo.", "oct."), and follows the format of a DateTime column too.
+- **Printout**: a blocked task is striped with its name on a plain plate and "Blocked" under its name; a deadline is a flag, and the words under the name say when the plan ends after it.
+
 ## 1.21.0
 
 Dates the way the table writes them, deadlines, and several cards dragged together. Tested in Grist 1.7.20 (every write read back from the table, every one undone with Grist's Undo).

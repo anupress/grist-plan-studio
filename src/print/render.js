@@ -92,9 +92,13 @@ export function renderTimePrint(s) {
         }
         const fits = w >= Math.min(b.title.length, 50) * 5.6 + 10;
         const fill = b.colour || '#3d73b8';
+        // the deadline: a flag at the end of its day, dark when the plan ends after it
+        if (b.deadline != null && b.deadline >= frame.from && b.deadline <= frame.to) {
+          strip.appendChild(el('div', { class: 'pp-deadline' + (b.overDeadline ? ' is-over' : ''), style: { left: xOf(frame, b.deadline) + frame.px - 1 + 'px', top: top - 2 + 'px', height: BAR + 4 + 'px' } }));
+        }
         strip.appendChild(el('div', {
-          class: 'pp-bar' + (b.critical ? ' is-critical' : '') + (b.clash ? ' is-clash' : ''),
-          style: { left: x + 'px', top: top + 'px', width: w + 'px', height: BAR + 'px', background: fill, color: onColor(fill) },
+          class: 'pp-bar' + (b.critical ? ' is-critical' : '') + (b.clash ? ' is-clash' : '') + (b.blocked ? ' is-blocked' : ''),
+          style: { left: x + 'px', top: top + 'px', width: w + 'px', height: BAR + 'px', backgroundColor: fill, color: onColor(fill) },
         }, [
           b.progress > 0 ? el('span', { class: 'pp-bar__progress', style: { width: Math.round(b.progress * 100) + '%' } }) : null,
           fits || s.labelsInside ? el('span', { class: 'pp-bar__label', text: b.title }) : null,

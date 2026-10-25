@@ -57,6 +57,11 @@
 .pp-bar__progress { position: absolute; left: 0; bottom: 0; height: 2px; background: rgba(0, 0, 0, 0.35); }
 .pp-bar.is-critical, .pp-ms.is-critical { box-shadow: 0 0 0 1.5px var(--pp-crit); }
 .pp-bar.is-clash, .pp-ms.is-clash { box-shadow: 0 0 0 1.5px var(--pp-crit); }
+.pp-bar.is-blocked { background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0 2px, transparent 2px 6px); }
+/* the name of a blocked task sits on a plain plate, so the stripes do not run through the letters */
+.pp-bar.is-blocked .pp-bar__label { display: inline-block; max-width: calc(100% - 4px); margin-left: 2px; padding: 0 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.88); color: #14202b; line-height: 13px; vertical-align: top; }
+.pp-deadline { position: absolute; width: 1.5px; background: var(--pp-muted); z-index: 1; }
+.pp-deadline.is-over { background: var(--pp-crit); width: 2px; }
 .pp-plan { position: absolute; height: 2px; background: var(--pp-muted); }
 .pp-done { position: absolute; width: 9px; height: 9px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--pp-ink); background: #fff; z-index: 2; }
 .pp-ms { position: absolute; transform: rotate(45deg) scale(0.75); background: var(--fill); border-radius: 1px; }

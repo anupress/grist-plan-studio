@@ -207,6 +207,15 @@ const ctx = { laneCol: col('Status'), orderCol: col('Rank'), rows };
   eq('the rank goes between the neighbours in the band: Ann’s Doing cell holds card 1 only, so moving 1 to Ben’s cell at index 0 ranks above Ben’s card 2 (rank 1)', toBen.items[0].plan.fields.Rank < 1, true);
   eq('a swim column that is a formula cannot be written', B.planCardMove(b, { id: 1, toKey: 'v:Doing', swimKey: 'r:2', index: 0 }, { ...ctxS, swimCol: { ...col('Owner'), isFormula: true } }), { error: 'swimFormula' });
   eq('sorted: a drop into another band still writes the band, never the place', (() => { const sb = swim({ sorter: (a, c) => String(a.title).localeCompare(String(c.title)) }); const p = B.planCardMove(sb, { id: 1, toKey: 'v:Doing', swimKey: 'r:2', index: 0 }, ctxS); return [Object.keys(p.items[0].plan.fields), p.ranked]; })(), [['Owner'], false]);
+  // several cards dropped together into a band (M29): cards 1 (Ann) and 6 (nobody), both Doing, go to Ben's Done cell
+  const together = B.planCardsMove(b, { id: 1, ids: [1, 6], toKey: 'v:Done', swimKey: 'r:2', index: 0 }, ctxS);
+  eq('two cards into another lane and band: each takes the lane, the person and a rank', together.items.map((i) => [i.id, i.plan.fields.Status, i.plan.fields.Owner, typeof i.plan.fields.Rank]), [[1, 'Done', 2, 'number'], [6, 'Done', 2, 'number']]);
+  eq('…and the ranks follow each other', together.items[0].plan.fields.Rank < together.items[1].plan.fields.Rank, true);
+  eq('…the swim change is told', [together.count, together.sameLane], [2, false]);
+  const stay = B.planCardsMove(b, { id: 1, ids: [1, 6], toKey: 'v:Doing', swimKey: 'r:1', index: 0 }, ctxS);
+  eq('into Ann’s Doing cell: card 1 is there already (rank only), card 6 takes Ann', stay.items.map((i) => [i.id, Object.keys(i.plan.fields).sort()]), [[1, ['Rank']], [6, ['Owner', 'Rank']]]);
+  eq('a band that is gone', B.planCardsMove(b, { id: 1, ids: [1, 6], toKey: 'v:Doing', swimKey: 'r:99', index: 0 }, ctxS).error, 'gone');
+  eq('a swim column that is a formula cannot take cards', B.planCardsMove(b, { id: 1, ids: [1, 6], toKey: 'v:Doing', swimKey: 'r:2', index: 0 }, { ...ctxS, swimCol: { ...col('Owner'), isFormula: true } }).error, 'swimFormula');
   // a card added in a band
   const lane = b.lanes.find((l) => l.key === 'v:Doing');
   const added = B.newCardFields(lane, 'New', { laneCol: col('Status'), orderCol: col('Rank'), titleCol: col('Task'), swim: { col: col('Owner'), value: 2, none: false } });

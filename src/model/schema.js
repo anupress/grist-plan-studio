@@ -55,8 +55,8 @@ export function tableColumns(tableId, metaTables, metaColumns) {
         choiceOptions: opts.choiceOptions && typeof opts.choiceOptions === 'object' ? opts.choiceOptions : {},
         // 'percent' for a number shown as a percentage (a capacity of 50 % is stored as 0.5)
         numMode: typeof opts.numMode === 'string' ? opts.numMode : null,
-        // how a Date column writes its days (moment-style, "DD/MM/YYYY"); null when it says nothing
-        dateFormat: kindOf(c.type) === 'Date' && typeof opts.dateFormat === 'string' && opts.dateFormat ? opts.dateFormat : null,
+        // how a Date or DateTime column writes its day (moment-style, "DD/MM/YYYY"); null when it says nothing
+        dateFormat: (kindOf(c.type) === 'Date' || kindOf(c.type) === 'DateTime') && typeof opts.dateFormat === 'string' && opts.dateFormat ? opts.dateFormat : null,
       };
     });
 }

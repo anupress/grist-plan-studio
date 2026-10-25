@@ -26,16 +26,21 @@ export function ordinal(n, locale) {
 }
 
 const names = new Map();
-/** The names of the twelve months or seven weekdays, in the language, as 'long', 'short' or 'narrow'. */
+/**
+ * The names of the twelve months or seven weekdays, in the language, as 'long' or 'short'. They are taken as the language writes them
+ * beside a day ("7 Sept.", "Mo."), which is what Grist's own formats do; English is always the plain English ("Sep"), as Grist writes it.
+ */
 function nameList(locale, kind, style) {
-  const key = locale + '|' + kind + '|' + style;
+  const loc = String(locale || 'en').toLowerCase().startsWith('en') ? 'en-US' : locale;
+  const key = loc + '|' + kind + '|' + style;
   let list = names.get(key);
   if (!list) {
-    const f = new Intl.DateTimeFormat(locale, { timeZone: 'UTC', [kind]: style });
-    // 2026-01-01 was a Thursday: 2026-01-04 is a Sunday, and the months run on from the 1st
+    const f = new Intl.DateTimeFormat(loc, { timeZone: 'UTC', day: 'numeric', [kind]: style });
+    const part = (date) => f.formatToParts(date).find((p) => p.type === kind).value;
+    // 2026-01-04 was a Sunday, and the months run on from the 1st
     list = kind === 'month'
-      ? Array.from({ length: 12 }, (_, i) => f.format(new Date(Date.UTC(2026, i, 1))))
-      : Array.from({ length: 7 }, (_, i) => f.format(new Date(Date.UTC(2026, 0, 4 + i))));
+      ? Array.from({ length: 12 }, (_, i) => part(new Date(Date.UTC(2026, i, 1))))
+      : Array.from({ length: 7 }, (_, i) => part(new Date(Date.UTC(2026, 0, 4 + i))));
     names.set(key, list);
   }
   return list;
