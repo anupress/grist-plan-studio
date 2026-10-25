@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.14.0
+
+Only mine, and more fields. Tested in Grist 1.7.20 (the counts compared with the table, the cells read back after each save).
+
+- **Mine** in the filter strip (every view but the agenda): asks who you are once, then keeps your tasks; a second click puts
+  everyone back. It is the person chip set for you, so counts and saved views follow.
+- **More fields in the edit window**: pick up to eight more columns in Settings (More, Edit window); they are edited under **More
+  fields**, only a changed cell is written, and everyone who edits sees the same ones.
+- German and French for every new word.
+
 ## 1.13.0
 
 Getting around the Gantt chart and the timeline. Tested in Grist 1.7.20 with real mouse, wheel and key events.

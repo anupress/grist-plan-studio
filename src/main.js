@@ -23,6 +23,7 @@ import { todayDay, dateFromDay, plain, dayOf, num, isoFromDay, dayFromISO, progr
 import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink, baselineFields, doneOnFields, canMoveDoneOn } from './model/edits.js';
 import { baselineSummary, baselineTargets, drifted } from './model/plan.js';
 import { planDelete, planDuplicate, descendantsOf } from './model/rowops.js';
+import { quickColumns } from './model/quickfields.js';
 import { slipText, slipShortText } from './ui/planwords.js';
 import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, storedMe, rememberMe, storedTab, rememberTab, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, TIME_DEFAULTS, VIEWS, snapshotView, withView, MAX_VIEWS } from './model/settings.js';
 import { buildBoard, planCardMove, newCardFields, cellText, LANE_KINDS, FIELD_KINDS } from './model/board.js';
@@ -100,6 +101,7 @@ const srBox = el('div', { class: 'ps-sr', role: 'status', 'aria-live': 'polite' 
 // The quick filters' strip sits between the toolbar and the view. Its callbacks are declared further down.
 const filterBar = createFilterBar({
   onQuery: (q) => patchFind((f) => { f.q = q; }),
+  onMine: () => toggleMine(),
   onToggle: (id, value) => patchFind((f) => {
     const list = f.sel[id] || [];
     const next = list.includes(value) ? list.filter((x) => x !== value) : [...list, value];
@@ -501,9 +503,11 @@ function wlLogs(personCol) {
 }
 
 /** Every column whose References need labels: the roles' and those of the view on show. */
+/** The columns Settings added to the edit window. */
+const quickCols = () => quickColumns(S.quick, S.columns, S.roles, S.tableId);
 function labelRoles() {
   const lane = laneCol();
-  const extra = { ...(lane ? { _lane: lane.id } : {}), ...Object.fromEntries(fieldCols(lane).map((c, i) => ['_f' + i, c.id])) };
+  const extra = { ...(lane ? { _lane: lane.id } : {}), ...Object.fromEntries(fieldCols(lane).map((c, i) => ['_f' + i, c.id])), ...Object.fromEntries(quickCols().map((c, i) => ['_q' + i, c.id])) };
   const tl = tlLaneCol(), res = bookResCol(), lab = bookLabelCol();
   const per = bookPeriodsBy();
   if (tl) extra._tl = tl.id;
@@ -619,12 +623,30 @@ function findChoices(id) {
   for (const v of cleanFind(S.view.find).sel[id] || []) if (!raw.some((x) => x.value === v)) items.push({ value: v, label: valueText(col, v), count: 0 });
   return { items, more: Math.max(0, raw.length - 300) };
 }
+/** The switch for "my tasks": the person this browser says it is, as the chip of the assignee column. Not in the agenda, which has its own. */
+function mineState() {
+  const who = colById(S.roles.assignee);
+  if (!who || S.mode === 'agenda' || !timePeople().length) return null;
+  const token = S.me && knowsMe() ? S.me.slice(2) : null;
+  const sel = cleanFind(S.view.find).sel[who.id] || [];
+  return { on: !!token && sel.length === 1 && sel[0] === token };
+}
+async function toggleMine() {
+  const who = colById(S.roles.assignee);
+  if (!who) return;
+  let me = knowsMe() ? S.me : null;
+  if (!me) me = await chooseMe(null, t('Whose tasks?'), t('Plan Studio remembers this in this browser, so Mine shows your tasks and the timer is yours.'));
+  if (!me) return;
+  const token = me.slice(2);
+  const on = mineState()?.on;
+  patchFind((f) => { if (on) delete f.sel[who.id]; else f.sel[who.id] = [token]; });
+}
 function drawFilterBar(level = 'full') {
   const f = cleanFind(S.view.find);
   const cols = findColumns();
   filterBar.update({
     visible: level === 'full' && S.ready && FIND_MODES.includes(S.mode) && S.rows.length > 0,
-    q: f.q, active: S.find.active, shown: S.find.shown, total: S.find.total,
+    q: f.q, active: S.find.active, shown: S.find.shown, total: S.find.total, mine: mineState(),
     chips: cols.map(({ col, role, extra }) => ({ id: col.id, label: col.label, role, extra, selectedValues: f.sel[col.id] || [], selected: (f.sel[col.id] || []).map((v) => valueText(col, v)) })),
     addable: S.columns.filter((c) => FIND_KINDS.includes(c.kind) && c.id !== S.roles.title && c.refTable !== S.tableId && !cols.some((x) => x.col.id === c.id)).map((c) => ({ id: c.id, label: c.label })),
     note: S.mode === 'workload' ? t('Loads count only these tasks, so Level is off.') : null,
@@ -2498,7 +2520,7 @@ function openQuick(id, note = null) {
   const labels = { ...S.labels };
   for (const role of ['parent', 'dependsOn']) if (S.roles[role]) labels[S.roles[role]] = names;
   openQuickEdit(shell, {
-    row, roles: S.roles, columns: S.columns, labels, editable: canEdit(), canOpenCard: S.live, canCopy: canEdit(), note, booking: S.mode === 'booking',
+    row, roles: S.roles, columns: S.columns, labels, extra: quickCols(), editable: canEdit(), canOpenCard: S.live, canCopy: canEdit(), note, booking: S.mode === 'booking',
     calendar: calendarWords(id),
     plan: slipText(taskById(id) || {}),
     time: {
@@ -2720,7 +2742,7 @@ async function openColumns(tab) {
   if (S.live && !S.peopleTable) { const who = wlRowCol(); if (who?.refTable) S.peopleTable = await loadTable(who.refTable).catch(() => null); }
   mappingOpen = openMapping(shell, {
     tableId: S.tableId, columns: S.columns, roles: S.roles, source: S.source, gantt: S.gantt, canEdit: canEdit() || S.demo,
-    board: S.board, booking: S.booking, workload: S.workload, opensAs: S.opensAs, cardFields: fieldCols(null).map((c) => c.id),
+    board: S.board, booking: S.booking, workload: S.workload, opensAs: S.opensAs, cardFields: fieldCols(null).map((c) => c.id), quickFields: quickCols().map((c) => c.id),
     peopleColumns: S.peopleTable?.columns || [], capacityGuess: capacityCol()?.id || null,
     time: S.time, timeTables, timeFound: S.time.table ? null : S.timeTableId, canSetupTime: S.live && canEdit() && !hasTime(),
     canAddColumns: S.live && canEdit(),
@@ -2732,8 +2754,9 @@ async function openColumns(tab) {
     onAddColumn: (role) => addColumnFor(role),
     onSetupTime: () => setupTime(),
     onReminders: () => openRemindersPanel(),
-    onSave: async ({ roles, gantt, board, booking, workload, time, opensAs, language }) => {
+    onSave: async ({ roles, gantt, board, booking, workload, time, quick, opensAs, language }) => {
       setLanguage(language);
+      if (quick) S.quick = quick;
       S.roles = roles;
       S.gantt = gantt;
       S.board = board;
@@ -2749,7 +2772,7 @@ async function openColumns(tab) {
         S.holidayDays = await loadHolidayDays(gantt.holidayTable).catch(() => new Map());
         await loadBookingTables();
         if (canEdit()) {
-          const next = writeOptions(S.options, { storedRoles: toStored(roles, S.columns), gantt, board, booking, workload, time, view: opensAs });
+          const next = writeOptions(S.options, { storedRoles: toStored(roles, S.columns), gantt, board, booking, workload, time, quick: S.quick, view: opensAs });
           try { await setOptions(next); S.options = next; toast(t('Saved for this widget.')); }
           catch (e) { toast(t('Could not save: {msg}', { msg: errText(e) })); }
         }
@@ -2769,6 +2792,7 @@ async function loadDocState() {
   S.booking = opts.booking;
   S.workload = opts.workload;
   S.time = opts.time;
+  S.quick = opts.quick;
   S.savedViews = opts.views;
   S.me = storedMe(S.tableId);
   timeLookedFor = false;   // a table made or renamed since: look for the time table again

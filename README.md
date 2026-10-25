@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.13.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.14.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -243,6 +243,14 @@ to begin with; any Choice, Reference or yes/no column, and a Text column that is
 - **Print** (or Save as PNG) makes the one-page report. The columns chosen are kept in this browser and by a saved view.
   A task with several people counts under each of them, and the page says so.
 
+## More fields in the edit window
+
+The edit window shows the columns the widget uses (name, dates, status, who, progress ...). **Settings → More → Edit window**
+lets you add up to eight more columns of the table (a sponsor, a budget, notes, a yes/no, a date, a Reference) under **More
+fields**. Each is edited with the right control for its type, and only the cells you change are written, in the same step as
+the rest. The choice is kept in the document with the other settings, so everyone who edits sees the same fields. A column a
+role already uses is not offered twice, and a formula column is shown but locked.
+
 ## Delete and duplicate
 
 A task's edit window (double-click a bar, a card or a row, or select it and press Enter) has **Duplicate** and **Delete**,
@@ -265,6 +273,9 @@ for each of **who**, **status** and **project**, and **+ Filter** adds a chip fo
 column. A chip opens a list of its values, each with how many tasks it would show given the other filters, and a value none
 are left of stays in the list at 0.
 
+- **Mine** (first in the strip, in every view but the agenda, which has its own) keeps the tasks of the person this
+  browser says it is: asked once, the same answer the timer and the agenda use. It is the person chip, set for you, so
+  the counts, the saved views and **Clear filters** treat it like any other choice; a second click puts everyone back.
 - **In words**: the strip says “5 of 22 shown” with **Clear filters**; a filter that leaves nothing says so and offers the
   way back. A printout says it is filtered.
 - **Nothing is written.** The filters decide what a view draws and nothing else: they stay in this browser, per table, and

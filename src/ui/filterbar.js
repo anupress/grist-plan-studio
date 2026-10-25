@@ -18,9 +18,10 @@ const MANY = 8;   // a list longer than this gets a box to find a value in
  * @property {number}  shown
  * @property {number}  total
  * @property {string|null} note     a sentence about what the filter does to this view's numbers
+ * @property {{on: boolean} | null} mine   the switch for the person this browser says it is; null when the tasks have no people (M22)
  */
 /**
- * @param on {onQuery(q), onToggle(colId, value), onClearColumn(colId), onRemoveColumn(colId), onClear(), onAdd(colId),
+ * @param on {onQuery(q), onToggle(colId, value), onClearColumn(colId), onRemoveColumn(colId), onClear(), onAdd(colId), onMine(),
  *            choices(colId) -> {items: [{value, label, count}], more: number}}
  */
 export function createFilterBar(on) {
@@ -105,6 +106,12 @@ export function createFilterBar(on) {
     bar.setAttribute('aria-label', t('Filter the tasks'));
     if (document.activeElement !== input && input.value !== state.q) input.value = state.q;
     clear(chips);
+    if (state.mine) {
+      chips.appendChild(el('button', {
+        type: 'button', class: 'ps-chip ps-chip--toggle' + (state.mine.on ? ' is-on' : ''), 'aria-pressed': state.mine.on ? 'true' : 'false', dataset: { fk: 'mine' },
+        title: state.mine.on ? t('Showing only your tasks. Click to show everyone’s.') : t('Show only your tasks'), onclick: () => on.onMine?.(),
+      }, [el('span', { class: 'ps-chip__text', text: t('Mine') })]));
+    }
     for (const chip of state.chips) {
       const isOpen = openId === chip.id;
       const btn = el('button', {

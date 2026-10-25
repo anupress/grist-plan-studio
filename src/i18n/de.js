@@ -812,6 +812,13 @@ export const DE = {
   'Planned start': 'Geplanter Beginn',
   'Planned end': 'Geplantes Ende',
   'Plan under the bars': 'Plan unter den Balken',
+  // mine and more fields (1.14)
+  'Edit window': 'Bearbeiten-Fenster',
+  'Also show in the edit window': 'Im Bearbeiten-Fenster auch zeigen',
+  'More fields': 'Weitere Felder',
+  'Up to {n} more columns, edited in the same window as the mapped ones.': 'Bis zu {n} weitere Spalten, die im selben Fenster bearbeitet werden wie die zugeordneten.',
+  'Show only your tasks': 'Nur Ihre Aufgaben zeigen',
+  'Showing only your tasks. Click to show everyone’s.': 'Es werden nur Ihre Aufgaben gezeigt. Klicken, um die aller zu zeigen.',
   // getting around (1.13)
   'Width of the names': 'Breite der Namensspalte',
   'Drag to change the width of the names. Double-click to reset.': 'Ziehen, um die Breite der Namen zu ändern. Ein Doppelklick setzt sie zurück.',

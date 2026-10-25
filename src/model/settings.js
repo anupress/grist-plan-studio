@@ -46,6 +46,7 @@ export const TIME_DEFAULTS = Object.freeze({
   cols: null,               // {task, person, date, start, end, hours, note}: its columns, or null (found by name)
 });
 export const VIEWS = ['gantt', 'timeline', 'board', 'booking', 'workload', 'agenda', 'calendar', 'overview'];
+import { cleanQuick } from './quickfields.js';
 const REGION = /^(DE(-[A-Z]{2})?|AT|CH|FR|UK-EW|US)$/;
 
 /** Widget options as Grist returns them (or null) -> {roles (stored form or null), gantt}. */
@@ -82,11 +83,11 @@ export function readOptions(options) {
   if (typeof tm.table === 'string' && tm.table) time.table = tm.table;
   if (tm.cols && typeof tm.cols === 'object' && typeof tm.cols.task === 'string') time.cols = Object.fromEntries(['task', 'person', 'date', 'start', 'end', 'hours', 'note'].map((k) => [k, typeof tm.cols[k] === 'string' ? tm.cols[k] : null]));
   const view = VIEWS.includes(o.view) ? o.view : 'auto';
-  return { roles: o.roles && typeof o.roles === 'object' ? o.roles : null, gantt, board, booking, workload, time, view, views: cleanViews(o.views) };
+  return { roles: o.roles && typeof o.roles === 'object' ? o.roles : null, gantt, board, booking, workload, time, quick: cleanQuick(o.quick), view, views: cleanViews(o.views) };
 }
 
 /** What Save writes. Other keys already in the options (from a later version) are kept. */
-export function writeOptions(previous, { storedRoles, gantt, board, booking, workload, time, view, views }) {
+export function writeOptions(previous, { storedRoles, gantt, board, booking, workload, time, quick, view, views }) {
   const prev = previous && typeof previous === 'object' ? previous : {};
   const out = { ...prev, v: SETTINGS_VERSION };
   if (storedRoles !== undefined) out.roles = storedRoles;
@@ -95,6 +96,7 @@ export function writeOptions(previous, { storedRoles, gantt, board, booking, wor
   if (booking) out.booking = { ...booking };
   if (workload) out.workload = { ...workload };
   if (time) out.time = { ...time };
+  if (quick) out.quick = cleanQuick(quick);
   if (view !== undefined) out.view = view;
   if (views !== undefined) out.views = views.map((v) => ({ ...v, view: { ...v.view } }));
   return out;

@@ -30,7 +30,7 @@ export const usedBy = (role, mode) => viewsOfRole(role).includes(mode);
 
 // ---- which options belong to which view -----------------------------------------------------------------------
 /** Every group of options, in the order the "more" part lists them. */
-export const GROUP_ORDER = ['colours', 'dates', 'working', 'board', 'booking', 'workload', 'time', 'reminders', 'browser'];
+export const GROUP_ORDER = ['colours', 'dates', 'working', 'quick', 'board', 'booking', 'workload', 'time', 'reminders', 'browser'];
 /** The groups a view's own tab holds (the rest sit under "more"). */
 export const VIEW_GROUPS = {
   gantt: ['colours', 'dates', 'working'],

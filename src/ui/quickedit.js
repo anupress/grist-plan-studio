@@ -98,7 +98,7 @@ function calendarSection(c, on, close) {
 }
 
 /**
- * @param s  {row, roles, columns, labels, editable, canOpenCard, canCopy (Duplicate and Delete are offered), note, booking: true in the booking grid, time: see timeSection,
+ * @param s  {row, roles, columns, labels, extra: [column] (more fields to show, M22), editable, canOpenCard, canCopy (Duplicate and Delete are offered), note, booking: true in the booking grid, time: see timeSection,
  *            calendar: {words} | null, plan: how far the task has drifted from its plan, in words | null}
  * @param on {onSave({fields, patch}), onOpenCard(), onDuplicate(), onDelete(), onClose(), onStartTimer(), onStopTimer(), onLogTime(), onSetupTime(), onCalendar()}
  */
@@ -115,6 +115,20 @@ export function openQuickEdit(host, s, on) {
     inputs.push({ col, inp, locked });
     fieldRows.push(el('div', { class: 'ps-field' + (col.kind === 'Bool' ? ' ps-field--check' : '') }, [
       el('label', { for: id, text: t(label) }),
+      inp.node,
+      col.isFormula ? el('p', { class: 'ps-hint', text: t('A formula fills this column.') }) : null,
+    ]));
+  }
+
+  // more fields: the columns picked in Settings, after the mapped ones
+  const extraRows = [];
+  for (const col of s.extra || []) {
+    const id = 'ps-qe-x-' + col.id;
+    const locked = !s.editable || col.isFormula;
+    const inp = inputFor(col, s.row[col.id], s.labels[col.id], id, locked);
+    inputs.push({ col, inp, locked });
+    extraRows.push(el('div', { class: 'ps-field' + (col.kind === 'Bool' ? ' ps-field--check' : '') }, [
+      el('label', { for: id, text: col.label }),
       inp.node,
       col.isFormula ? el('p', { class: 'ps-hint', text: t('A formula fills this column.') }) : null,
     ]));
@@ -143,6 +157,8 @@ export function openQuickEdit(host, s, on) {
       s.note ? el('p', { class: 'ps-note', text: s.note }) : null,
       s.plan ? el('p', { class: 'ps-qe-plan', text: s.plan }) : null,
       ...fieldRows,
+      extraRows.length ? el('h3', { class: 'ps-qe-more', text: t('More fields') }) : null,
+      ...extraRows,
       el('button', { type: 'submit', hidden: true }),
     ]),
     timeSection(s.time, on, () => close()),

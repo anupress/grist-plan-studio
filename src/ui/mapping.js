@@ -18,6 +18,7 @@ import { HOLIDAY_REGIONS } from '../model/calendar.js';
 import { t, UI_LANGUAGES, storedLanguage } from '../i18n/index.js';
 import { usedBy, viewsOfRole, groupsFor, previewLines, mappedCount, queryWords, matchesQuery } from '../model/settingsmap.js';
 import { trapFocus } from './dialog.js';
+import { quickCandidates, MAX_QUICK } from '../model/quickfields.js';
 
 const ROLE_TEXT = {
   title: ['Name', 'What each task is called.'],
@@ -47,7 +48,7 @@ const COLOUR_KINDS = ['Choice', 'ChoiceList', 'Ref', 'RefList', 'Text', 'Bool'];
 const CORE = ['title', 'start', 'end'];           // what almost every plan needs
 const OTHER_DATES = ['due', 'duration'];          // other ways to give a task its date
 const VIEW_NAME = { gantt: 'Gantt chart', timeline: 'Timeline', board: 'Board', calendar: 'Calendar', booking: 'Booking grid', workload: 'Workload', agenda: 'Agenda', overview: 'Overview' };
-const GROUP_TITLE = { colours: 'Colours', dates: 'Reading dates', working: 'Working days', board: 'Board', booking: 'Booking grid', workload: 'Workload', time: 'Time tracking', reminders: 'Reminders', browser: 'This browser' };
+const GROUP_TITLE = { colours: 'Colours', dates: 'Reading dates', working: 'Working days', quick: 'Edit window', board: 'Board', booking: 'Booking grid', workload: 'Workload', time: 'Time tracking', reminders: 'Reminders', browser: 'This browser' };
 const TABS = [['columns', 'Columns'], ['view', 'This view'], ['more', 'More']];
 
 function sourceText(source) {
@@ -59,7 +60,7 @@ function sourceText(source) {
 
 /**
  * @param host     element the panel opens in
- * @param s        {tableId, columns, roles, source, gantt, board, booking, workload, opensAs, cardFields: [colId], canEdit, canAddColumns, datedTables,
+ * @param s        {tableId, columns, roles, source, gantt, board, booking, workload, opensAs, cardFields: [colId], quickFields: [colId], canEdit, canAddColumns, datedTables,
  *                  peopleColumns (of the table the people come from), capacityGuess (its capacity column found by name),
  *                  time, timeTables (tables that can hold time entries), timeFound (the one found by name), canSetupTime,
  *                  mode (the view on show), tab ('columns' | 'view' | 'more')}
@@ -75,6 +76,7 @@ export function openMapping(host, s, on) {
   let opensAs = s.opensAs || 'auto';
   let language = storedLanguage();
   let fieldsTouched = false;
+  let quickTouched = false;
   const mode = s.mode || 'gantt';
   const selects = new Map();
   const items = [];                                   // every field, for the search: {node, text}
@@ -176,10 +178,20 @@ export function openMapping(host, s, on) {
       field(w, F(t('Days off from a table'), selCols('ps-holtab', gantt.holidayTable || '', [['', t('none')], ...(s.datedTables || []).map((id) => [id, id])], (e) => { gantt.holidayTable = e.target.value || null; }),
         t('Each row with a date is a day off; a second date column makes it a run of days. A row that names a person is that person’s day off, in the workload.'), 'ps-holtab')),
     ],
+    quick: (w) => [
+      field(w, el('div', { class: 'ps-field' }, [
+        el('label', { id: 'ps-qf-l', text: t('Also show in the edit window') }),
+        el('div', { class: 'ps-checks ps-checks--tall', role: 'group', 'aria-labelledby': 'ps-qf-l', dataset: { for: 'quick' } }, quickCandidates(s.columns, roles, s.tableId).map((c) => {
+          const box = el('input', { type: 'checkbox', value: c.id, checked: (s.quickFields || []).includes(c.id), onchange: () => { quickTouched = true; } });
+          return el('label', { class: 'ps-check' }, [box, el('span', { text: c.label })]);
+        })),
+        el('p', { class: 'ps-hint', text: t('Up to {n} more columns, edited in the same window as the mapped ones.', { n: MAX_QUICK }) }),
+      ])),
+    ],
     board: (w) => [
       field(w, el('div', { class: 'ps-field' }, [
         el('label', { id: 'ps-cf-l', text: t('Cards also show') }),
-        el('div', { class: 'ps-checks ps-checks--tall', role: 'group', 'aria-labelledby': 'ps-cf-l' }, s.columns.filter((c) => FIELD_KINDS.includes(c.kind) && c.id !== roles.title).map((c) => {
+        el('div', { class: 'ps-checks ps-checks--tall', role: 'group', 'aria-labelledby': 'ps-cf-l', dataset: { for: 'board' } }, s.columns.filter((c) => FIELD_KINDS.includes(c.kind) && c.id !== roles.title).map((c) => {
           const box = el('input', { type: 'checkbox', value: c.id, checked: (s.cardFields || []).includes(c.id), onchange: () => { fieldsTouched = true; } });
           return el('label', { class: 'ps-check' }, [box, el('span', { text: c.label })]);
         })),
@@ -311,10 +323,11 @@ export function openMapping(host, s, on) {
       el('button', { type: 'button', class: 'ps-btn ps-btn--primary', text: s.canEdit ? t('Save') : t('Apply'), onclick: () => {
         const clean = Object.fromEntries(Object.entries(roles).filter(([, v]) => v));
         if (fieldsTouched) {
-          board.fields = [...panel.querySelectorAll('.ps-checks input[type=checkbox]:checked')].map((b) => s.columns.find((c) => c.id === b.value)).filter(Boolean).map((c) => ({ ref: c.ref, id: c.id }));
+          board.fields = [...panel.querySelectorAll('.ps-checks[data-for="board"] input[type=checkbox]:checked')].map((b) => s.columns.find((c) => c.id === b.value)).filter(Boolean).map((c) => ({ ref: c.ref, id: c.id }));
         }
+        const quick = quickTouched ? { fields: [...panel.querySelectorAll('.ps-checks[data-for="quick"] input[type=checkbox]:checked')].map((b) => s.columns.find((c) => c.id === b.value)).filter(Boolean).slice(0, MAX_QUICK).map((c) => ({ ref: c.ref, id: c.id })) } : null;
         close();
-        on.onSave({ roles: clean, gantt, board, booking, workload, time, opensAs, language });
+        on.onSave({ roles: clean, gantt, board, booking, workload, time, quick, opensAs, language });
       } }),
     ]),
   ]);

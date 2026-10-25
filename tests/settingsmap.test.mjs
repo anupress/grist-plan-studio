@@ -25,7 +25,7 @@ eq('a dependency column is for the Gantt chart and the workload', VIEWS.filter((
 
 // groups
 eq('the Gantt chart’s own tab: colours, how dates are read, working days', M.groupsFor('gantt').here, ['colours', 'dates', 'working']);
-eq('…the rest are under more, in order', M.groupsFor('gantt').more, ['board', 'booking', 'workload', 'time', 'reminders', 'browser']);
+eq('…the rest are under more, in order', M.groupsFor('gantt').more, ['quick', 'board', 'booking', 'workload', 'time', 'reminders', 'browser']);
 eq('the board’s tab has the board’s options and the colours', M.groupsFor('board').here, ['board', 'colours']);
 eq('a group is in one place only, for every view', VIEWS.every((v) => { const g = M.groupsFor(v); return g.here.every((x) => !g.more.includes(x)) && [...g.here, ...g.more].sort().join() === [...M.GROUP_ORDER].sort().join(); }), true);
 eq('every view has a tab of its own', VIEWS.every((v) => M.groupsFor(v).here.length > 0), true);
