@@ -89,7 +89,7 @@ export function createBooking(host, on = {}) {
     const y = new Date().getUTCFullYear();
     const sameYear = dateFromDay(s.start).getUTCFullYear() === y && dateFromDay(s.end).getUTCFullYear() === y;
     if (!sameYear) return rangeText(F, s);
-    return s.start === s.end ? F.dayMonth.format(dateFromDay(s.start)) : `${F.dayMonth.format(dateFromDay(s.start))} – ${F.dayMonth.format(dateFromDay(s.end))}`;
+    return s.start === s.end ? F.when.format(dateFromDay(s.start)) : `${F.when.format(dateFromDay(s.start))} – ${F.when.format(dateFromDay(s.end))}`;
   };
   const isToday = (p) => p.start != null && model.today >= p.start && model.today <= p.end;
 
@@ -360,7 +360,7 @@ export function createBooking(host, on = {}) {
     if (cursor && (cursor.ri >= next.resources.length || cursor.pi >= next.periods.length)) cursor = null;
     model = next;
     TH = next.trackH || TRACK_H;
-    F = formatters(next.locale);
+    F = formatters(next.locale, next.datePattern);
     corner.textContent = next.resourceLabel || '';
     root.classList.toggle('is-editable', !!next.editable);
     size();

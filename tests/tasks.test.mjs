@@ -88,5 +88,19 @@ eq('span', [V.isoFromDay(spanOf(r.tasks).from), V.isoFromDay(spanOf(r.tasks).to)
   eq('a changed end date changes it', a === c, false);
 }
 
+
+// ---- deadlines (M29): a due date apart from the end the plan has
+{
+  const dl = (extra) => buildTasks([{ id: 1, Task: 'x', Start: D('2026-11-02'), ...extra }], { roles, columns, labels }).tasks[0];
+  const late = dl({ End: D('2026-11-10'), Due: D('2026-11-06') });
+  eq('an end after the due date: a deadline, and the days after it', [late.deadline, late.overDeadline], [day('2026-11-06'), 4]);
+  const ok = dl({ End: D('2026-11-04'), Due: D('2026-11-06') });
+  eq('an end before the due date: a deadline, on time', [ok.deadline, ok.overDeadline], [day('2026-11-06'), 0]);
+  eq('a due date that is the end has nothing to mark', [dl({ End: D('2026-11-06'), Due: D('2026-11-06') }).deadline, dl({ End: D('2026-11-06'), Due: D('2026-11-06') }).overDeadline], [null, 0]);
+  eq('a due date that ends the bar is not a deadline', [dl({ Due: D('2026-11-06') }).deadline, dl({ Due: D('2026-11-06') }).endFrom], [null, 'due']);
+  eq('no due date, no deadline', dl({ End: D('2026-11-06') }).deadline, null);
+  eq('a deadline is part of what a redraw compares', dl({ End: D('2026-11-10'), Due: D('2026-11-06') }).hash !== dl({ End: D('2026-11-10'), Due: D('2026-11-07') }).hash, true);
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

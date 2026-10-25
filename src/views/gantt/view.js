@@ -28,7 +28,7 @@ import { formatters, rangeText, drawScale, drawShade } from './scale.js';
 import { createNavigation, clampNames } from './navigate.js';
 import { dateFromDay } from '../../model/values.js';
 import { drifted } from '../../model/plan.js';
-import { slipText, doneText } from '../../ui/planwords.js';
+import { slipText, doneText, deadlineText } from '../../ui/planwords.js';
 import { t } from '../../i18n/index.js';
 
 export const HEAD_H = 52;
@@ -113,8 +113,8 @@ export function createGantt(host, on = {}) {
 
   const labelFits = (title, w) => w >= Math.min(title.length, 60) * 7 + 16;
   const whenText = (s) => (s.start == null ? t('No dates')
-    : s.start === s.end ? F.dayMonth.format(dateFromDay(s.start))
-      : `${F.dayMonth.format(dateFromDay(s.start))} – ${F.dayMonth.format(dateFromDay(s.end))}`);
+    : s.start === s.end ? F.when.format(dateFromDay(s.start))
+      : `${F.when.format(dateFromDay(s.start))} – ${F.when.format(dateFromDay(s.end))}`);
 
   function caret(key, collapsed, label) {
     return el('button', {
@@ -126,6 +126,14 @@ export function createGantt(host, on = {}) {
   /** The planned days under a bar that has moved, and the ✓ on the day it was really done (M18). */
   function planElements(task, i, box) {
     const out = [];
+    // the deadline: a flag at the end of the day it falls on, red when the plan ends after it
+    if (task.deadline != null && model.showDeadline !== false) {
+      const db = barBox(frame, { kind: 'bar', start: task.deadline, end: task.deadline }, i, RH, BH);
+      out.push(el('div', {
+        class: 'ps-deadline' + (task.overDeadline ? ' is-over' : ''), dataset: { id: String(task.id), part: 'deadline' }, role: 'img', 'aria-label': deadlineText(task, (d) => F.when.format(dateFromDay(d))),
+        style: { left: db.x + db.w - 1 + 'px', top: i * RH + 'px', height: RH + 'px' },
+      }));
+    }
     if (model.showPlan && drifted(task)) {
       const pb = barBox(frame, { kind: 'bar', start: task.baseStart, end: task.baseEnd }, i, RH, BH);
       out.push(el('div', {
@@ -136,7 +144,7 @@ export function createGantt(host, on = {}) {
     if (task.doneOn != null) {
       const x = xOf(frame, task.doneOn) + frame.px / 2;
       const can = model.canDoneOn?.(task);
-      const words = doneText(task, (d) => F.dayMonth.format(dateFromDay(d)));
+      const words = doneText(task, (d) => F.when.format(dateFromDay(d)));
       out.push(el('div', {
         class: 'ps-done' + (can ? ' can-move' : ''), dataset: { id: String(task.id), part: 'done' }, role: 'img', 'aria-label': words,
         style: { left: x - 7 + 'px', top: i * RH + (RH - 14) / 2 + 'px' },
@@ -151,7 +159,7 @@ export function createGantt(host, on = {}) {
     const box = barBox(frame, { kind: e.summary ? 'bar' : task.kind, start: span.start, end: span.end }, i, RH, BH);
     const title = task.title || t('(no name)');
     const mode = model.labels || 'auto';
-    const label = [title, rangeText(F, span), slipText(task), task.blocked ? t('Blocked') : null].filter(Boolean).join(', ');
+    const label = [title, rangeText(F, span), slipText(task), deadlineText(task, (d) => F.when.format(dateFromDay(d))), task.blocked ? t('Blocked') : null].filter(Boolean).join(', ');
     const critical = model.showCritical && model.critical?.has(task.id);
     const link = model.linkable && !e.summary ? el('span', { class: 'ps-bar__link', dataset: { id: String(task.id), part: 'link' }, title: t('Drag onto another task: it starts after this one ends') }) : null;
     const out = [];
@@ -353,8 +361,10 @@ export function createGantt(host, on = {}) {
     const slip = model.showPlan ? slipText(task) : null;
     if (slip) lines.push(el('div', { class: 'ps-tip__note', text: slip }));
     if (task.baseStart != null && drifted(task)) lines.push(el('div', { class: 'ps-tip__note', text: t('Planned {range}', { range: rangeText(F, { start: task.baseStart, end: task.baseEnd }) }) }));
-    const finished = doneText(task, (d) => F.dayMonth.format(dateFromDay(d)));
+    const finished = doneText(task, (d) => F.when.format(dateFromDay(d)));
     if (finished) lines.push(el('div', { text: finished }));
+    const dl = deadlineText(task, (d) => F.when.format(dateFromDay(d)));
+    if (dl) lines.push(el('div', { class: task.overDeadline ? 'ps-tip__warn' : 'ps-tip__note', text: dl }));
     // hours logged against the plan, when time is tracked (M10)
     const timeText = model.timeText?.(task);
     if (timeText) lines.push(el('div', { text: timeText }));
@@ -380,7 +390,7 @@ export function createGantt(host, on = {}) {
     if (mode === 'done') {
       d.el.style.left = xOf(frame, d.day) + frame.px / 2 - 7 + 'px';
       tip.classList.add('ps-tip--drag');
-      clear(tip).append(el('strong', { text: t('Done on {date}', { date: F.dayMonth.format(dateFromDay(d.day)) }) }));
+      clear(tip).append(el('strong', { text: t('Done on {date}', { date: F.when.format(dateFromDay(d.day)) }) }));
       tip.hidden = false;
       return;
     }
@@ -669,7 +679,7 @@ export function createGantt(host, on = {}) {
     rows = next.entries;
     RH = next.rowH || ROW_H;
     BH = next.barH || BAR_H;
-    F = formatters(next.locale);
+    F = formatters(next.locale, next.datePattern);
     indexOf.clear();
     rows.forEach((e, i) => { if (e.kind === 'task') indexOf.set(e.task.id, i); });
     clear(corner).append(el('span', { class: 'ps-corner__title', text: next.titleLabel || t('Task') }), ...(next.listCols || []).map((c) => el('span', { class: 'ps-corner__cell', text: c.label, title: c.label })), nav.splitter);

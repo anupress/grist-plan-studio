@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.20.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.21.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -307,6 +307,9 @@ with no lag, as before. The demo has three such links.
   the selected tasks shows the same. Each is one action, one step in Undo.
 - **A bar dragged from the selection takes the others along**, by the same number of days: the preview shows them moving. The tasks
   that wait for them are offered a move too, once for all.
+- **On the board, a card of the selection dragged to a lane takes the others along**: each takes the lane's value (and the swimlane's),
+  and they land one after the other where the card is dropped, in the order the board draws them; the others dim while it moves, and
+  the lifted card says how many go with it. One Undo.
 - Selecting works in the Gantt chart, the timeline, the board, the calendar and the agenda. **Copy as text** and **Download as CSV** then
   take only the selected tasks.
 
@@ -335,6 +338,16 @@ with no lag, as before. The demo has three such links.
   first is told apart by the second. Empty values come last and the table's own order breaks the last tie, so sorting twice shuffles nothing.
 - **In the calendar, drag the edge of a bar** to change the day a task starts or ends, **drag across empty days** to add a task that
   runs over them, or press **Alt+Shift+← →** to end it a day earlier or later. One Undo each.
+
+## Dates like the table's, and deadlines
+
+- **Display › Dates** writes the days the way the table writes them: the format of the **Start** column in Grist (`DD/MM/YYYY`,
+  `MMM D, YYYY`, `dddd, D MMMM`…), with the month and weekday names in the interface's language. It applies to the lists, cards,
+  tooltips, labels and dialogs; headers (months, weeks) keep the language's own names. The choice is kept in this browser, and by saved
+  views. The format is read when the widget loads, so a changed column format shows after a reload.
+- **Deadline**: a task with an end of its own and a different **Due** date has a deadline. The Gantt chart marks it with a thin flag at the end
+  of that day, red when the plan ends after it; the tooltip and the screen-reader label say “Due 22 Oct, ends 1 day after it”, and a board
+  card says “Ends 1 day after its due date”. A due date that is the end itself, or the only date a task has, is not a deadline.
 
 ## Search and filters
 

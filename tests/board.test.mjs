@@ -214,5 +214,48 @@ const ctx = { laneCol: col('Status'), orderCol: col('Rank'), rows };
   eq('…none for the empty band', 'Owner' in B.newCardFields(lane, 'New', { laneCol: col('Status'), titleCol: col('Task'), swim: { col: col('Owner'), value: 0, none: true } }).fields, false);
 }
 
+
+// ---- several cards dropped together (M29)
+eq('ranks for two cards between 1 and 4: evenly spaced', B.ranksBetween(1, 4, 2), [2, 3]);
+eq('ranks for two cards between 1 and 2: thirds', B.ranksBetween(1, 2, 2).map((x) => Math.round(x * 1000) / 1000), [1.333, 1.667]);
+eq('Int ranks need whole numbers between: 1 and 5 hold two, 1 and 3 do not', [B.ranksBetween(1, 5, 2, 'Int'), B.ranksBetween(1, 3, 2, 'Int')], [[2, 3], null]);
+eq('ranks above the top, below the bottom, and in an empty lane', [B.ranksBetween(undefined, 3, 2, 'Int'), B.ranksBetween(3, undefined, 2), B.ranksBetween(undefined, undefined, 3)], [[1, 2], [4, 5], [1, 2, 3]]);
+eq('a neighbour with no rank: no room, number the lane again', B.ranksBetween(null, 3, 2), null);
+{
+  const b = board();
+  const m = B.planCardsMove(b, { id: 4, ids: [4, 5], toKey: 'v:Doing', index: 3 }, ctx);
+  eq('two cards from two lanes to the bottom of Doing: the status of each, ranks 4 and 5, in the order the board draws them', m.items, [
+    { id: 5, plan: { fields: { Status: 'Doing', Rank: 4 }, patch: { Status: 'Doing', Rank: 4 } } },
+    { id: 4, plan: { fields: { Status: 'Doing', Rank: 5 }, patch: { Status: 'Doing', Rank: 5 } } },
+  ]);
+  eq('…it says how many, and that the lane changed', [m.count, m.sameLane, m.ranked], [2, false, true]);
+  const up = B.planCardsMove(b, { id: 6, ids: [1, 6], toKey: 'v:Doing', index: 0 }, ctx);
+  eq('two cards of one lane to its top: ranks only, above Pick fonts', up.items, [
+    { id: 1, plan: { fields: { Rank: -1 }, patch: { Rank: -1 } } },
+    { id: 6, plan: { fields: { Rank: 0 }, patch: { Rank: 0 } } },
+  ]);
+  eq('…and they stay in the lane', up.sameLane, true);
+  const empty = B.planCardsMove(b, { id: 4, ids: [4, 1], toKey: 'v:To do', index: 0 }, ctx);
+  eq('into an empty lane: ranks 1 and 2', empty.items.map((x) => [x.id, x.plan.fields.Status, x.plan.fields.Rank]), [[1, 'To do', 1], [4, 'To do', 2]]);
+  const one = B.planCardsMove(b, { id: 6, ids: [6], toKey: 'v:Doing', index: 1 }, ctx);
+  eq('one card is the single move', one.items, B.planCardMove(b, { id: 6, toKey: 'v:Doing', index: 1 }, ctx).items);
+  const mid = B.planCardsMove(b, { id: 4, ids: [4, 6], toKey: 'v:Doing', index: 1 }, ctx);
+  eq('between two cards, one of them selected: the index counts the cards that stay (6 leaves, so they land after Pick fonts)', mid.items.map((x) => [x.id, Math.round(x.plan.fields.Rank * 1000) / 1000]), [[6, 1.333], [4, 1.667]]);
+}
+{
+  const bp = board({ orderCol: col('Pos') });
+  const m = B.planCardsMove(bp, { id: 4, ids: [4, 5], toKey: 'v:Doing', index: 1 }, { ...ctx, orderCol: col('Pos') });
+  eq('Int ranks with no room between 1 and 2: the lane is numbered again, only the ranks that change are written', m.items, [
+    { id: 5, plan: { fields: { Status: 'Doing', Pos: 2 }, patch: { Status: 'Doing', Pos: 2 } } },
+    { id: 4, plan: { fields: { Status: 'Doing' }, patch: { Status: 'Doing' } } },
+    { id: 2, plan: { fields: { Pos: 4 }, patch: { Pos: 4 } } },
+  ]);
+  const none = board({ orderCol: null });
+  const n = B.planCardsMove(none, { id: 4, ids: [4, 5], toKey: 'v:Doing', index: 1 }, { ...ctx, orderCol: null });
+  eq('without an order column only the lanes are written', [n.items.map((x) => [x.id, x.plan.fields]), n.ranked], [[[5, { Status: 'Doing' }], [4, { Status: 'Doing' }]], false]);
+  eq('…and a drop inside the same lane is told it has no order to change', B.planCardsMove(none, { id: 1, ids: [1, 2], toKey: 'v:Doing', index: 0 }, { ...ctx, orderCol: null }).error, 'noOrder');
+  const fx = columnsFromFixture([{ id: 'Status', type: 'Choice', choices: ['To do', 'Doing'], isFormula: true }])[0];
+  eq('a lane column that is a formula cannot take cards', B.planCardsMove(board(), { id: 4, ids: [4, 5], toKey: 'v:Doing', index: 0 }, { ...ctx, laneCol: fx }).error, 'laneFormula');
+}
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

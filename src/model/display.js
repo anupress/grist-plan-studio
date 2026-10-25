@@ -24,6 +24,7 @@ export const DISPLAY_DEFAULTS = Object.freeze({
   weekNumbers: true, weekends: true, today: true,
   plan: true,               // the planned days under a bar that has moved (M18), when the table has a plan
   cols: [],                 // column ids shown beside the names in the Gantt chart's list
+  dates: null,              // null (written the way the interface's language writes them) | 'table' (the Start column's own format) (M29)
   listW: null,              // the Gantt chart's name column, in px, or null (it takes about a third of the widget) (M21)
   laneW: null,              // the timeline's lane names, in px, or null
 });
@@ -43,6 +44,7 @@ export function cleanDisplay(v) {
   if (LABEL_MODES.includes(v.labels)) d.labels = v.labels;
   for (const k of ['weekNumbers', 'weekends', 'today', 'plan']) if (typeof v[k] === 'boolean') d[k] = v[k];
   for (const k of ['listW', 'laneW']) if (Number.isFinite(v[k]) && v[k] >= 140 && v[k] <= 720) d[k] = Math.round(v[k]);
+  if (v.dates === 'table') d.dates = 'table';
   if (Array.isArray(v.cols)) d.cols = [...new Set(v.cols.filter(id))].slice(0, MAX_LIST_COLS);
   return d;
 }

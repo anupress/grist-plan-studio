@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.21.0
+
+Dates the way the table writes them, deadlines, and several cards dragged together. Tested in Grist 1.7.20 (every write read back from the table, every one undone with Grist's Undo).
+
+- **Display › Dates**: write the days in the Start column's own format (`DD/MM/YYYY`…) instead of the language's short date, in lists,
+  cards, tooltips, labels and dialogs. Kept in this browser and by saved views.
+- **Deadline**: a Due date apart from the End is marked in the Gantt chart (a thin flag, red when the plan ends after it) and said in
+  words in the tooltip, the label and on the board's card.
+- **Board**: drag one of several selected cards and they all go to the lane, one after the other (one Undo).
+- A checklist in the demo, lane counts and avatars big enough to hit, the blocked stripe visible in dark mode and on a plain plate behind
+  calendar names, the Gantt chart's names no longer cut to a letter on a phone.
+- German and French for every new word.
+
 ## 1.20.0
 
 Close the gaps, blocked tasks, checklists, sorting by several things, and more in the calendar. Tested in Grist 1.7.20 (every write read

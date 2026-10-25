@@ -2,6 +2,7 @@
 // gesture writes is decided in model/board.js and main.js.
 //
 //   drag a card              to another lane (writes the lane column) or up and down (writes the rank)
+//   drag one of several selected cards: they all go, one after the other
 //   swimlanes                rows of lanes, one band for each value of a second column; a drop into another band writes that column too
 //   fold a lane              the lane shrinks to a strip with its count; it still takes drops, at the end
 //   click / arrow keys       select (Grist's cursor follows)
@@ -23,7 +24,7 @@ const SEP = '\u0001';
 const AT_END = 1e9;   // a drop on a folded lane has no place among cards that are not drawn: it goes last
 
 /**
- * @param on {onSelect(id), onOpen(id), onQuickEdit(id), onMove({id, toKey, swimKey?, index}), onAdd({laneKey, swimKey?, title}),
+ * @param on {onSelect(id), onOpen(id), onQuickEdit(id), onMove({id, ids?, toKey, swimKey?, index}), onAdd({laneKey, swimKey?, title}),
  *            onLimit(laneKey), onFold(laneKey), onUndo(), onRedo()}
  */
 export function createBoard(host, on) {
@@ -31,6 +32,7 @@ export function createBoard(host, on) {
   //         editable, laneLocked, swimLocked, canAdd, canLimit, selectedId, laneLabel, fmtDay(d), fmtRange(a, b), today, fmtHours(h)}
   let model = null;
   let pending = null;                // a model that arrived mid-drag, drawn when the drag ends
+  let mates = [];                    // the other selected cards that go with the one being dragged
   let dragging = false;
   let sortables = [];
   let adding = null;                 // {laneKey, swimKey, value}: the open "Add card" box survives a redraw
@@ -122,6 +124,7 @@ export function createBoard(host, on) {
       timeLine(card),
       subLine(card),
       checkLine(card),
+      card.overDeadline ? el('p', { class: 'ps-card__blocked', text: tn(card.overDeadline, 'Ends {n} day after its due date', 'Ends {n} days after its due date') }) : null,
       card.blocked ? el('p', { class: 'ps-card__blocked', text: t('Blocked') }) : null,
       (() => {
         const when = whenText(card);
@@ -323,10 +326,22 @@ export function createBoard(host, on) {
         chosenClass: 'is-chosen',
         dragClass: 'is-dragged',
         fallbackClass: 'is-lifted',
-        onStart: () => { dragging = true; root.classList.add('is-dragging'); },
+        onStart: (evt) => {
+          dragging = true;
+          root.classList.add('is-dragging');
+          // a card of the selection takes the rest of it along: the others dim where they are, and the lifted card says how many
+          const id = Number(evt.item.dataset.id);
+          mates = model.multi && model.multi.size > 1 && model.multi.has(id) ? [...model.multi].filter((x) => x !== id) : [];
+          for (const m of mates) nodes.get(m)?.classList.add('is-mate');
+          const lifted = document.querySelector('.is-lifted');
+          if (lifted && mates.length) lifted.dataset.more = '+' + mates.length;
+        },
         onEnd: (evt) => {
           dragging = false;
           root.classList.remove('is-dragging');
+          for (const m of mates) nodes.get(m)?.classList.remove('is-mate');
+          const together = mates.length ? [Number(evt.item.dataset.id), ...mates] : null;
+          mates = [];
           const id = Number(evt.item.dataset.id);
           const toKey = evt.to.dataset.lane;
           const swimKey = evt.to.dataset.swim;   // undefined without swimlanes
@@ -337,7 +352,7 @@ export function createBoard(host, on) {
           pending = null;
           model = next;
           draw();
-          if (moved) on.onMove?.({ id, toKey, ...(swimKey != null ? { swimKey } : {}), index });
+          if (moved) on.onMove?.({ id, ...(together ? { ids: together } : {}), toKey, ...(swimKey != null ? { swimKey } : {}), index });
         },
       }));
     }

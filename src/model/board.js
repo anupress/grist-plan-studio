@@ -91,10 +91,11 @@ export function buildBoard(tasks, rows, ctx) {
       swim: swimCol ? laneKeyOf(row[swimCol.id], swimCol) : null,
       blocked: !!task.blocked,
       checks: task.checks || null,
+      overDeadline: task.overDeadline || 0,
       sub: kids?.get(task.id) || null,
     };
     card.hash = [card.title, card.lane, card.order, card.colour, card.people.join('|'), card.done, card.progress,
-      card.due, card.span, card.late, card.time ? `${Math.round(card.time.logged * 100)}/${card.time.planned ?? ''}` : '', card.swim, card.blocked, card.checks ? `${card.checks.done}/${card.checks.total}` : '', card.sub ? `${card.sub.done}/${card.sub.total}` : '', ...card.fields.map((f) => f.text)].join('\u0001');
+      card.due, card.span, card.late, card.time ? `${Math.round(card.time.logged * 100)}/${card.time.planned ?? ''}` : '', card.swim, card.blocked, card.overDeadline, card.checks ? `${card.checks.done}/${card.checks.total}` : '', card.sub ? `${card.sub.done}/${card.sub.total}` : '', ...card.fields.map((f) => f.text)].join('\u0001');
     lane.cards.push(card);
     byId.set(card.id, card);
   }
@@ -236,6 +237,88 @@ export function planCardMove(board, move, ctx) {
     if (Object.keys(f).length) items.push({ id: c.id, plan: { fields: f, patch: p } });
   });
   return { items, sameLane, swimChanged, ranked: true };
+}
+
+/**
+ * Ranks for `k` cards that land together between `above` and `below` (numbers, or undefined at a lane's edge), in that order.
+ * Null when there is no room and the lane has to be numbered again.
+ */
+export function ranksBetween(above, below, k, kind = 'Numeric') {
+  const has = (x) => typeof x === 'number' && isFinite(x);
+  if (above === null || below === null) return null;
+  const upTo = (n) => Array.from({ length: k }, (_, i) => n(i + 1));
+  if (!has(above) && !has(below)) return upTo((i) => i);
+  if (!has(above)) return upTo((i) => (kind === 'Int' ? Math.ceil(below) : below) - (k - i + 1));
+  if (!has(below)) return upTo((i) => (kind === 'Int' ? Math.floor(above) : above) + i);
+  if (kind === 'Int') return below - above > k ? upTo((i) => above + i) : null;
+  const step = (below - above) / (k + 1);
+  return step > 1e-9 * Math.max(1, Math.abs(above)) ? upTo((i) => above + step * i) : null;
+}
+
+/**
+ * The writes for several cards dropped together at `index` in the lane with key `toKey`: each takes the lane's value (and the band's),
+ * and they land one after the other, in the order they are drawn.
+ * @param move  {id (the card that was dragged), ids (all the cards that go), toKey, swimKey?, index}  index counts the cards of the
+ *              target lane (of the band) without the dragged one, as the drop reports it
+ * @returns {{items, sameLane, ranked, count}| {error}}
+ */
+export function planCardsMove(board, move, ctx) {
+  const { laneCol, orderCol = null, rows, swimCol = null } = ctx;
+  const lane = board.lanes.find((l) => l.key === move.toKey);
+  const wanted = new Set(move.ids || [move.id]);
+  // the cards that go, in the order the board draws them (lane by lane)
+  const cards = board.lanes.flatMap((l) => l.cards).filter((c) => wanted.has(c.id));
+  if (!lane || !cards.length) return { error: 'gone' };
+  if (cards.length === 1) return planCardMove(board, { id: cards[0].id, toKey: move.toKey, swimKey: move.swimKey, index: move.index }, ctx);
+  const toSwim = swimCol ? (move.swimKey ?? cards.find((c) => c.id === move.id)?.swim ?? cards[0].swim) : null;
+  const rowOf = new Map(rows.map((r) => [r.id, r]));
+  const band = swimCol ? board.swims.find((s) => s.key === toSwim) : null;
+  if (swimCol && !band) return { error: 'gone' };
+  const fieldsOf = (card) => {
+    const fields = {}, patch = {};
+    if (card.lane !== lane.key) {
+      if (laneCol.isFormula) return { error: 'laneFormula' };
+      const [v, cell] = encodeInput(laneCol, lane.value, rowOf.get(card.id)?.[laneCol.id]);
+      fields[laneCol.id] = v; patch[laneCol.id] = cell;
+    }
+    if (swimCol && card.swim !== toSwim) {
+      if (swimCol.isFormula) return { error: 'swimFormula' };
+      const [v, cell] = encodeInput(swimCol, band.value, rowOf.get(card.id)?.[swimCol.id]);
+      fields[swimCol.id] = v; patch[swimCol.id] = cell;
+    }
+    return { fields, patch };
+  };
+  const moves = [];
+  for (const card of cards) {
+    const f = fieldsOf(card);
+    if (f.error) return f;
+    moves.push({ card, ...f });
+  }
+  const sameLane = moves.every((m) => !Object.keys(m.fields).length);
+  const canRank = orderCol && !orderCol.isFormula && !board.sorted;
+  if (!canRank) {
+    if (sameLane) return { error: board.sorted ? 'sorted' : orderCol ? 'orderFormula' : 'noOrder' };
+    return { items: moves.filter((m) => Object.keys(m.fields).length).map((m) => ({ id: m.card.id, plan: { fields: m.fields, patch: m.patch } })), sameLane, ranked: false, count: cards.length };
+  }
+  // where they land among the cards that stay: the drop's index counts the cards of the lane without the dragged one
+  const inBand = (c) => !swimCol || c.swim === toSwim;
+  const others = lane.cards.filter((c) => !wanted.has(c.id) && inBand(c));
+  const before = lane.cards.filter((c) => c.id !== move.id && inBand(c)).slice(0, Math.max(0, move.index));
+  const at0 = Math.min(others.length, before.filter((c) => !wanted.has(c.id)).length);
+  const at = (i) => (i < 0 || i >= others.length ? undefined : others[i].order);
+  const kind = orderCol.kind === 'Int' ? 'Int' : 'Numeric';
+  const ranks = ranksBetween(at(at0 - 1), at(at0), moves.length, kind);
+  const items = [];
+  const put = (m, rank) => {
+    const fields = { ...m.fields }, patch = { ...m.patch };
+    if (rank !== m.card.order) { fields[orderCol.id] = rank; patch[orderCol.id] = rank; }
+    if (Object.keys(fields).length) items.push({ id: m.card.id, plan: { fields, patch } });
+  };
+  if (ranks) { moves.forEach((m, i) => put(m, ranks[i])); return { items, sameLane, ranked: true, count: cards.length }; }
+  // no room: number the lane 1, 2, 3 ... in its new order, writing only the ranks that change
+  const next = [...others.slice(0, at0).map((c) => ({ card: c, fields: {}, patch: {} })), ...moves, ...others.slice(at0).map((c) => ({ card: c, fields: {}, patch: {} }))];
+  next.forEach((m, i) => put(m, i + 1));
+  return { items, sameLane, ranked: true, count: cards.length };
 }
 
 /** The fields of a card added at the bottom of a lane: its name, the lane's value, the next rank, the link value. */

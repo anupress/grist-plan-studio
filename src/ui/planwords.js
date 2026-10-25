@@ -34,6 +34,13 @@ export function doneText(task, fmt) {
   return when + ', ' + (d > 0 ? tn(d, '{n} day after its end', '{n} days after its end') : tn(-d, '{n} day before its end', '{n} days before its end'));
 }
 
+/** "Due 12 Nov, ends 3 days after it": the deadline of a task that has one, and how late its plan ends (the words say what the marker shows). */
+export function deadlineText(task, fmt) {
+  if (task.deadline == null) return null;
+  const due = t('Due {date}', { date: fmt(task.deadline) });
+  return task.overDeadline ? due + ', ' + tn(task.overDeadline, 'ends {n} day after it', 'ends {n} days after it') : due;
+}
+
 /** What a link says, in a sentence: "“B” starts 2 days after “A” ends." `link` is {type, lag}; a and b are the names of the tasks. */
 export function linkText(link, a, b) {
   const lag = Number.isFinite(link.lag) ? Math.round(link.lag) : 0;

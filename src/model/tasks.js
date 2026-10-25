@@ -178,6 +178,10 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
       unscheduled.push(t);
       continue;
     }
+    // a deadline: the due date of a task that has an end of its own; one that falls on the end has nothing to mark
+    t.deadline = due != null && t.endFrom === 'end' && due !== t.end ? due : null;
+    // how many days the plan ends after it (0 when on time)
+    t.overDeadline = t.deadline != null && t.end > t.deadline ? t.end - t.deadline : 0;
     if (planStart != null || planEnd != null) {
       const len = t.end - t.start;
       t.baseStart = planStart ?? planEnd - len;
@@ -185,7 +189,7 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
     }
     // What a redraw compares: the drawn facts of this task, nothing else.
     t.hash = [t.title, t.start, t.end, t.kind, t.flag, t.status, t.project, t.colour, t.progress, t.people.join('|'),
-      t.parentId, t.deps.join(','), t.lag, t.linkType, t.blocked, t.checks ? t.checks.done + '/' + t.checks.total : '', t.group, t.group2, t.baseStart, t.baseEnd, t.doneOn].join('\u0001');
+      t.parentId, t.deps.join(','), t.lag, t.linkType, t.blocked, t.checks ? t.checks.done + '/' + t.checks.total : '', t.deadline, t.group, t.group2, t.baseStart, t.baseEnd, t.doneOn].join('\u0001');
     tasks.push(t);
   }
   return { tasks, unscheduled, flagged };

@@ -9,14 +9,14 @@ import { kindOf } from '../model/schema.js';
 export const SAMPLE_TABLE = 'Tasks';
 
 const col = (ref, id, type, extra = {}) => ({
-  ref, id, label: id.replace(/_/g, ' '), type, kind: kindOf(type),
+  ref, id, label: id.replace(/_/g, ' '), type, kind: kindOf(type), dateFormat: extra.dateFormat || null,
   isFormula: false, refTable: (/^Ref(?:List)?:(.+)$/.exec(type) || [])[1] || null, visibleColId: extra.visibleColId || null,
   choices: extra.choices || [], choiceOptions: extra.choiceOptions || {},
 });
 
 export const SAMPLE_COLUMNS = [
   col(1, 'Task', 'Text'),
-  col(2, 'Start', 'Date'),
+  col(2, 'Start', 'Date', { dateFormat: 'DD MMM YYYY' }),
   col(3, 'End', 'Date'),
   col(4, 'Due', 'Date'),
   col(5, 'Status', 'Choice', {
@@ -100,6 +100,8 @@ export function sampleRows(today = todayDay()) {
   // with the copywriting it follows, the accessibility review waits two days after the build.
   const LINKS = { 14: ['Start to start', 21], 15: ['Finish to finish', 0], 16: ['Finish to start', 2] };
 
+  // Deadlines apart from the plan's end: Visual design ends a day after its, Front-end build two days before its, Testing has a day to spare.
+  const DEADLINE = { 9: 24, 13: 41, 18: 47 };
   // Checklists, one item to a line: the cards say how many are ticked.
   const CHECKS = {
     9: ['x Home page', 'x Product page', '  Checkout', '  Mobile layouts'],
@@ -110,7 +112,7 @@ export function sampleRows(today = todayDay()) {
   const checklist = (id) => (CHECKS[id] || []).map((l) => `[${l[0]}] ${l.slice(2)}`).join('\n');
 
   return Object.entries(T).map(([id, [task, s, e, due, status, owner, progress, ms, project, phase, deps, hours]]) => ({
-    id: Number(id), Task: task, Start: s == null ? null : d(s), End: e == null ? null : d(e), Due: due == null ? null : d(due),
+    id: Number(id), Task: task, Start: s == null ? null : d(s), End: e == null ? null : d(e), Due: due == null ? (DEADLINE[id] != null ? d(DEADLINE[id]) : null) : d(due),
     Status: status, Owner: R('People', owner), Progress: progress, Milestone: ms, Project: R('Projects', project),
     Depends_on: L(...deps), Phase: phase ? R('Tasks', phase) : null,
     // The board's order within a lane: a rank per row, in steps of ten so a drag lands between two.

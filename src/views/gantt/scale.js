@@ -5,10 +5,19 @@ import { el, clear } from '../../core/util.js';
 import { ticks, weekendDays, xOf, dayAt, ZOOMS } from './layout.js';
 import { dateFromDay } from '../../model/values.js';
 import { t } from '../../i18n/index.js';
+import { patternFormatter } from '../../model/dateformat.js';
 
-export function formatters(locale) {
+/**
+ * The formatters of a locale. `when`, `whenYear` and `whenFull` write a day in a tooltip, a label or a list: the language's way, or the
+ * table's own pattern ("DD/MM/YYYY") when one is given. The others are for headers and keep the names of months and weeks.
+ */
+export function formatters(locale, pattern = null) {
   const f = (o) => new Intl.DateTimeFormat(locale, { timeZone: 'UTC', ...o });
+  const mine = pattern ? patternFormatter(pattern, locale) : null;
   return {
+    when: mine || f({ day: 'numeric', month: 'short' }),
+    whenYear: mine || f({ day: 'numeric', month: 'short', year: 'numeric' }),
+    whenFull: mine || f({ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }),
     monthYear: f({ month: 'long', year: 'numeric' }),
     monthYearShort: f({ month: 'short', year: 'numeric' }),
     month: f({ month: 'long' }),
@@ -22,10 +31,10 @@ export function formatters(locale) {
 
 /** "2 Nov – 6 Nov 2026", "Fri, 20 Nov 2026" */
 export function rangeText(F, span) {
-  if (span.start === span.end) return F.full.format(dateFromDay(span.start));
+  if (span.start === span.end) return F.whenFull.format(dateFromDay(span.start));
   const a = dateFromDay(span.start), b = dateFromDay(span.end);
   const sameYear = a.getUTCFullYear() === b.getUTCFullYear();
-  return `${(sameYear ? F.dayMonth : F.dayMonthYear).format(a)} – ${F.dayMonthYear.format(b)}`;
+  return `${(sameYear ? F.when : F.whenYear).format(a)} – ${F.whenYear.format(b)}`;
 }
 
 /** show.weekNumbers off: a week is named by the day it starts, as most calendars do without numbers. */

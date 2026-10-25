@@ -55,6 +55,8 @@ export function tableColumns(tableId, metaTables, metaColumns) {
         choiceOptions: opts.choiceOptions && typeof opts.choiceOptions === 'object' ? opts.choiceOptions : {},
         // 'percent' for a number shown as a percentage (a capacity of 50 % is stored as 0.5)
         numMode: typeof opts.numMode === 'string' ? opts.numMode : null,
+        // how a Date column writes its days (moment-style, "DD/MM/YYYY"); null when it says nothing
+        dateFormat: kindOf(c.type) === 'Date' && typeof opts.dateFormat === 'string' && opts.dateFormat ? opts.dateFormat : null,
       };
     });
 }
@@ -66,7 +68,7 @@ export function tableColumns(tableId, metaTables, metaColumns) {
 export function columnsFromFixture(cols) {
   return cols.map((c, i) => ({
     ref: i + 1, id: c.id, label: c.label || c.id, type: c.type, kind: kindOf(c.type), isFormula: !!c.isFormula,
-    refTable: refTableOf(c.type), visibleColId: null, choices: c.choices || [], choiceOptions: {}, numMode: c.numMode || null,
+    refTable: refTableOf(c.type), visibleColId: null, choices: c.choices || [], choiceOptions: {}, numMode: c.numMode || null, dateFormat: c.dateFormat || null,
   }));
 }
 

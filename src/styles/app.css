@@ -756,6 +756,11 @@ button, input, select { font: inherit; color: inherit; }
 .ps-cal__chip.is-blocked .ps-cal__chip-text { padding: 0 4px; margin-left: -2px; border-radius: 3px; background: var(--ps-card); }
 .ps-card__blocked { margin: 6px 0 0; font-size: 12px; font-weight: 600; color: var(--ps-crit); }
 
+/* the deadline of a task (M29): a thin flag at the end of its due day, red when the plan ends after it */
+.ps-deadline { position: absolute; width: 2px; background: var(--ps-muted); opacity: 0.55; pointer-events: none; z-index: 2; }
+.ps-deadline::before { content: ""; position: absolute; top: 2px; left: 0; width: 7px; height: 7px; background: inherit; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.ps-deadline.is-over { background: var(--ps-crit); opacity: 1; }
+
 /* the checklist in the edit window (M28) */
 .ps-checklist { display: flex; flex-direction: column; gap: 4px; }
 .ps-checklist .ps-check { min-height: 28px; }

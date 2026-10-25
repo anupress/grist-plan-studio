@@ -23,6 +23,7 @@ export function helpFor(view) {
       about: t('A lane for each value of a column, such as Status, and a card for each task.'),
       can: [
         t('Drag a card to another lane to change its value, or up and down to put it in order.'),
+        t('Select several cards with Ctrl or Shift held, then drag one of them: they all go to the lane, one after the other.'),
         t('The number in a lane’s title counts its open cards; click it to set a limit.'),
         t('Add card, at the foot of a lane, adds a task there.'),
         t('Swimlanes split the lanes into rows, one for each value of another column such as the person: a card dropped in another row takes that value too.'),
@@ -83,6 +84,7 @@ export function helpFor(view) {
         t('Right-click a task for its menu: add a sub-task, indent it, mark it done, copy it to a later date or repeat it. [ and ] move it one level out or in.'),
         t('Click a task with Ctrl or Shift held to select several, or hold Shift and drag a box over the chart. A bar dragged from the selection takes the others along. The strip above the view marks them done, sets a column on all of them, moves their dates or deletes them.'),
         t('More, in the toolbar, adds several tasks from a list, copies the plan as text or a CSV file, folds everything and prints.'),
+        t('A due date apart from the end marks a deadline: a thin flag at the end of that day, red when the plan ends after it.'),
         t('Close the gaps, in More, moves every task that waits up to the first day its links allow, and shows you the moves first.'),
       ],
     };
@@ -107,6 +109,7 @@ export function tipFor(view) {
 const general = () => [
   t('Search and the chips under the toolbar leave tasks out of the view; they never change your table.'),
   t('Display sets how rows and bars look in this browser. Settings says which column means what.'),
+  t('Display, Dates, writes the days the way the table’s Start column writes them.'),
   t('Display can sort the rows or cards by up to three things: sort by, then by, and then by.'),
   t('A task can be marked Blocked, or hold a checklist with a box for each item. A blocked task is striped and says so in words; cards, bars and the agenda say how many items are ticked.'),
   t('Each change you make is one step in Grist’s Undo (Ctrl+Z).'),

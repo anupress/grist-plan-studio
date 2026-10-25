@@ -333,7 +333,7 @@ export function createTimeline(host, on = {}) {
     model = next;
     RH = next.rowH || ROW_H;
     BH = next.barH || BAR_H;
-    F = formatters(next.locale);
+    F = formatters(next.locale, next.datePattern);
     clear(corner).append(next.laneLabel || '', nav.splitter);
     root.classList.toggle('is-editable', !!next.editable);
     frame = makeFrame(next.span, next.today, next.zoom, next.weekStart);

@@ -16,7 +16,7 @@ const eq = (n, got, want) => { if (JSON.stringify(got) === JSON.stringify(want))
 eq('nothing stored is the default', D.cleanDisplay(null), { ...D.DISPLAY_DEFAULTS, cols: [] });
 eq('junk is the default', D.cleanDisplay('compact'), D.cleanDisplay(null));
 eq('a valid choice of each kind is kept', D.cleanDisplay({ density: 'compact', sort: 'col:Status', colourBy: 'Owner', labels: 'beside', weekNumbers: false, weekends: false, today: false, plan: true, cols: ['Status', 'Owner'], listW: null, laneW: null }),
-  { density: 'compact', sort: 'col:Status', sortThen: [], laneSort: null, colourBy: 'Owner', labels: 'beside', weekNumbers: false, weekends: false, today: false, plan: true, cols: ['Status', 'Owner'], listW: null, laneW: null });
+  { density: 'compact', sort: 'col:Status', sortThen: [], laneSort: null, colourBy: 'Owner', labels: 'beside', weekNumbers: false, weekends: false, today: false, plan: true, cols: ['Status', 'Owner'], dates: null, listW: null, laneW: null });
 eq('an unknown density, label mode or sort falls back', [D.cleanDisplay({ density: 'huge' }).density, D.cleanDisplay({ labels: 'inside' }).labels, D.cleanDisplay({ sort: 'random' }).sort, D.cleanDisplay({ sort: 'col:' }).sort], ['comfortable', 'auto', null, null]);
 eq('a toggle must be a yes or no', D.cleanDisplay({ weekends: 'no', today: 0 }), D.cleanDisplay(null));
 eq('list columns: strings only, once each, at most three', D.cleanDisplay({ cols: ['a', 'a', 7, 'b', 'c', 'd'] }).cols, ['a', 'b', 'c']);

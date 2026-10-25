@@ -37,7 +37,7 @@ import { slipText, slipShortText, linkText } from './ui/planwords.js';
 import { linkTypeOf, latestEnd as latestEndOfLink } from './model/links.js';
 import { linkBox } from './ui/linkbox.js';
 import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, storedMe, rememberMe, storedTab, rememberTab, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, TIME_DEFAULTS, VIEWS, snapshotView, withView, MAX_VIEWS } from './model/settings.js';
-import { buildBoard, planCardMove, newCardFields, cellText, LANE_KINDS, FIELD_KINDS } from './model/board.js';
+import { buildBoard, planCardMove, planCardsMove, newCardFields, cellText, LANE_KINDS, FIELD_KINDS } from './model/board.js';
 import { LANE_KINDS as TL_KINDS, planLaneChange, lanesOf } from './model/lanes.js';
 import { buildTimeline } from './model/timeline.js';
 import { buildBooking, calendarPeriods, tablePeriods, columnPeriods, bookingRange, suggestUnit, planBookingMove, newBookingFields, PERIOD_UNITS } from './model/booking.js';
@@ -67,6 +67,7 @@ import { renderToolbar } from './ui/toolbar.js';
 import { openMapping } from './ui/mapping.js';
 import { createFilterBar } from './ui/filterbar.js';
 import { openDisplay, SECTIONS as DISPLAY_SECTIONS } from './ui/display.js';
+import { tablePattern, patternFormatter } from './model/dateformat.js';
 import { cleanDisplay, isDefaultDisplay, heights, gridHeights, taskSorter, listColumns, MAX_LIST_COLS } from './model/display.js';
 import { applyFind, rowsKept, cleanFind, emptyFind, choicesOf, facetRows, FIND_KINDS, NONE } from './model/find.js';
 import { openQuickEdit } from './ui/quickedit.js';
@@ -346,7 +347,18 @@ const weekStart = () => (S.gantt.weekStart === 'auto' ? weekStartOf(dateLocale(g
 // Date formatters are costly to make (a board of 5,000 cards spent most of its time on them), so one
 // is made per locale and shape and kept.
 const formats = new Map();
+/** The pattern the Start column writes its days in (Grist's own, "DD/MM/YYYY"), or null with no such column. */
+const startPattern = () => { const c = S.roles.start ? S.columns.find((x) => x.id === S.roles.start) : null; return c ? tablePattern(c) : null; };
+/** The table's pattern when this browser chose it in Display, else null (the language's way). */
+const activePattern = () => (disp().dates === 'table' ? startPattern() : null);
 const dateFormat = (withYear) => {
+  // the table's way: one pattern for every day, with or without a year (a person who chose it wants the table's dates)
+  const pattern = activePattern();
+  if (pattern) {
+    const pk = dateLocale(gristCulture()) + '|p|' + pattern;
+    if (!formats.has(pk)) formats.set(pk, patternFormatter(pattern, dateLocale(gristCulture())));
+    return formats.get(pk);
+  }
   const key = dateLocale(gristCulture()) + (withYear ? '|y' : '');
   if (!formats.has(key)) formats.set(key, new Intl.DateTimeFormat(dateLocale(gristCulture()), { timeZone: 'UTC', day: 'numeric', month: 'short', ...(withYear ? { year: 'numeric' } : {}) }));
   return formats.get(key);
@@ -743,7 +755,7 @@ function displayState() {
   const colourable = S.columns.filter((c) => (c.kind === 'Choice' || c.kind === 'ChoiceList' || c.kind === 'Ref' || c.kind === 'RefList' || c.kind === 'Text' || c.kind === 'Bool') && c.id !== S.roles.title && c.refTable !== S.tableId).map((c) => ({ id: c.id, label: c.label }));
   // the dates are said by the bars and by the list already: sorting by start or end has its own entries, and the list shows both
   const dates = new Set([S.roles.start, S.roles.end, S.roles.due]);
-  return { mode: S.mode, display: d, sortOptions: cand.filter((c) => !dates.has(c.id)), colourOptions: colourable, colOptions: [...(S.mode === 'gantt' ? [{ id: '@wbs', label: t('No.') }] : []), ...(hasPlan() && S.mode === 'gantt' ? [{ id: '@slip', label: t('Against the plan') }] : []), ...cand.filter((c) => c.id !== S.roles.start && c.id !== S.roles.end && c.id !== S.roles.baselineStart && c.id !== S.roles.baselineEnd && c.id !== S.roles.doneOn)],
+  return { mode: S.mode, display: d, datePattern: startPattern(), sortOptions: cand.filter((c) => !dates.has(c.id)), colourOptions: colourable, colOptions: [...(S.mode === 'gantt' ? [{ id: '@wbs', label: t('No.') }] : []), ...(hasPlan() && S.mode === 'gantt' ? [{ id: '@slip', label: t('Against the plan') }] : []), ...cand.filter((c) => c.id !== S.roles.start && c.id !== S.roles.end && c.id !== S.roles.baselineStart && c.id !== S.roles.baselineEnd && c.id !== S.roles.doneOn)],
     hasPlan: hasPlan(), maxCols: MAX_LIST_COLS, isDefault: isDefaultDisplay(d) };
 }
 function setDisplay(next) {
@@ -966,7 +978,7 @@ function recompute() {
     linkTitle: (l) => linkText(l, names.get(l.from) || '', names.get(l.to) || ''),
     holidays: m.cal.holidays, length: m.cal.length, workdays: m.cal.workdays,
     caps: (task) => capabilities(task, c), linkable: canLink(c), editable, showCritical: S.view.critical,
-    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), selectedId: S.selectedId, multi: S.multi,
+    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), datePattern: activePattern(), selectedId: S.selectedId, multi: S.multi,
     titleLabel: titleCol ? titleCol.label : t('Task'),
     timeText: (task) => timeText(task),
     ...displayProps(true),
@@ -1067,7 +1079,7 @@ function recomputeTimeline() {
   v.update({
     lanes: tl.lanes, tracks: tl.tracks, span, holidays: cal.holidays, length: cal.length, workdays: cal.workdays,
     caps: (task) => capabilities(task, c), editable, laneMovable: editable && !lane.isFormula,
-    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), selectedId: S.selectedId, multi: S.multi,
+    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), datePattern: activePattern(), selectedId: S.selectedId, multi: S.multi,
     laneLabel: lane.label, noneLabel: t('No {col}', { col: lane.label }),
     ...displayProps(false),
   }, { first: S.firstDraw, fit: fitNow });
@@ -1144,7 +1156,7 @@ function recomputeBooking() {
   v.update({
     resources: g.resources, periods, free: g.free, unit, mode: periodCol ? 'column' : 'dates', today: todayDay(),
     editable: editable && !res.isFormula, canBook: editable && !res.isFormula && (periodCol ? !periodCol.isFormula : true),
-    selectedId: S.selectedId, resourceLabel: res.label, noneLabel: t('No {col}', { col: res.label }), locale: dateLocale(gristCulture()), labelOf,
+    selectedId: S.selectedId, resourceLabel: res.label, noneLabel: t('No {col}', { col: res.label }), locale: dateLocale(gristCulture()), datePattern: activePattern(), labelOf,
     trackH: gridHeights(disp()).trackH,
   }, { first: S.firstDraw, startAt: startPeriod(g, periods) });
   S.firstDraw = false;
@@ -1267,7 +1279,7 @@ function recomputeWorkload() {
   S.signature = sig;
   const team = teamTotals(wl.people.filter((p) => !p.none), periods, wl.from);
   v.update({
-    people, periods, unit, team, today, measure, gone, selectedId: S.selectedId, rowLabel: person.label, noneLabel: t('Not assigned'), locale: dateLocale(gristCulture()),
+    people, periods, unit, team, today, measure, gone, selectedId: S.selectedId, rowLabel: person.label, noneLabel: t('Not assigned'), locale: dateLocale(gristCulture()), datePattern: activePattern(),
     rowH: gridHeights(disp()).wlRowH,
     workdays: unit === 'day' ? periods.map((p) => cal.isWork(p.start)) : null,
     tasksAt: (ri, pi) => tasksIn(people[ri].src, periods[pi]),
@@ -1857,13 +1869,15 @@ function foldLane(laneKey) {
 }
 
 /** A card dropped at `index` in the lane `toKey` (of the band `swimKey`, with swimlanes), or moved there with Alt + arrows. */
-function moveCard({ id, toKey, swimKey, index }) {
+function moveCard({ id, ids, toKey, swimKey, index }) {
   const b = S.boardModel;
   const lane = laneCol();
   if (!b || !lane || !canEdit()) { S.signature = ''; recompute(); return; }
   const swim = swimCol();
   const was = b.byId.get(id);
-  const plan = planCardMove(b, { id, toKey, swimKey, index }, { laneCol: lane, orderCol: orderCol(), rows: S.rows, swimCol: swim });
+  const many = ids && ids.length > 1;
+  const planCtx = { laneCol: lane, orderCol: orderCol(), rows: S.rows, swimCol: swim };
+  const plan = many ? planCardsMove(b, { id, ids, toKey, swimKey, index }, planCtx) : planCardMove(b, { id, toKey, swimKey, index }, planCtx);
   if (plan.error) {
     S.signature = '';
     recompute();
@@ -1881,7 +1895,8 @@ function moveCard({ id, toKey, swimKey, index }) {
   const name = taskById(id)?.title || t('(no name)');
   const to = b.lanes.find((l) => l.key === toKey);
   const band = plan.swimChanged ? b.swims.find((s) => s.key === swimKey) : null;
-  const message = plan.sameLane ? t('Moved “{name}” within {lane}.', { name, lane: laneName(to) })
+  const message = many ? (plan.sameLane ? t('Moved {count} within {lane}.', { count: tn(plan.count, '{n} card', '{n} cards'), lane: laneName(to) }) : t('Moved {count} to {lane}.', { count: tn(plan.count, '{n} card', '{n} cards'), lane: laneName(to) }))
+    : plan.sameLane ? t('Moved “{name}” within {lane}.', { name, lane: laneName(to) })
     : band && was?.lane === toKey ? t('Moved “{name}” to {band}.', { name, band: bandName(band) })
     : band ? t('Moved “{name}” to {lane}, {band}.', { name, lane: laneName(to), band: bandName(band) })
     : t('Moved “{name}” to {lane}.', { name, lane: laneName(to) })

@@ -8,13 +8,13 @@ import { t } from '../i18n/index.js';
 
 /** The sections each view has. */
 export const SECTIONS = {
-  gantt: ['density', 'sort', 'colour', 'labels', 'show', 'cols'],
-  timeline: ['density', 'lanes', 'colour', 'labels', 'show'],
-  board: ['density', 'sort', 'colour'],
-  calendar: ['density', 'colour'],
-  booking: ['density'],
-  workload: ['density'],
-  agenda: ['density'],
+  gantt: ['density', 'sort', 'colour', 'labels', 'show', 'cols', 'dates'],
+  timeline: ['density', 'lanes', 'colour', 'labels', 'show', 'dates'],
+  board: ['density', 'sort', 'colour', 'dates'],
+  calendar: ['density', 'colour', 'dates'],
+  booking: ['density', 'dates'],
+  workload: ['density', 'dates'],
+  agenda: ['density', 'dates'],
 };
 
 /**
@@ -83,6 +83,8 @@ export function openDisplay(host, state, on) {
       body.push(then(0));
       if (d.sortThen[0]) body.push(then(1));
     }
+    // how a day is written: the language's way, or the way the table's Start column writes it (the example shows which)
+    if (sections.includes('dates') && s.datePattern) body.push(select(t('Dates'), 'dates', [{ id: 'table', label: t('As the table: {format}', { format: s.datePattern }) }], d.dates, t('As the language writes them')));
     if (sections.includes('lanes')) body.push(select(t('Sort lanes by'), 'laneSort', [
       { id: 'name', label: t('Name') }, { id: 'busiest', label: t('Most tasks first') }, { id: 'start', label: t('Earliest start first') },
     ], d.laneSort, t('The lanes’ own order')));

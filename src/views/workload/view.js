@@ -221,7 +221,7 @@ export function createWorkload(host, on = {}) {
       el('span', { class: 'ps-wl__tname' }, [
         task.title || t('(no name)'),
         // what remains of a task that should have ended sits on the first working day from today
-        late ? el('span', { class: 'ps-wl__late', text: t('Late: planned to end {date}', { date: F.dayMonth.format(dateFromDay(task.end)) }) }) : null,
+        late ? el('span', { class: 'ps-wl__late', text: t('Late: planned to end {date}', { date: F.when.format(dateFromDay(task.end)) }) }) : null,
       ]),
       el('span', { class: 'ps-wl__th', text: hours(h) + ' h' }),
     ]));
@@ -332,7 +332,7 @@ export function createWorkload(host, on = {}) {
     closePop(false);
     model = next;
     RH = next.rowH || ROW_H;
-    F = formatters(next.locale);
+    F = formatters(next.locale, next.datePattern);
     corner.textContent = next.rowLabel || '';
     size();
     if (first) scrollToPeriod(startAt ?? next.periods.findIndex(isToday));
