@@ -10,10 +10,10 @@ import { ANUPRESS_LOGO } from '../core/assets/brand-logo.js';
 import { VERSION } from '../version.js';
 
 const ZOOM_LABELS = { day: 'Days', week: 'Weeks', month: 'Months', quarter: 'Quarters', year: 'Years' };
-const VIEW_LABELS = { gantt: 'Gantt', timeline: 'Timeline', board: 'Board', booking: 'Bookings', workload: 'Workload' };
+const VIEW_LABELS = { gantt: 'Gantt', timeline: 'Timeline', board: 'Board', booking: 'Bookings', workload: 'Workload', agenda: 'Agenda' };
 const WL_UNIT_LABELS = { day: 'Days', week: 'Weeks', month: 'Months' };
 
-const seg = (label, items, current, onPick) => el('div', { class: 'ps-seg', role: 'group', 'aria-label': label }, items.map(([id, text]) => el('button', {
+const seg = (label, items, current, onPick, extra = '') => el('div', { class: 'ps-seg' + (extra ? ' ' + extra : ''), role: 'group', 'aria-label': label }, items.map(([id, text]) => el('button', {
   type: 'button', class: 'ps-seg__btn' + (id === current ? ' is-on' : ''), 'aria-pressed': id === current ? 'true' : 'false',
   text, onclick: () => { if (id !== current) onPick(id); },
 })));
@@ -33,9 +33,10 @@ const button = (text, title, onclick, cls = '') => el('button', { type: 'button'
  * @param {{level, mode, zoom, counts: {tasks, unscheduled, flagged, cards, bookings, clashes, outside, overloads, noHours, logged (text, Logged only)}, demo, editable,
  *          readOnlyWhy, canAdd, groupOptions, groupBy, hasLinks, critical, laneOptions, laneBy, tlLaneOptions, tlLaneBy,
  *          rowOptions, rowsBy, periodOptions, periodsBy, filterOptions, filterBy, wlRowOptions, wlRowsBy, wlUnit, wlMeasure (null without time entries), canLevel,
+ *          agendaWho ('mine' | 'all' | null without people), agendaDoable, canCalendar,
  *          timer: {title, since, elapsed} | null, hasTime, examples, example}} s
  * @param {{onMode, onZoom, onFit, onToday, onColumns, onNew, onUndated, onGroup, onCritical, onLanes, onTlLanes,
- *          onRows, onPeriods, onFilter, onClash, onWlRows, onWlUnit, onWlMeasure, onLevel, onOverload, onStopTimer, onTimesheet, onExample,
+ *          onRows, onPeriods, onFilter, onClash, onWlRows, onWlUnit, onWlMeasure, onAgendaWho, onCalendar, onReminders, onLevel, onOverload, onStopTimer, onTimesheet, onExample,
  *          onPrint, onKeys}} on
  */
 export function renderToolbar(host, s, on) {
@@ -43,7 +44,11 @@ export function renderToolbar(host, s, on) {
   const level = s.level || 'full';
   const c = s.counts;
   const counts = [];
-  if (view === 'board') counts.push(el('span', { text: tn(c.cards, '{n} card', '{n} cards') }));
+  if (view === 'agenda') {
+    // rows that can be finished are tasks; a table without Done, Status or Progress just has items
+    counts.push(el('span', { text: s.agendaDoable ? tn(c.open, '{n} open task', '{n} open tasks') : tn(c.open, '{n} item', '{n} items') }));
+    if (c.late) counts.push(el('span', { class: 'ps-warn', text: tn(c.late, '{n} late', '{n} late') }));
+  } else if (view === 'board') counts.push(el('span', { text: tn(c.cards, '{n} card', '{n} cards') }));
   else if (view === 'booking') {
     counts.push(el('span', { text: tn(c.bookings, '{n} booking', '{n} bookings') }));
     if (c.clashes) counts.push(el('button', { type: 'button', class: 'ps-link ps-warn', text: tn(c.clashes, '{n} double booked', '{n} double booked'), title: t('Show the first one'), onclick: on.onClash }));
@@ -96,6 +101,12 @@ export function renderToolbar(host, s, on) {
         // Weekend 1, 2, 3 have no dates, so there is no today to scroll to.
         s.periodsBy?.startsWith('col:') ? null : button(t('Today'), t('Scroll to today'), on.onToday),
       ];
+    } else if (view === 'agenda') {
+      tools = [
+        s.agendaWho ? seg(t('Show'), [['mine', t('Mine')], ['all', t('Everyone')]], s.agendaWho, on.onAgendaWho) : null,
+        s.canCalendar ? button(t('Add to calendar'), t('A calendar file with the dates below and a reminder'), on.onCalendar) : null,
+        button(t('Email reminders'), t('Email the tasks that are late or due soon, every morning'), on.onReminders, ' ps-hide-narrow'),
+      ];
     } else if (view === 'workload') {
       tools = [
         s.canLevel ? button(t('Level'), t('Move tasks later, inside their slack, until nobody is over capacity. You see the moves first.'), on.onLevel, ' ps-btn--primary') : null,
@@ -120,7 +131,10 @@ export function renderToolbar(host, s, on) {
         el('span', { text: modeText }),
       ]),
       s.demo && s.examples?.length ? picker(t('Example'), t('Example'), s.examples, s.example, on.onExample) : null,
-      level === 'bare' ? null : seg(t('View'), Object.entries(VIEW_LABELS).map(([id, label]) => [id, t(label)]), view, on.onMode),
+      // A strip of views on a wide screen, one menu on a phone (the stylesheet shows one of them)
+      level === 'bare' ? null : seg(t('View'), Object.entries(VIEW_LABELS).map(([id, label]) => [id, t(label)]), view, on.onMode, 'ps-seg--views'),
+      level === 'bare' ? null : el('select', { class: 'ps-input ps-viewpick', 'aria-label': t('View'), onchange: (e) => on.onMode(e.target.value) },
+        Object.entries(VIEW_LABELS).map(([id, label]) => el('option', { value: id, text: t(label), selected: id === view }))),
       level === 'full' ? el('span', { class: 'ps-counts' }, counts.flatMap((x, i) => (i ? [' · ', x] : [x]))) : null,
     ]),
     el('div', { class: 'ps-bar-right' }, [
@@ -133,9 +147,9 @@ export function renderToolbar(host, s, on) {
         el('button', { type: 'button', class: 'ps-timer__stop', text: t('Stop'), title: t('Stop the timer and log its time'), onclick: on.onStopTimer }),
       ]) : null,
       s.hasTime && level === 'full' ? button(t('Timesheet'), t('Hours logged this week, per task and day'), on.onTimesheet) : null,
-      level === 'full' ? button(t('Print'), t('Print or save as PDF (Ctrl+P)'), on.onPrint) : null,
-      level === 'bare' ? null : el('button', { type: 'button', class: 'ps-btn ps-btn--key', text: '?', title: t('Keyboard shortcuts (?)'), 'aria-label': t('Keyboard shortcuts'), onclick: on.onKeys }),
-      level === 'bare' ? null : button(t('Columns'), t('Which column is the start, the end, the status…'), on.onColumns),
+      level === 'full' && view !== 'agenda' ? button(t('Print'), t('Print or save as PDF (Ctrl+P)'), on.onPrint, ' ps-hide-narrow') : null,
+      level === 'bare' ? null : el('button', { type: 'button', class: 'ps-btn ps-btn--key ps-hide-narrow', text: '?', title: t('Keyboard shortcuts (?)'), 'aria-label': t('Keyboard shortcuts'), onclick: on.onKeys }),
+      level === 'bare' ? null : button(t('Columns'), t('Which column is the start, the end, the status…'), on.onColumns, ' ps-columns-btn'),
     ]),
   );
 }

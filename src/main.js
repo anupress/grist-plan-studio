@@ -8,7 +8,7 @@
 import { el, clear } from './core/util.js';
 import { VERSION } from './version.js';
 import {
-  start, accessLevel, selectedTableId, gristCulture, getOptions, setOptions, moveCursor, apply, linkingInfo,
+  start, accessLevel, selectedTableId, gristCulture, getOptions, setOptions, moveCursor, apply, linkingInfo, docAddress,
   openRecordCard, undo as gristUndo, redo as gristRedo,
 } from './grist/connect.js';
 import { loadColumns, loadForeignMapping, loadLabels, loadOwnSection, loadHolidayDays, loadDaysOff, listDatedTables, loadTable, listTables, columnRefs, forgetMeta, listTablesWithColumns, docTimeZone } from './data/live.js';
@@ -18,7 +18,7 @@ import { buildTasks, spanOf } from './model/tasks.js';
 import { arrange } from './model/tree.js';
 import { linksOf, isLate, pushPlan, criticalPath, wouldLoop } from './model/schedule.js';
 import { makeCalendar, holidaysBetween } from './model/calendar.js';
-import { todayDay, dateFromDay, plain, dayOf, num, isoFromDay, dayFromISO } from './model/values.js';
+import { todayDay, dateFromDay, plain, dayOf, num, isoFromDay, dayFromISO, progressScale } from './model/values.js';
 import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink } from './model/edits.js';
 import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, storedMe, rememberMe, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, TIME_DEFAULTS, VIEWS } from './model/settings.js';
 import { buildBoard, planCardMove, newCardFields, cellText, LANE_KINDS, FIELD_KINDS } from './model/board.js';
@@ -26,6 +26,9 @@ import { LANE_KINDS as TL_KINDS, planLaneChange, lanesOf } from './model/lanes.j
 import { buildTimeline } from './model/timeline.js';
 import { buildBooking, calendarPeriods, tablePeriods, columnPeriods, bookingRange, suggestUnit, planBookingMove, newBookingFields, PERIOD_UNITS } from './model/booking.js';
 import { buildWorkload, periodTotals, teamTotals, tasksIn, levelPlan, effortUnitOf, detectCapacity, capacityMode, capacityPerDay, WL_UNITS, WL_MEASURES } from './model/workload.js';
+import { buildAgenda } from './model/agenda.js';
+import { toIcs, fileName } from './model/ics.js';
+import { reminderScript, detectEmailColumn } from './model/reminders.js';
 import { detectTimeColumns, findTimeTable, readEntries, loggedByTask, runningOf, planStart, planStop, planLog, toCsv, timeTableSetup, timeTableShowActions } from './model/time.js';
 import { ZOOM_ORDER, ZOOMS, fitZoom, isoWeek, startOfUnit } from './views/gantt/layout.js';
 import { renderTimePrint, renderBoardPrint, renderBookingPrint, renderWorkloadPrint, subtitleFor } from './print/render.js';
@@ -37,11 +40,13 @@ import { createBoard } from './views/board/view.js';
 import { createTimeline } from './views/timeline/view.js';
 import { createBooking } from './views/booking/view.js';
 import { createWorkload } from './views/workload/view.js';
+import { createAgenda } from './views/agenda/view.js';
 import { renderToolbar } from './ui/toolbar.js';
 import { openMapping } from './ui/mapping.js';
 import { openQuickEdit } from './ui/quickedit.js';
 import { confirmBox, numberBox, chooseBox, logBox } from './ui/dialog.js';
 import { openTimesheet } from './ui/timesheet.js';
+import { openReminders } from './ui/reminders.js';
 import { t, tn, setLanguage, storedLanguage, dateLocale, weekStartOf } from './i18n/index.js';
 import { SAMPLE_COLUMNS, SAMPLE_LABELS, SAMPLE_TABLE, SAMPLE_PEOPLE, SAMPLE_TIME_TABLE, SAMPLE_TIME_COLUMNS, sampleRows, sampleDaysOff, sampleTimeRows } from './demo/sample.js';
 import { STORES_COLUMNS, STORES_LABELS, STORES_TABLE, STORES_RESOURCES, storesRows } from './demo/stores.js';
@@ -60,7 +65,7 @@ const S = {
   opensAs: 'auto', mode: 'gantt',   // the view the widget opens in (saved), and the one shown now
   rows: [], labels: {}, holidayDays: new Map(), built: null, signature: '',
   zoom: null, fitNext: false, selectedId: null, firstDraw: true,
-  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null },   // this browser's view of this table
+  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null },   // this browser's view of this table
   example: 'plan',     // the demo's data: 'plan' (a website relaunch) or 'stores' (pop-up stores × weekends)
   pendingEdit: null,   // {id, note}: open quick edit once Grist sends this new row
 };
@@ -95,14 +100,16 @@ let boardView = null;   // the board, when it is
 let timelineView = null;
 let bookingView = null;
 let workloadView = null;
-const current = () => view || boardView || timelineView || bookingView || workloadView;
-/** Take down every view but `keep` ('gantt', 'board', 'timeline', 'booking', 'workload'; null for all). */
+let agendaView = null;
+const current = () => view || boardView || timelineView || bookingView || workloadView || agendaView;
+/** Take down every view but `keep` ('gantt', 'board', 'timeline', 'booking', 'workload', 'agenda'; null for all). */
 function dropOthers(keep) {
   if (keep !== 'gantt') dropView();
   if (keep !== 'board') dropBoard();
   if (keep !== 'timeline' && timelineView) { timelineView.destroy(); timelineView = null; S.signature = ''; S.firstDraw = true; }
   if (keep !== 'booking' && bookingView) { bookingView.destroy(); bookingView = null; S.signature = ''; S.firstDraw = true; }
   if (keep !== 'workload' && workloadView) { workloadView.destroy(); workloadView = null; S.signature = ''; S.firstDraw = true; }
+  if (keep !== 'agenda' && agendaView) { agendaView.destroy(); agendaView = null; S.signature = ''; S.firstDraw = true; }
 }
 function ensureView() {
   if (view) return view;
@@ -183,6 +190,17 @@ function ensureWorkload() {
     onRedo: () => redo(),
   });
   return workloadView;
+}
+
+function ensureAgenda() {
+  if (agendaView) return agendaView;
+  dropOthers('agenda');
+  clear(stage);
+  agendaView = createAgenda(stage, {
+    onQuickEdit: (id) => openQuick(id),
+    onAnnounce: (text) => announce(text),
+  });
+  return agendaView;
 }
 
 /** A message in place of the view; `actions` are [label, run] buttons, the first one the main one. */
@@ -429,12 +447,15 @@ function resolveMode() {
   const stored = storedMode(S.tableId, S.opensAs);
   if (stored) return stored;
   if (VIEWS.includes(S.opensAs)) return S.opensAs;
+  // On a phone the list is what reads: the agenda, for any table that has task names.
+  if (S.roles.title && typeof window !== 'undefined' && window.innerWidth < PHONE) return 'agenda';
   if (ganttReady(S.roles)) return 'gantt';
   // No dates: bookings by a period column (stores × weekends) open as the grid, the rest as a board.
   const res = colById(S.roles.resource), per = colById(S.roles.period);
   if (res && per && rowable(res) && periodable(per, res)) return 'booking';
   return boardPossible() ? 'board' : 'gantt';
 }
+const PHONE = 600;   // px: under this the widget is a phone's, and the agenda its first view
 function setMode(mode) {
   if (mode === S.mode) return;
   S.mode = mode;
@@ -466,6 +487,8 @@ function drawToolbar(model = null, level = 'full') {
       flagged: b ? b.flagged : 0,
       bookings: b ? b.tasks.length + b.unscheduled.length : 0, clashes: bm ? bm.clashes.size : 0, outside: bm ? bm.outside : 0,
       overloads: wm ? wm.ahead.length : 0, noHours: wm ? wm.missing : 0,
+      open: S.mode === 'agenda' && S.agendaModel ? S.agendaModel.ag.open : 0,
+      late: S.mode === 'agenda' ? S.agendaModel?.ag.groups.find((g) => g.id === 'late')?.items.length || 0 : 0,
       // logged hours are history: the bar says how many, not whether anyone is over
       logged: wm?.measure === 'logged' ? fmtHours(wm.people.reduce((s, p) => s + p.totals.reduce((a, x) => a + x.load, 0), 0)) : null,
     },
@@ -485,6 +508,8 @@ function drawToolbar(model = null, level = 'full') {
     wlRowOptions: asOptions(S.columns.filter(wlRowable)), wlRowsBy: wlRowCol()?.id || null, wlUnit: wlUnit(),
     wlMeasure: hasTime() ? wlMeasure() : null,
     canLevel: !!(wm && wm.ahead.length && (canEdit() || S.demo)),
+    agendaWho: S.mode === 'agenda' ? agendaWho() : null, agendaDoable: !!S.agendaModel?.doable,
+    canCalendar: S.mode === 'agenda' && !!S.agendaModel?.ag.groups.some((g) => g.id !== 'late' && g.id !== 'undated'),
     timer: (() => { const r = myTimer(); return r ? { title: taskById(r.task)?.title || t('(no name)'), since: r.start, elapsed: elapsedText(r.start) } : null; })(),
     hasTime: hasTime(),
     examples: Object.entries(EXAMPLE_LABELS).map(([id, label]) => ({ id, label: t(label) })), example: S.example,
@@ -504,6 +529,9 @@ function drawToolbar(model = null, level = 'full') {
     onWlUnit: (u) => { S.view.wlUnit = u; saveView(); S.signature = ''; S.firstDraw = true; recompute(); },
     onWlMeasure: (m) => { S.view.wlMeasure = m; saveView(); S.signature = ''; recompute(); },
     onLevel: () => levelNow(),
+    onAgendaWho: (v) => setAgendaWho(v),
+    onCalendar: () => exportCalendar(null),
+    onReminders: () => openRemindersPanel(),
     onOverload: () => { const o = S.wlModel?.ahead[0]; if (o) workloadView?.scrollToCell(S.wlModel.cellOf(o)); },
     onStopTimer: () => stopTimer(),
     onTimesheet: () => openTimesheetPanel(),
@@ -515,7 +543,7 @@ function drawToolbar(model = null, level = 'full') {
 const saveView = () => rememberView(S.tableId, {
   groupBy: S.view.groupBy, critical: S.view.critical, collapsed: [...S.view.collapsed], laneBy: S.view.laneBy,
   tlLaneBy: S.view.tlLaneBy, bookRows: S.view.bookRows, bookPeriods: S.view.bookPeriods, bookFilter: S.view.bookFilter,
-  wlRows: S.view.wlRows, wlUnit: S.view.wlUnit, wlMeasure: S.view.wlMeasure,
+  wlRows: S.view.wlRows, wlUnit: S.view.wlUnit, wlMeasure: S.view.wlMeasure, agendaWho: S.view.agendaWho,
 });
 
 /** Everything the chart needs, from the rows. */
@@ -552,6 +580,7 @@ function recompute() {
   if (S.mode === 'timeline') { recomputeTimeline(); return; }
   if (S.mode === 'booking') { recomputeBooking(); return; }
   if (S.mode === 'workload') { recomputeWorkload(); return; }
+  if (S.mode === 'agenda') { recomputeAgenda(); return; }
   if (!ganttReady(S.roles)) {
     S.built = null;
     drawToolbar(null, 'switch');
@@ -881,6 +910,135 @@ function recomputeWorkload() {
     },
   }, { first: S.firstDraw, startAt: Math.max(0, periodOf(today)) });
   S.firstDraw = false;
+}
+
+// ---- the agenda (M11) --------------------------------------------------------------------------------------
+// Open tasks (or bookings) by the day they next need someone. "Mine" is the person this browser said it
+// is, the same answer the timer uses; a table without people has no such choice.
+const isDoable = () => !!(S.roles.done || S.roles.status || S.roles.progress);
+const knowsMe = () => !!(S.me && timePeople().some((p) => p.value === S.me));
+/** Mine or Everyone: what this browser chose, else Mine once it knows who it is; null when the tasks have no people. */
+function agendaWho() {
+  if (!timePeople().length) return null;
+  if (S.view.agendaWho) return S.view.agendaWho === 'mine' && !knowsMe() ? 'all' : S.view.agendaWho;
+  return knowsMe() ? 'mine' : 'all';
+}
+async function setAgendaWho(v) {
+  if (v === 'mine' && !knowsMe()) {
+    const me = await chooseMe(null, t('Whose tasks?'), t('Plan Studio remembers this in this browser, so Mine shows your tasks and the timer is yours.'));
+    if (!me) return;
+  }
+  S.view.agendaWho = v;
+  saveView();
+  S.signature = '';
+  recompute();
+}
+const wdFormats = new Map();
+/** "Fri 6 Nov" */
+function fmtDayWd(d) {
+  const loc = dateLocale(gristCulture());
+  if (!wdFormats.has(loc)) wdFormats.set(loc, new Intl.DateTimeFormat(loc, { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }));
+  return wdFormats.get(loc).format(dateFromDay(d));
+}
+function recomputeAgenda() {
+  if (!S.roles.title) {
+    S.built = null;
+    drawToolbar(null, 'switch');
+    emptyState(t('Which column holds the task names?'), t('The agenda lists each task by name and date. Pick the columns in Columns.'));
+    return;
+  }
+  const cal = calendar();
+  S.built = buildTasks(S.rows, { roles: S.roles, columns: S.columns, labels: S.labels, calendar: cal, settings: { ...S.gantt, colourBy: colourByCol()?.id || null } });
+  const today = todayDay();
+  const who = agendaWho();
+  const me = who === 'mine' ? timePeople().find((p) => p.value === S.me)?.label ?? null : null;
+  const doable = isDoable();
+  const ag = buildAgenda(S.built.tasks, S.built.unscheduled, { today, weekStart: weekStart(), doable, keep: me != null ? (x) => x.people.includes(me) : null });
+  S.agendaModel = { ag, today, who, doable };
+  drawToolbar();
+  const v = ensureAgenda();
+  const empty = ag.open ? null : me != null
+    ? { title: t('Nothing for {name}', { name: me }), body: t('No open task is assigned to {name}. Switch to Everyone to see the rest.', { name: me }) }
+    : { title: t('Nothing to do'), body: t('Tasks that are not done show up here, under the day they need someone.') };
+  const sig = ['a', who, me, doable, S.selectedId, today, dateLocale(gristCulture()),
+    ...ag.groups.map((g) => g.id + ':' + g.items.map((i) => i.task.id + '|' + i.task.hash + '|' + i.day + '|' + i.late).join(','))].join('\n');
+  if (sig === S.signature) return;
+  S.signature = sig;
+  v.update({ groups: ag.groups, selectedId: S.selectedId, fmtDay: fmtDayWd, empty });
+}
+
+// ---- add to calendar (M11) -----------------------------------------------------------------------------------
+// A calendar file for one task, or for the dates the agenda shows. A task that can be finished goes in as its
+// deadline (the day it must be done); a booking, which cannot, as the days it runs. The reminder is chosen
+// first, and is timed from the start of that first day.
+const ALARMS = [['eve', 'At 9:00 the day before', 900], ['day', 'At 9:00 on the day', -540], ['three', 'At 9:00, three days before', 3780], ['none', 'No reminder', null]];
+async function exportCalendar(ids = null) {
+  const doable = isDoable();
+  const list = ids
+    ? ids.map((id) => taskById(id)).filter((x) => x && x.start != null)
+    : (S.agendaModel?.ag.groups || []).filter((g) => g.id !== 'late' && g.id !== 'undated').flatMap((g) => g.items.map((i) => i.task));
+  if (!list.length) { toast(t('There is no dated task to add.')); return; }
+  const day = (x) => (doable ? x.end : x.start);
+  const choice = await chooseBox(shell, {
+    title: t('Add to calendar'),
+    body: list.length === 1
+      ? t('A calendar file with “{name}”, {date}. Open it and your calendar app adds it.', { name: list[0].title || t('(no name)'), date: fmtShort(day(list[0])) })
+      : tn(list.length, 'A calendar file with this date. Open it and your calendar app adds it.', 'A calendar file with these {n} dates. Open it and your calendar app adds them.'),
+    label: t('Remind me'), options: ALARMS.map(([value, label]) => ({ value, label: t(label) })), value: 'eve', ok: t('Download'),
+  });
+  if (!choice) return;
+  const alarm = ALARMS.find((a) => a[0] === choice)[2];
+  const events = list.map((x) => ({
+    uid: `${S.tableId || 'demo'}-${x.id}@plan-studio.anupress.com`, title: x.title || t('(no name)'), start: day(x), end: x.end,
+    description: [doable && x.start !== x.end ? t('Planned {range}', { range: fmtShortRange(x.start, x.end) }) : null, x.status, x.people.join(', ') || null].filter(Boolean).join('\n'),
+    alarm,
+  }));
+  const title = printTitle();
+  const url = URL.createObjectURL(new Blob([toIcs(events, { now: nowSecs(), name: title || null })], { type: 'text/calendar;charset=utf-8' }));
+  const a = el('a', { href: url, download: fileName([title, t('Calendar')].filter(Boolean).join(' ')) + '.ics' });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast(tn(events.length, 'Calendar file with {n} event downloaded.', 'Calendar file with {n} events downloaded.'));
+}
+
+// ---- email reminders (M11) -----------------------------------------------------------------------------------
+async function openRemindersPanel() {
+  if (dialogOpen) return;
+  dialogOpen = true;
+  const who = colById(S.roles.assignee);
+  const peopleTable = who && (who.kind === 'Ref' || who.kind === 'RefList') ? who.refTable : null;
+  let table = null;
+  if (peopleTable) table = S.live ? await loadTable(peopleTable).catch(() => null) : S.peopleTable;
+  const email = table ? detectEmailColumn(table.columns, table.rows) : null;
+  const nameCol = who?.visibleColId || table?.columns.find((c) => c.kind === 'Text' && c.id !== email?.id)?.id || null;
+  const api = (await docAddress().catch(() => null)) || 'https://docs.getgrist.com/api/docs/YOUR-DOCUMENT-ID';
+  const loc = dateLocale(gristCulture());
+  const months = Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat(loc, { timeZone: 'UTC', month: 'short' }).format(new Date(Date.UTC(2026, i, 1))));
+  const cols = (id) => (id && colById(id) ? id : null);
+  const progressCol = colById(S.roles.progress);
+  const words = {
+    subjectOne: t('{n} task needs your attention'), subjectMany: t('{n} tasks need your attention'),
+    hello: t('Hello {name},'), helloAll: t('Hello,'),
+    late: t('Late:'), today: t('Due today:'), tomorrow: t('Due tomorrow:'), soon: t('Due in the next {n} days:'),
+    lateBy: t('{n} days late'), lateByOne: t('1 day late'), due: t('due {date}'),
+    open: t('Open the plan: {url}'), footer: t('Sent every morning at {hour}:00 by your Plan Studio reminder script.'),
+  };
+  const tasks = {
+    table: S.tableId || SAMPLE_TABLE, title: cols(S.roles.title), start: cols(S.roles.start), end: cols(S.roles.end), due: cols(S.roles.due),
+    done: colById(S.roles.done)?.kind === 'Bool' ? S.roles.done : null, status: cols(S.roles.status), progress: progressCol ? S.roles.progress : null,
+    person: cols(S.roles.assignee), endInclusive: S.gantt.endInclusive !== false,
+    progressFull: progressCol ? progressScale(S.rows.map((r) => num(r[progressCol.id]))) : 1,
+  };
+  openReminders(shell, {
+    people: email ? { table: peopleTable } : null, peopleTable, days: 3, hour: 7,
+    build: ({ sendTo, days, hour }) => reminderScript({
+      api, docUrl: api.replace('/api/docs/', '/doc/'), docName: printTitle(), tasks,
+      people: table ? { table: peopleTable, name: nameCol, email: email?.id || null } : null,
+      sendTo, daysAhead: days, hour, months, dayPattern: /^de\b/i.test(loc) ? '{d}. {m}' : '{d} {m}', words,
+    }),
+  }, { onClose: () => { dialogOpen = false; } });
 }
 
 /** Level: the moves that take people under capacity, shown first, written as one action. */
@@ -1240,16 +1398,20 @@ async function whoAmI(taskId) {
   const people = timePeople();
   if (!S.timeCols?.person || !people.length) return { ok: true, key: null };
   if (S.me && people.some((p) => p.value === S.me)) return { ok: true, key: S.me };
+  const v = await chooseMe(taskId, t('Who is timing?'), t('Plan Studio remembers this in this browser, so the timer and the timesheet are yours.'));
+  return v ? { ok: true, key: v } : { ok: false, key: null };
+}
+/** Ask which of the people this browser is, and remember it here; null when the question is cancelled. */
+async function chooseMe(taskId, title, body) {
+  const people = timePeople();
+  if (!people.length) return null;
   const task = taskById(taskId);
   const guess = people.find((p) => task?.people?.includes(p.label))?.value || people[0].value;
-  const v = await chooseBox(shell, {
-    title: t('Who is timing?'), body: t('Plan Studio remembers this in this browser, so the timer and the timesheet are yours.'),
-    label: t('I am'), options: people, value: guess, ok: t('That’s me'),
-  });
-  if (!v) return { ok: false, key: null };
+  const v = await chooseBox(shell, { title, body, label: t('I am'), options: people, value: guess, ok: t('That’s me') });
+  if (!v) return null;
   S.me = v;
   rememberMe(S.tableId, v);
-  return { ok: true, key: v };
+  return v;
 }
 
 /** Writes to the time table as one action, so one Undo takes them back; the demo keeps them in memory. */
@@ -1556,10 +1718,11 @@ const showNoTimeHint = (on) => showBanner('noTimeHint', on, t('Nothing logged in
 // ---- print -----------------------------------------------------------------------------------------------
 // The printout is built from the model on screen, for paper (print/render.js), into #ps-print, which
 // only shows when printing. In a Grist iframe, print() prints this widget alone.
-const VIEW_NAMES = { gantt: 'Gantt chart', timeline: 'Timeline', board: 'Board', booking: 'Booking grid', workload: 'Workload' };
+const VIEW_NAMES = { gantt: 'Gantt chart', timeline: 'Timeline', board: 'Board', booking: 'Booking grid', workload: 'Workload', agenda: 'Agenda' };
 let printing = false;
 function startPrint() {
   if (printing || !S.ready) return;
+  if (S.mode === 'agenda') { toast(t('The agenda does not print. Switch to the Gantt chart, the board or the workload to print.')); return; }
   printing = true;
   openPrint(shell, { canPages: S.mode === 'gantt' || S.mode === 'timeline' }, {
     onClose: () => { printing = false; },
@@ -1716,11 +1879,13 @@ function openQuick(id, note = null) {
   for (const role of ['parent', 'dependsOn']) if (S.roles[role]) labels[S.roles[role]] = names;
   openQuickEdit(shell, {
     row, roles: S.roles, columns: S.columns, labels, editable: canEdit(), canOpenCard: S.live, note, booking: S.mode === 'booking',
+    calendar: calendarWords(id),
     time: {
       logged: S.logged.get(id) || 0, planned: plannedOf(id), running: myTimer()?.task === id, hours: fmtHours,
       canTrack: hasTime() && (canEdit() || S.demo), canSetup: S.live && canEdit() && !hasTime(),
     },
   }, {
+    onCalendar: () => exportCalendar([id]),
     onStartTimer: () => startTimer(id),
     onStopTimer: () => stopTimer(),
     onLogTime: () => logTime(id),
@@ -1736,6 +1901,15 @@ function openQuick(id, note = null) {
       write(id, plan, t('Saved “{name}”.', { name }));
     },
   });
+}
+
+/** What "Add to calendar" would hold for this task, in words; null for a task without a date. */
+function calendarWords(id) {
+  const x = taskById(id);
+  if (!x || x.start == null) return null;
+  return { words: isDoable()
+    ? t('A calendar file with the due date, {date}, and a reminder.', { date: fmtShort(x.end) })
+    : t('A calendar file with this booking, {date}, and a reminder.', { date: x.start === x.end ? fmtShort(x.start) : fmtShortRange(x.start, x.end) }) };
 }
 
 /**
@@ -1827,6 +2001,7 @@ async function openColumns() {
     onClose: () => { mappingOpen = null; },
     onAddColumn: (role) => addColumnFor(role),
     onSetupTime: () => setupTime(),
+    onReminders: () => openRemindersPanel(),
     onSave: async ({ roles, gantt, board, booking, workload, time, opensAs, language }) => {
       setLanguage(language);
       S.roles = roles;

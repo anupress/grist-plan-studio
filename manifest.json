@@ -5,9 +5,9 @@
     "url": "https://anupress.github.io/grist-plan-studio/index.html",
     "published": true,
     "accessLevel": "full",
-    "description": "Gantt chart, timeline, board, booking grid and workload over the tables you already keep. Drag a task, a card or a booking and the change is written straight back to your table; level an overloaded plan in one step; time your tasks, keep a weekly timesheet and see the hours still to do. Prints to PDF, in English, German or French. Runs entirely in the browser: no server, nothing leaves your document.",
+    "description": "Gantt chart, timeline, board, booking grid and workload over the tables you already keep. Drag a task, a card or a booking and the change is written straight back to your table; level an overloaded plan in one step; time your tasks, keep a weekly timesheet and see the hours still to do; an agenda for your phone, a calendar file and morning email reminders. Prints to PDF, in English, German or French. Runs entirely in the browser: no server, nothing leaves your document.",
     "authors": [{ "name": "ANUPRESS", "url": "https://anupress.com" }],
-    "lastUpdatedAt": "2026-10-25T12:00:00+01:00"
+    "lastUpdatedAt": "2026-10-25T14:28:21+01:00"
   },
   {
     "widgetId": "@anupress/widget-advanced-charts",

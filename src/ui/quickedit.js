@@ -87,9 +87,20 @@ function timeSection(tm, on, close) {
   ]);
 }
 
+/** Add to calendar (M11): what the file will hold, in words, and the button. Null for a task without a date. */
+function calendarSection(c, on, close) {
+  if (!c) return null;
+  return el('section', { class: 'ps-qe-time ps-qe-cal', 'aria-labelledby': 'ps-qe-cal-h' }, [
+    el('h3', { id: 'ps-qe-cal-h', text: t('Calendar') }),
+    el('p', { text: c.words }),
+    el('button', { type: 'button', class: 'ps-btn', text: t('Add to calendar…'), onclick: () => { close(); on.onCalendar?.(); } }),
+  ]);
+}
+
 /**
- * @param s  {row, roles, columns, labels, editable, canOpenCard, note, booking: true in the booking grid, time: see timeSection}
- * @param on {onSave({fields, patch}), onOpenCard(), onClose(), onStartTimer(), onStopTimer(), onLogTime(), onSetupTime()}
+ * @param s  {row, roles, columns, labels, editable, canOpenCard, note, booking: true in the booking grid, time: see timeSection,
+ *            calendar: {words} | null}
+ * @param on {onSave({fields, patch}), onOpenCard(), onClose(), onStartTimer(), onStopTimer(), onLogTime(), onSetupTime(), onCalendar()}
  */
 export function openQuickEdit(host, s, on) {
   const inputs = [];
@@ -134,6 +145,7 @@ export function openQuickEdit(host, s, on) {
       el('button', { type: 'submit', hidden: true }),
     ]),
     timeSection(s.time, on, () => close()),
+    calendarSection(s.calendar, on, () => close()),
     el('div', { class: 'ps-drawer__foot' }, [
       s.canOpenCard ? el('button', { type: 'button', class: 'ps-btn', text: t('Open Grist’s card'), title: t('Every column of this row, in Grist’s record card'), onclick: () => { close(); on.onOpenCard?.(); } }) : null,
       el('span', { class: 'ps-spacer' }),

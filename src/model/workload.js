@@ -9,9 +9,10 @@
 //   as "without hours" so the view can say so.
 //   Without an hours column: each task takes a full normal day of each of its people, every working
 //   day it spans. That is the usual planning assumption, and the view says it is one.
-//   Done tasks and parent tasks (their children carry the work) ask for nothing. A milestone asks for
-//   its hours on its day, and for nothing when there are no hours. A task that falls only on days
-//   off (a weekend market) asks for its hours on those days, which have no capacity.
+//   Finished tasks (Done ticked, full progress, a status such as Done) and parent tasks (their children
+//   carry the work) ask for nothing. A milestone asks for its hours on its day, and for nothing when
+//   there are no hours. A task that falls only on days off (a weekend market) asks for its hours on
+//   those days, which have no capacity.
 //
 // What a person has
 //   hoursPerDay on each working day (no weekend, public holiday or day of the holidays table), scaled
@@ -185,7 +186,7 @@ export function buildWorkload(tasks, rows, ctx) {
   } else {
     const logged = measure === 'remaining' && c.effortCol ? loggedBy(logs) : null;
     for (const task of tasks) {
-      if (task.start == null || task.done || parents.has(task.id)) continue;
+      if (task.start == null || task.finished || parents.has(task.id)) continue;
       const row = rowOf.get(task.id);
       if (!row) continue;
       const d = demandOf(task, row, c);
@@ -322,7 +323,7 @@ export function levelPlan(tasks, rows, ctx) {
     if (due != null && due >= task.end) e = Math.min(e, due);
     return e;
   };
-  const movable = dated.filter((x) => !x.done && x.kind !== 'milestone' && !parents.has(x.id) && x.start >= today
+  const movable = dated.filter((x) => !x.finished && x.kind !== 'milestone' && !parents.has(x.id) && x.start >= today
     && shares.has(x.id) && involved(x) && canMove(x));
 
   // Take the movable tasks off; everything else stays where it is.

@@ -16,16 +16,16 @@
 
 import { encodeInput } from './edits.js';
 import { refId, listOf, plain, num, dayOf } from './values.js';
+import { isDoneStatus } from './tasks.js';
 
 export const LANE_KINDS = ['Choice', 'Ref', 'Text'];
 /** Columns a card can show (attachments and lists of numbers would only show ids). */
 export const FIELD_KINDS = ['Text', 'Choice', 'ChoiceList', 'Ref', 'RefList', 'Date', 'DateTime', 'Numeric', 'Int', 'Bool', 'Any'];
 const NONE = '';
 
-// A status that means finished, in English, German and French: such a card is never late and does not
-// count against a lane's limit, even in a table without a Done column.
-const DONE_WORDS = /^(done|complete|completed|closed|finished|shipped|resolved|erledigt|fertig|abgeschlossen|geschlossen|termine|terminee|fait|clos|cloture)$/;
-export const isDoneStatus = (s) => DONE_WORDS.test(String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase());
+// A status that means finished (tasks.js): such a card is never late and does not count against a
+// lane's limit, even in a table without a Done column.
+export { isDoneStatus };
 
 const isHex = (s) => typeof s === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(s.trim());
 const choiceFill = (col, value) => {

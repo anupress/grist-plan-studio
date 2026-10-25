@@ -36,6 +36,10 @@ const BY_VIEW = {
     ['← → ↑ ↓', 'Move from cell to cell'],
     ['Enter', 'Book a free cell, or edit the booking'],
   ],
+  agenda: [
+    ['↑ ↓', 'Move from task to task'],
+    ['Enter', 'Edit the task'],
+  ],
   workload: [
     ['← → ↑ ↓', 'Move from cell to cell'],
     ['Enter', 'List the tasks behind the cell; Enter on one edits it'],

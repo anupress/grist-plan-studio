@@ -24,6 +24,10 @@ export const PALETTE = getPalette('access').series;
 
 const isHex = (s) => typeof s === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(s.trim());
 
+// A status that means finished, in English, German and French.
+const DONE_WORDS = /^(done|complete|completed|closed|finished|shipped|resolved|erledigt|fertig|abgeschlossen|geschlossen|termine|terminee|fait|clos|cloture)$/;
+export const isDoneStatus = (s) => DONE_WORDS.test(String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase());
+
 /** Grist's default choice fill is white or unset: treat both as "no colour chosen". */
 function choiceFill(col, value) {
   const f = col?.choiceOptions?.[value]?.fillColor;
@@ -128,6 +132,8 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
       // Which column the end came from, so an edit knows what to write: 'end' | 'due' | 'duration' | 'start'
       endFrom: null,
       status: statusKey, project: projectKey, people: people(row), colour, progress, done,
+      // finished by any sign the table gives: Done ticked, full progress, or a status such as Done or Erledigt
+      finished: done || (progress != null && progress >= 1) || isDoneStatus(statusKey),
     };
 
     if (start != null) {

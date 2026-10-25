@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.3.0
+
+An agenda for the phone, a calendar file with a reminder, and morning email reminders on the free plan.
+Tested in Grist 1.7.20 on docs.getgrist.com.
+
+- **Agenda**, a sixth view: the tasks that are not finished, under the day they next need someone.
+  Late (with how many days) first, then Today, Tomorrow, Under way, This week, Next week, Later and
+  No date. A task is finished when Done is ticked, its progress is full, or its status is a word such
+  as Done, Completed, Erledigt or Terminé. A table with no Done, Status or Progress column has nothing
+  late. A tap opens the quick edit.
+- **Mine · Everyone**: Mine shows the tasks of the person this browser says it is. It asks once, and
+  the answer is the one the timer uses. A browser that knows who it is opens on Mine.
+- **On a phone** (under 600 px wide) the Agenda is the first view, unless the widget is set to open as
+  something else or this browser last used another view. The toolbar becomes one menu and the controls
+  that fit a thumb: the view strip is a menu, Print and the keyboard list are left out, controls are at
+  least 40 px tall, and tick boxes are larger.
+- **Add to calendar**, from the Agenda or a task's quick edit: an .ics file with the due day of each
+  task (a booking's days, for bookings), a reminder you choose (9:00 the day before, on the day, three
+  days before, or none), and a stable id so importing again updates rather than duplicates.
+- **Email reminders**, in Columns → Reminders or from the Agenda: writes a Google Apps Script for the
+  document that emails every morning the tasks that are late or due soon, to each person at the address
+  in the people table's Email column or to one address. It runs in the person's own Google account and
+  reads Grist through its REST API with their API key, typed into Google's editor, never into Plan
+  Studio. In English, German and French.
+- **Opens as** in Columns lists the Agenda.
+- The workload and Level now treat a task whose status says Done, or whose progress is full, as
+  finished, as the board always did, instead of only a ticked Done column.
+
 ## 1.2.1
 
 The workload shows the time logged and the hours that remain, from the time entries.

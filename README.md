@@ -1,13 +1,13 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.1-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
-**board**, a **booking grid** or a **workload**, and writes every change straight back to that table. It maps onto
-your own columns, follows Grist's filters and linking, prints to PDF, and runs entirely in the
-viewer's browser: there is no server, and nothing leaves your document.
+**board**, a **booking grid**, a **workload** or an **agenda** for your phone, and writes every change straight
+back to that table. It maps onto your own columns, follows Grist's filters and linking, prints to PDF,
+and runs entirely in the viewer's browser: there is no server, and nothing leaves your document.
 
 Paste this into Grist (**Add widget → Custom → Enter Custom URL**):
 
@@ -26,7 +26,7 @@ Opened in a plain browser tab, the widget runs on sample data and saves nothing:
 - **[Pop-up stores over weekends](https://anupress.github.io/grist-plan-studio/?example=stores)**:
   the booking grid, with no dates at all
 
-## The five views
+## The six views
 
 | View | Rows are | What you do in it |
 |---|---|---|
@@ -35,6 +35,7 @@ Opened in a plain browser tab, the widget runs on sample data and saves nothing:
 | **Board** | cards in a lane per status, person or any other column | drag cards between and within lanes, add cards, set lane limits |
 | **Booking grid** | resources × days, weeks, months or your own periods | see free cells counted per period, click one to book it, spot double bookings |
 | **Workload** | people × days, weeks or months, hours against capacity | see who is over and when, list the tasks behind a cell, **Level** the plan |
+| **Agenda** | open tasks under the day they need someone | late first, then today, tomorrow and the weeks ahead; **Mine** or **Everyone**; the first view on a phone |
 
 ![The same plan as a board, a lane per status](docs/images/board.png)
 
@@ -43,6 +44,8 @@ Opened in a plain browser tab, the widget runs on sample data and saves nothing:
 ![The timeline, a band per person](docs/images/timeline.png)
 
 ![The workload: hours against capacity per person and week, with the days over capacity said in words](docs/images/workload.png)
+
+![The agenda: late tasks first, then today, tomorrow and the weeks ahead, each with its due day](docs/images/agenda.png)
 
 ## Workload and levelling
 
@@ -141,13 +144,40 @@ Hours, Note, named in the interface language).
 Grist does not tell a widget who is signed in, so Plan Studio asks whose timer it is the first time
 and remembers the answer in this browser.
 
+## Agenda, calendar and reminders
+
+The **Agenda** lists the tasks that are not finished (Done ticked, progress full, or a status such as
+Done, Erledigt or Terminé) under the day they next need someone: **Late**, with how many days, then
+**Today**, **Tomorrow**, **Under way**, this week, next week, later, and the tasks with no date. A table
+that cannot say a row is finished (no Done, Status or Progress column), such as bookings, has nothing
+late. **Mine** shows the tasks of the person this browser says it is, asked once and the same answer the
+timer uses; **Everyone** shows all. Under 600 px wide the Agenda is the first view, and the toolbar
+folds into one menu and the controls a thumb can hit.
+
+![The agenda on a phone](docs/images/agenda-phone.png)
+
+- **Add to calendar**, from the Agenda (the dates it shows) or a task's quick edit, downloads an .ics
+  file. A task that can be finished goes in as its due day (its end), a booking as the days it runs.
+  You choose the reminder first: 9:00 the day before, 9:00 on the day, 9:00 three days before, or none.
+  Each event keeps the same id, so importing the file again updates it instead of adding a copy.
+  Whether a calendar app keeps an imported reminder is the app's choice; if yours does not, set its
+  own notification.
+- **Email reminders** (**Columns → Reminders**, or the Agenda's button) write a short Google Apps
+  Script for your document. Grist's own email action is for paid plans and cannot run on a date, so
+  this one runs in your Google account instead, free: every morning it emails each person the tasks
+  that are late or due in the next few days, at the address in the Email column of their row in the
+  people table, or everyone's to one address. It reads the document through Grist's REST API with your
+  own API key, which you paste into Google's editor and never into Plan Studio. A free Google account
+  can send 100 emails a day, a Workspace account 1,500. Anything else that can call that API and send
+  mail, such as n8n or Make, can do the same.
+
 ## Where settings live
 
 - **In the widget's options**, saved in the document and shared by everyone, written only when
   someone presses Save in Columns: the column mapping, how dates are read, the view the widget
   opens in, what a card shows, lane limits, the booking grid's periods and the time-entries table.
 - **In this browser**: zoom, grouping, folded rows, the lane column and the last view, the
-  interface language, and who you are for timers. Looking around never writes to the document.
+  interface language, who you are for timers and for Mine, and Mine or Everyone. Looking around never writes to the document.
 
 ## Privacy
 

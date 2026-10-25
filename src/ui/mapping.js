@@ -130,8 +130,8 @@ export function openMapping(host, s, on) {
       el('h3', { text: t('Board') }),
       el('div', { class: 'ps-field' }, [
         el('label', { for: 'ps-opens', text: t('This widget opens as') }),
-        sel('ps-opens', opensAs, [['auto', t('Automatic')], ['gantt', t('Gantt chart')], ['timeline', t('Timeline')], ['board', t('Board')], ['booking', t('Booking grid')], ['workload', t('Workload')]], (e) => { opensAs = e.target.value; }),
-        el('p', { class: 'ps-hint', text: t('Automatic: the Gantt chart when the table has dates, otherwise the board. For everyone who opens this page; the toolbar switches the view in this browser only.') }),
+        sel('ps-opens', opensAs, [['auto', t('Automatic')], ['gantt', t('Gantt chart')], ['timeline', t('Timeline')], ['board', t('Board')], ['booking', t('Booking grid')], ['workload', t('Workload')], ['agenda', t('Agenda')]], (e) => { opensAs = e.target.value; }),
+        el('p', { class: 'ps-hint', text: t('Automatic: the Agenda on a phone, otherwise the Gantt chart when the table has dates, or else the board. For everyone who opens this page; the toolbar switches the view in this browser only.') }),
       ]),
       el('div', { class: 'ps-field' }, [
         el('label', { text: t('Cards also show'), id: 'ps-cf-l' }),
@@ -188,6 +188,11 @@ export function openMapping(host, s, on) {
         ], (e) => { time.table = e.target.value || null; time.cols = null; }),
         el('p', { class: 'ps-hint', text: t('A table with a Reference to this one, a date or a start, and hours or a start and an end. Timers and logged hours are written there.') }),
         s.canSetupTime ? el('button', { type: 'button', class: 'ps-link ps-add-col', text: t('Add a time-entries table'), onclick: () => { close(); on.onSetupTime?.(); } }) : null,
+      ]),
+      el('h3', { text: t('Reminders') }),
+      el('div', { class: 'ps-field' }, [
+        el('p', { class: 'ps-hint', text: t('Email the tasks that are late or due soon every morning, from your own Google account. Free: no Grist plan is needed.') }),
+        el('button', { type: 'button', class: 'ps-link ps-add-col', text: t('Set up email reminders…'), onclick: () => { close(); on.onReminders?.(); } }),
       ]),
       el('h3', { text: t('Colours') }),
       el('div', { class: 'ps-field' }, [

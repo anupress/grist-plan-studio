@@ -105,6 +105,18 @@ export async function selectedTableId() {
   try { return await g().getSelectedTableId(); } catch { return null; }
 }
 
+/**
+ * The document's REST address (https://host/api/docs/<id>), for the reminder script. Only the address
+ * is read from the access token Grist hands out: the token itself is never kept or shown. (The
+ * document's name is not available to a widget: getDocName gives its id.)
+ * @returns {Promise<string | null>}
+ */
+export async function docAddress() {
+  if (!live) return null;
+  const token = await g().docApi.getAccessToken({ readOnly: true }).catch(() => null);
+  return token?.baseUrl ? String(token.baseUrl).replace(/\/$/, '') : null;
+}
+
 // ---- writing -------------------------------------------------------------------------------------
 
 /** One action bundle = one undo step. Throws Grist's own error (access rules, bad value) to the caller. */

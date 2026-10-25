@@ -41,7 +41,7 @@ export const TIME_DEFAULTS = Object.freeze({
   table: null,              // the time-entries table picked in Columns, or null (found by its columns)
   cols: null,               // {task, person, date, start, end, hours, note}: its columns, or null (found by name)
 });
-export const VIEWS = ['gantt', 'timeline', 'board', 'booking', 'workload'];
+export const VIEWS = ['gantt', 'timeline', 'board', 'booking', 'workload', 'agenda'];
 const REGION = /^(DE(-[A-Z]{2})?|AT|CH|FR|UK-EW|US)$/;
 
 /** Widget options as Grist returns them (or null) -> {roles (stored form or null), gantt}. */
@@ -127,6 +127,7 @@ export function storedView(tableId) {
     wlRows: typeof v.wlRows === 'string' ? v.wlRows : null,
     wlUnit: ['day', 'week', 'month'].includes(v.wlUnit) ? v.wlUnit : null,
     wlMeasure: ['planned', 'logged', 'remaining'].includes(v.wlMeasure) ? v.wlMeasure : null,
+    agendaWho: ['mine', 'all'].includes(v.agendaWho) ? v.agendaWho : null,
   };
 }
 export function rememberView(tableId, view) { keep(viewKey(tableId), view); }
