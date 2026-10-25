@@ -60,11 +60,11 @@ export function createCalendar(host, on = {}) {
     const label = [model.describe(x), x.finished ? t('done') : null, x.kind === 'milestone' ? t('milestone') : null].filter(Boolean).join(', ');
     const node = el('button', {
       type: 'button', tabindex: '-1', dataset: { id: String(x.id), week: String(week.start) },
-      class: 'ps-cal__chip' + (x.id === model.selectedId ? ' is-selected' : '') + (x.finished ? ' is-done' : '') + (x.kind === 'milestone' ? ' is-milestone' : '')
+      class: 'ps-cal__chip' + (x.id === model.selectedId || model.multi?.has(x.id) ? ' is-selected' : '') + (x.finished ? ' is-done' : '') + (x.kind === 'milestone' ? ' is-milestone' : '')
         + (seg.fromLeft ? ' is-from-left' : '') + (seg.toRight ? ' is-to-right' : '') + (model.canDrag(x) ? ' is-movable' : ''),
       style: { gridColumn: `${seg.col0 + 1} / ${seg.col1 + 2}`, gridRow: String(seg.track + 2), ...(x.colour ? { '--stripe': x.colour } : {}) },
       'aria-label': label, 'aria-pressed': x.id === model.selectedId ? 'true' : 'false', title: label,
-      onclick: () => { if (suppressClick) return; on.onSelect?.(x.id); on.onQuickEdit?.(x.id); },
+      onclick: (e) => { if (suppressClick) return; if (e.ctrlKey || e.metaKey || e.shiftKey) { on.onSelect?.(x.id, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey }); return; } on.onSelect?.(x.id); on.onQuickEdit?.(x.id); },
       onpointerdown: (e) => pressed(e, seg),
     }, [
       el('span', { class: 'ps-cal__chip-text', text: x.title || t('(no name)') }),

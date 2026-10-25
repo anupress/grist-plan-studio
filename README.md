@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.17.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.18.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -295,6 +295,20 @@ red, and the push that moves the tasks that wait, Level, and the critical path a
 The type and the lag are two columns of the task that waits (**Link type** and **Lag (days)**, found by name, or added after asking when
 you save the dialog) and hold for everything it waits for: one setting a task. Without the columns every link is finish to start
 with no lag, as before. The demo has three such links.
+
+## Select several tasks
+
+- **Ctrl (or Cmd) and click** adds a task to the selection or takes it out; **Shift and click** selects every task between this one and
+  the one clicked before, in the order they are drawn. In the Gantt chart, **Shift and drag** over the empty part of the chart draws a
+  box that selects every bar it touches. **Ctrl+A** selects everything drawn; **Esc** lets go; a plain click selects one task again.
+- A strip above the view says how many are selected and offers: **Mark done** and **Mark open**, **Set…** (a column and a value, the
+  same for all: status, person, project, a number, a yes/no, a date), **Move dates…** (the same number of days, working days when the
+  plan counts them), **Delete…** (it asks, and says what happens to sub-tasks that are not selected) and **Clear**. A right-click on one of
+  the selected tasks shows the same. Each is one action, one step in Undo.
+- **A bar dragged from the selection takes the others along**, by the same number of days: the preview shows them moving. The tasks
+  that wait for them are offered a move too, once for all.
+- Selecting works in the Gantt chart, the timeline, the board, the calendar and the agenda. **Copy as text** and **Download as CSV** then
+  take only the selected tasks.
 
 ## Search and filters
 

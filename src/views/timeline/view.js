@@ -128,7 +128,7 @@ export function createTimeline(host, on = {}) {
         const title = task.title || t('(no name)');
         const c = caps(task);
         const fill = task.colour || 'var(--ps-bar)';
-        const selected = task.id === sel;
+        const selected = task.id === sel || !!model.multi?.has(task.id);
         const attrs = { dataset: { id: String(task.id), lane: lane.key, part: 'body' }, role: 'img', 'aria-label': `${title}, ${rangeText(F, task)}${b.clash ? ', ' + t('overlaps another booking') : ''}` };
         if (task.kind === 'milestone') {
           bars.appendChild(el('div', {
@@ -276,7 +276,7 @@ export function createTimeline(host, on = {}) {
   canvas.addEventListener('click', (e) => {
     if (performance.now() < swallowUntil) return;
     const f = barFrom(e.target);
-    if (f) on.onSelect?.(f.bar.task.id);
+    if (f) on.onSelect?.(f.bar.task.id, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey });
   });
   canvas.addEventListener('dblclick', (e) => { const f = barFrom(e.target); if (f) on.onOpen?.(f.bar.task.id); });
   canvas.addEventListener('mousemove', (e) => {

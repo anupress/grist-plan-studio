@@ -1,4 +1,4 @@
-// Delete and duplicate a task (M20), as the actions Grist is given. Pure: tests/rowops.test.mjs.
+// Delete and duplicate a task (M20), as the actions Grist is given; delete several at once (M26). Pure: tests/rowops.test.mjs.
 //
 // Delete: the row goes, and what pointed at it is tidied in the same action, so one Undo brings everything back:
 //   - its sub-tasks either move up one level (they get its own parent) or go with it, as the person says;
@@ -25,29 +25,33 @@ export function descendantsOf(tasks, id) {
 }
 
 /**
+ * Delete one task, or several at once (M26): the rows go, and what pointed at them is tidied in the same action.
  * @param ctx    {tableId, roles, columns}
  * @param tasks  every task (dated and not) from buildTasks: id, parentId, deps
- * @param opts   {children: 'keep' (they move up one level) | 'delete' (they go too)}
+ * @param opts   {children: 'keep' (their sub-tasks move up to the nearest task that stays) | 'delete' (they go too)}
  * @returns {{updates: Array<{id, fields, patch}>, removed: number[], moved: number, unlinked: number} | {error: 'gone' | 'parentFormula'}}
  */
-export function planDelete(ctx, tasks, id, { children = 'keep' } = {}) {
-  const target = tasks.find((x) => x.id === id);
-  if (!target) return { error: 'gone' };
-  const below = descendantsOf(tasks, id);
-  const gone = new Set([id, ...(children === 'delete' ? below : [])]);
+export function planDeleteMany(ctx, tasks, ids, { children = 'keep' } = {}) {
+  const known = new Set(tasks.map((x) => x.id));
+  const targets = [...new Set(ids)].filter((id) => known.has(id));
+  if (!targets.length) return { error: 'gone' };
+  const gone = new Set(targets);
+  if (children === 'delete') for (const id of targets) for (const d of descendantsOf(tasks, id)) gone.add(d);
+  const byId = new Map(tasks.map((x) => [x.id, x]));
   const updates = [];
   const parentCol = colOf(ctx, 'parent'), depCol = colOf(ctx, 'dependsOn');
   let moved = 0;
   if (children === 'keep') {
-    const kids = tasks.filter((x) => x.parentId === id);
-    if (kids.length) {
+    // a sub-task of a task that goes moves up to the nearest task above it that stays, or to the top
+    for (const x of tasks) {
+      if (gone.has(x.id) || x.parentId == null || !gone.has(x.parentId)) continue;
       if (!parentCol || parentCol.isFormula) return { error: 'parentFormula' };
-      const up = target.parentId != null && !gone.has(target.parentId) ? target.parentId : 0;
-      for (const k of kids) {
-        const [v, cell] = encodeInput(parentCol, up);
-        updates.push({ id: k.id, fields: { [parentCol.id]: v }, patch: { [parentCol.id]: cell } });
-        moved++;
-      }
+      let up = x.parentId;
+      const seen = new Set();
+      while (up != null && gone.has(up) && !seen.has(up)) { seen.add(up); up = byId.get(up)?.parentId ?? null; }
+      const [v, cell] = encodeInput(parentCol, up != null && !gone.has(up) ? up : 0);
+      updates.push({ id: x.id, fields: { [parentCol.id]: v }, patch: { [parentCol.id]: cell } });
+      moved++;
     }
   }
   let unlinked = 0;
@@ -64,6 +68,9 @@ export function planDelete(ctx, tasks, id, { children = 'keep' } = {}) {
   }
   return { updates, removed: [...gone], moved, unlinked };
 }
+
+/** Delete one task (see planDeleteMany). */
+export const planDelete = (ctx, tasks, id, opts) => planDeleteMany(ctx, tasks, [id], opts);
 
 /** A cell in the form encodeInput takes, or undefined for a column that is not copied. */
 function inputOf(col, cell) {

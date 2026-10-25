@@ -11,6 +11,9 @@ const COMMON = [
   ['/', 'Search by name'],
   ['D', 'Open or close Display'],
   ['Shift+F10', 'Open the menu of the selected task'],
+  ['Ctrl+click  Shift+click', 'Select several tasks'],
+  ['Ctrl+A', 'Select every task drawn'],
+  ['Esc', 'Let go of the selection'],
   ['?', 'Help and these shortcuts'],
 ];
 const BY_VIEW = {

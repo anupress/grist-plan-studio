@@ -135,5 +135,23 @@ eq('a cycle in the data does not run forever', O.descendantsOf([{ id: 1, parentI
   eq('not there', O.planReparent(ctx, tasks, 99, 'in'), { error: 'gone' });
 }
 
+// ---- several at once (M26)
+{
+  // 1 Phase; 2 Build and 3 Test under it; 4 Unit tests and 7 Review under 2; 5 Ship waits for 2 and 3; 6 Docs waits for 4
+  const many = O.planDeleteMany(ctx, tasks, [2, 3]);
+  eq('two tasks: both go, once each', many.removed, [2, 3]);
+  eq('…their sub-tasks move up to the nearest task that stays (Phase)', many.updates.filter((u) => 'Parent' in u.fields).map((u) => [u.id, u.fields.Parent]), [[4, 1], [7, 1]]);
+  eq('…and what waited for either is let go (Unit tests waited for Test, Ship for both, Review for Build)', many.updates.filter((u) => 'After' in u.fields).map((u) => [u.id, u.fields.After]).sort((a, b) => a[0] - b[0]), [[4, null], [5, null], [7, null]]);
+  const nested = O.planDeleteMany(ctx, tasks, [2, 4]);
+  eq('a task and its own sub-task: Review moves up to Phase, not under the one that goes', [nested.removed, nested.updates.filter((u) => 'Parent' in u.fields).map((u) => [u.id, u.fields.Parent])], [[2, 4], [[7, 1]]]);
+  const chain = O.planDeleteMany(ctx, tasks, [1, 2]);
+  eq('a parent and a child that both go: the grandchildren go to the top', chain.updates.filter((u) => 'Parent' in u.fields).map((u) => [u.id, u.fields.Parent]).sort((a, b) => a[0] - b[0]), [[3, 0], [4, 0], [7, 0]]);
+  eq('with their sub-tasks too: the whole branch goes', O.planDeleteMany(ctx, tasks, [2], { children: 'delete' }).removed.sort(), [2, 4, 7]);
+  eq('none of them is there', O.planDeleteMany(ctx, tasks, [97, 98]), { error: 'gone' });
+  eq('one that is there and one that is not: the one that is there', O.planDeleteMany(ctx, tasks, [6, 98]).removed, [6]);
+  eq('the same twice is once', O.planDeleteMany(ctx, tasks, [6, 6]).removed, [6]);
+  eq('a formula Parent column cannot take their sub-tasks up', O.planDeleteMany({ ...ctx, columns: columns.map((c) => (c.id === 'Parent' ? { ...c, isFormula: true } : c)) }, tasks, [2, 3]), { error: 'parentFormula' });
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

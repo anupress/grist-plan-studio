@@ -18,7 +18,7 @@ const FIELD_LABELS = {
 const sortedLabels = (map) => [...(map || new Map()).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])));
 
 /** One input for one column, reading the cell's current value; returns {node, read()} */
-function inputFor(col, cell, labels, id, disabled) {
+export function inputFor(col, cell, labels, id, disabled) {
   const k = col.kind;
   if (k === 'Date' || k === 'DateTime') {
     const d = dayOf(cell, col.type);

@@ -11,7 +11,9 @@
 //   drag a bar            move it            drag its left or right edge   change the start or end
 //   drag a milestone      move it            drag across an undated row     give that task dates
 //   drag the dot at a bar's end onto another bar                            link them (finish -> start)
-//   click an arrow        its type and lag, or remove the link    click a ▸ / ▾                  fold or unfold a parent or group
+//   click an arrow        its type and lag, or remove the link
+//   Ctrl / Shift + click  select several; Shift + drag on the empty chart draws a box that selects the bars it touches;
+//                         a drag of one selected bar moves them all    click a ▸ / ▾                  fold or unfold a parent or group
 //   Alt+←/→               move by a day      Alt+Shift+←/→                  change the end by a day
 //   drag the ✓ at the day a task was really done                       move that day (M18)
 //   drag the empty chart, Ctrl+wheel, drag the edge of the names        move across, zoom, widen the names (navigate.js, M21)
@@ -41,7 +43,7 @@ const SVG = 'http://www.w3.org/2000/svg';
 const svgEl = (tag, attrs = {}) => { const n = document.createElementNS(SVG, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
 
 /**
- * @param on {onSelect(id), onOpen(id), onQuickEdit(id), onEdit({id, mode, start, end}), onLink({from, to}),
+ * @param on {onSelect(id, {ctrl, shift}), onSelectMany(ids, {add}), onOpen(id), onQuickEdit(id), onEdit({id, mode, start, end}), onLink({from, to}),
  *            onArrow({from, to}), onToggle(key), onZoomStep(dir), onToday(), onUndo(), onRedo()}
  */
 export function createGantt(host, on = {}) {
@@ -222,7 +224,7 @@ export function createGantt(host, on = {}) {
         continue;
       }
       const task = e.task;
-      const selected = task.id === sel;
+      const selected = task.id === sel || !!model.multi?.has(task.id);
       const title = task.title || t('(no name)');
       const span = spanOf(e);
       list.appendChild(el('div', {
@@ -402,6 +404,7 @@ export function createGantt(host, on = {}) {
       d.el.style.width = box.w + 'px';
     }
     if (d.outLabel) d.outLabel.hidden = true;
+    if (d.mates) for (const m of d.mates) m.style.transform = `translateX(${(start - task.start) * frame.px}px)`;
     const shift = mode === 'move' ? start - task.start : mode === 'start' ? start - task.start : mode === 'end' ? end - task.end : null;
     const parts = [rangeText(F, shown)];
     if (shift) parts.push((shift > 0 ? '+' : '−') + t('{n} days', { n: Math.abs(shift) }));
@@ -418,6 +421,16 @@ export function createGantt(host, on = {}) {
       start: task.start ?? day0, end: task.end ?? day0, day: task.doneOn ?? day0,
       outLabel: node ? bars.querySelector(`.ps-bar__out[data-id="${task.id}"]`) : null,
     };
+    // a bar that is one of several selected takes the others along: they are moved on screen with it
+    if (mode === 'move' && model.multi?.size > 1 && model.multi.has(task.id)) {
+      drag.mates = [];
+      for (const id of model.multi) {
+        if (id === task.id) continue;
+        const en = entryOf(id);
+        if (!en || en.kind !== 'task' || en.undated || en.summary || !caps(en.task).move) continue;
+        drag.mates.push(...bars.querySelectorAll(`[data-id="${id}"]:not(.ps-drawrow):not(.ps-sum)`));
+      }
+    }
     if (mode === 'link') {
       drag.from = anchor(task.id, 'end');
       drag.line = svgEl('path', { class: 'ps-arrow ps-arrow--draft' });
@@ -492,8 +505,11 @@ export function createGantt(host, on = {}) {
   }
 
   chart.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0 || !model?.editable) return;
+    if (e.button !== 0) return;
     const n = e.target.closest && e.target.closest('[data-id]');
+    // Shift and drag over the empty part of the chart draws a box: every bar it touches is selected
+    if (!n && e.shiftKey && model && !e.target.closest('[data-toggle], .ps-arrow__hit')) { beginBox(e); return; }
+    if (!model?.editable) return;
     if (!n) return;
     const entry = entryOf(Number(n.dataset.id));
     if (!entry || entry.kind !== 'task') return;
@@ -516,9 +532,42 @@ export function createGantt(host, on = {}) {
     scroll.focus({ preventScroll: true });
     beginDrag(e, task, mode, indexOf.get(task.id), part === 'draw' || part === 'link' ? null : part === 'done' ? n : n.closest('.ps-bar, .ps-ms'));
   });
-  chart.addEventListener('pointermove', (e) => { if (drag) moveDrag(e); });
-  chart.addEventListener('pointerup', (e) => { if (drag) endDrag(e); });
-  chart.addEventListener('pointercancel', (e) => { if (drag) endDrag(e, true); });
+  chart.addEventListener('pointermove', (e) => { if (drag) moveDrag(e); else if (box) moveBox(e); });
+  chart.addEventListener('pointerup', (e) => { if (drag) endDrag(e); else if (box) endBox(e); });
+  chart.addEventListener('pointercancel', (e) => { if (drag) endDrag(e, true); else if (box) endBox(e, true); });
+
+  // ---- a box to select with ---------------------------------------------------------------------------
+  let box = null;
+  function beginBox(e) {
+    e.preventDefault();
+    scroll.focus({ preventScroll: true });
+    box = { x0: chartX(e.clientX), y0: chartY(e.clientY), x: chartX(e.clientX), y: chartY(e.clientY), id: e.pointerId, add: e.ctrlKey || e.metaKey, node: el('div', { class: 'ps-lasso', 'aria-hidden': 'true' }) };
+    chart.appendChild(box.node);
+    try { chart.setPointerCapture(e.pointerId); } catch { /* fine without */ }
+  }
+  function moveBox(e) {
+    box.x = chartX(e.clientX); box.y = chartY(e.clientY);
+    Object.assign(box.node.style, { left: Math.min(box.x0, box.x) + 'px', top: Math.min(box.y0, box.y) + 'px', width: Math.abs(box.x - box.x0) + 'px', height: Math.abs(box.y - box.y0) + 'px' });
+  }
+  function endBox(e, cancelled = false) {
+    const b = box;
+    box = null;
+    b.node.remove();
+    try { chart.releasePointerCapture(b.id); } catch { /* released already */ }
+    swallowUntil = performance.now() + 300;
+    const x1 = Math.min(b.x0, b.x), x2 = Math.max(b.x0, b.x), y1 = Math.min(b.y0, b.y), y2 = Math.max(b.y0, b.y);
+    if (cancelled || (x2 - x1 < 4 && y2 - y1 < 4)) return;
+    const ids = [];
+    for (let i = Math.max(0, Math.floor(y1 / RH)); i <= Math.min(rows.length - 1, Math.floor(y2 / RH)); i++) {
+      const en = rows[i];
+      if (!en || en.kind !== 'task' || en.undated) continue;
+      const span = spanOf(en);
+      const ms = !en.summary && en.task.kind === 'milestone';
+      const bb = barBox(frame, { kind: ms ? 'milestone' : 'bar', start: span.start, end: span.end }, i, RH, BH);
+      if (bb.x < x2 && bb.x + Math.max(bb.w || 0, ms ? BH : 0) > x1) ids.push(en.task.id);
+    }
+    on.onSelectMany?.(ids, { add: b.add });
+  }
 
   // ---- other events ----------------------------------------------------------------------------------
   const entryFrom = (target) => {
@@ -533,7 +582,7 @@ export function createGantt(host, on = {}) {
     const hit = e.target.closest && e.target.closest('.ps-arrow__hit');
     if (hit) { on.onArrow?.({ from: Number(hit.getAttribute('data-from')), to: Number(hit.getAttribute('data-to')) }); return; }
     const entry = entryFrom(e.target);
-    if (entry) on.onSelect?.(entry.task.id);
+    if (entry) on.onSelect?.(entry.task.id, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey });
   });
   canvas.addEventListener('dblclick', (e) => {
     if (e.target.closest && e.target.closest('[data-toggle], .ps-arrow__hit')) return;

@@ -98,7 +98,7 @@ export function createBoard(host, on) {
     const more = card.people.length - people.length;
     const label = [card.title || t('(no name)'), card.done ? t('done') : null, card.people.join(', ') || null].filter(Boolean).join(', ');
     const node = el('article', {
-      class: 'ps-card' + (card.done ? ' is-done' : '') + (card.colour ? ' has-stripe' : '') + (card.id === model.selectedId ? ' is-selected' : ''),
+      class: 'ps-card' + (card.done ? ' is-done' : '') + (card.colour ? ' has-stripe' : '') + (card.id === model.selectedId || model.multi?.has(card.id) ? ' is-selected' : ''),
       dataset: { id: String(card.id) }, tabindex: '-1', 'aria-label': label, 'aria-selected': card.id === model.selectedId ? 'true' : 'false',
       style: card.colour ? { '--stripe': card.colour } : {},
     }, [
@@ -335,7 +335,7 @@ export function createBoard(host, on) {
   const cardAt = (target) => target.closest?.('.ps-card');
   root.addEventListener('click', (e) => {
     const n = cardAt(e.target);
-    if (n) on.onSelect?.(Number(n.dataset.id));
+    if (n) on.onSelect?.(Number(n.dataset.id), { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey });
   });
   root.addEventListener('dblclick', (e) => {
     const n = cardAt(e.target);

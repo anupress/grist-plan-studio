@@ -78,6 +78,7 @@ export function helpFor(view) {
         t('Drag the empty part of the chart to move across it. Ctrl and the wheel zoom around the pointer. Drag the edge of the names, in the heading, to widen them.'),
         t('Set baseline remembers today’s dates as the plan. A bar that later moves shows the plan as a thin line under it, and says by how many days.'),
         t('Right-click a task for its menu: add a sub-task, indent it, mark it done, copy it to a later date or repeat it. [ and ] move it one level out or in.'),
+        t('Click a task with Ctrl or Shift held to select several, or hold Shift and drag a box over the chart. A bar dragged from the selection takes the others along. The strip above the view marks them done, sets a column on all of them, moves their dates or deletes them.'),
         t('More, in the toolbar, adds several tasks from a list, copies the plan as text or a CSV file, folds everything and prints.'),
       ],
     };

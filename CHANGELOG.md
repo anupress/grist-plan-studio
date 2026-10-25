@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.18.0
+
+Select several tasks. Tested in Grist 1.7.20.
+
+- **Select several**: Ctrl and Shift clicks, a box drawn with Shift in the Gantt chart, Ctrl+A, Esc.
+- **A strip for what to do with them**: Mark done / open, **Set…** a column on all, **Move dates…**, **Delete…**, Clear; also from a right-click.
+- **A bar dragged from the selection moves them all** (one Undo, one question about the tasks that wait for them).
+- Copy as text and CSV take only the selected tasks.
+- German and French for every new word.
+
 ## 1.17.0
 
 Links with a type and a lag. Tested in Grist 1.7.20.

@@ -18,7 +18,7 @@ const GROUP_LABELS = {
 };
 
 /**
- * @param on {onQuickEdit(id), onAnnounce(text)}
+ * @param on {onQuickEdit(id), onSelect(id, {ctrl, shift}) (a click with Ctrl or Shift), onAnnounce(text)}
  */
 export function createAgenda(host, on = {}) {
   // model: {groups: [{id, items: [{task, day, what, late}]}], selectedId, fmtDay(day) -> "Fri 6 Nov", empty: {title, body} | null}
@@ -48,10 +48,10 @@ export function createAgenda(host, on = {}) {
     const label = [x.title || t('(no name)'), late, ...details].join(', ');
     return el('li', { class: 'ps-ag__item' }, [
       el('button', {
-        type: 'button', class: 'ps-ag__row' + (x.id === model.selectedId ? ' is-selected' : '') + (x.colour ? ' has-stripe' : ''),
+        type: 'button', class: 'ps-ag__row' + (x.id === model.selectedId || model.multi?.has(x.id) ? ' is-selected' : '') + (x.colour ? ' has-stripe' : ''),
         dataset: { id: String(x.id) }, 'aria-label': label, 'aria-current': x.id === model.selectedId ? 'true' : null,
         style: x.colour ? { '--stripe': x.colour } : {},
-        onclick: () => on.onQuickEdit?.(x.id),
+        onclick: (e) => (e.ctrlKey || e.metaKey || e.shiftKey ? on.onSelect?.(x.id, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey }) : on.onQuickEdit?.(x.id)),
       }, [
         el('span', { class: 'ps-ag__main' }, [
           el('span', { class: 'ps-ag__title', text: x.title || t('(no name)') }),

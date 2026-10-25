@@ -40,17 +40,19 @@ export function wouldLoop(links, from, to) {
  * The tasks that must move when one task gets new dates: every successor that would now start
  * before its predecessor ends is pushed to the first allowed day, keeping its length, and so on
  * down the chain. Nothing is ever pulled earlier.
- * @param changed {id, start, end}  the new dates of the moved task
+ * @param changed {id, start, end}  the new dates of the moved task, or a list of them when several moved together
  * @returns {Array<{id, start, end}>}  the successors to move (not the changed task itself)
  */
 export function pushPlan(tasks, links, changed, cal) {
   const pos = new Map(tasks.map((t) => [t.id, { start: t.start, end: t.end, len: t.start == null ? 0 : cal.length(t.start, t.end) }]));
-  if (!pos.has(changed.id)) return [];
-  pos.set(changed.id, { ...pos.get(changed.id), start: changed.start, end: changed.end });
+  const list = (Array.isArray(changed) ? changed : [changed]).filter((c) => pos.has(c.id));
+  if (!list.length) return [];
+  for (const c of list) pos.set(c.id, { ...pos.get(c.id), start: c.start, end: c.end });
+  const fixed = new Set(list.map((c) => c.id));
   const next = new Map();
   for (const l of links) { if (!next.has(l.from)) next.set(l.from, []); next.get(l.from).push(l); }
   const moved = new Map();
-  const queue = [changed.id];
+  const queue = list.map((c) => c.id);
   for (let guard = 0; queue.length && guard < tasks.length * 4 + 10; guard++) {
     const id = queue.shift();
     const p = pos.get(id);
@@ -58,7 +60,7 @@ export function pushPlan(tasks, links, changed, cal) {
     for (const link of next.get(id) || []) {
       const s = link.to;
       const q = pos.get(s);
-      if (!q || q.start == null || s === changed.id) continue;
+      if (!q || q.start == null || fixed.has(s)) continue;
       const earliest = minStart(link, p, q, cal);
       if (q.start >= earliest) continue;
       const start = earliest;

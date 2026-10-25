@@ -20,15 +20,18 @@ import { arrange } from './model/tree.js';
 import { linksOf, isLate, pushPlan, criticalPath, wouldLoop } from './model/schedule.js';
 import { makeCalendar, holidaysBetween } from './model/calendar.js';
 import { todayDay, dateFromDay, plain, dayOf, num, isoFromDay, dayFromISO, progressScale } from './model/values.js';
-import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink, baselineFields, doneOnFields, canMoveDoneOn, doneFields, datesFields } from './model/edits.js';
+import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink, baselineFields, doneOnFields, canMoveDoneOn, doneFields, datesFields, encodeInput } from './model/edits.js';
 import { baselineSummary, baselineTargets, drifted } from './model/plan.js';
-import { planDelete, planDuplicate, planSeries, planReparent, descendantsOf } from './model/rowops.js';
+import { planDelete, planDeleteMany, planDuplicate, planSeries, planReparent, descendantsOf } from './model/rowops.js';
+import { clickSelection, selectAll, pruneSelection } from './model/selection.js';
 import { parseOutline, planOutline } from './model/outline.js';
 import { deltasOf } from './model/series.js';
 import { wbsOf, tableRows, toTsv } from './model/tabletext.js';
 import { copyBox } from './ui/copy.js';
 import { outlineBox } from './ui/outline.js';
 import { openMenu } from './ui/menu.js';
+import { createBulkBar } from './ui/bulkbar.js';
+import { setBox, daysBox } from './ui/bulkset.js';
 import { quickColumns } from './model/quickfields.js';
 import { slipText, slipShortText, linkText } from './ui/planwords.js';
 import { linkTypeOf, latestEnd as latestEndOfLink } from './model/links.js';
@@ -95,6 +98,7 @@ const S = {
   view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, swimBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, ovBy0: null, ovBy1: null, find: emptyFind(), display: cleanDisplay(null) },   // this browser's view of this table
   calDay: null,        // a day in the month or week the calendar shows; null = today (not saved: looking around)
   example: 'plan',     // the demo's data: 'plan' (a website relaunch) or 'stores' (pop-up stores × weekends)
+  multi: new Set(), anchor: null,   // the tasks selected together (M26), and where a Shift click starts
   pendingEdit: null,   // {id, note}: open quick edit once Grist sends this new row
 };
 const demoHistory = { undo: [], redo: [] };
@@ -121,7 +125,12 @@ const filterBar = createFilterBar({
   onAdd: (id) => patchFind((f) => { if (!f.cols.includes(id)) f.cols = [...f.cols, id]; }),
   choices: (id) => findChoices(id),
 });
-const shell = el('div', { class: 'ps-app', dataset: { version: VERSION } }, [toolbar, filterBar.el, stage, toastBox, srBox]);
+// what to do with several selected tasks at once (M26)
+const bulkBar = createBulkBar({
+  onDone: () => markDone(selectedIds(), true), onOpen: () => markDone(selectedIds(), false), onSet: () => bulkSet(), onShift: () => bulkShift(),
+  onDelete: () => bulkDelete(), onClear: () => clearMulti(),
+});
+const shell = el('div', { class: 'ps-app', dataset: { version: VERSION } }, [toolbar, filterBar.el, bulkBar.el, stage, toastBox, srBox]);
 function announce(text) {
   srBox.textContent = '';
   setTimeout(() => { srBox.textContent = text; }, 30);   // emptied first, so the same words are said again
@@ -165,7 +174,8 @@ function ensureView() {
   dropOthers('gantt');
   clear(stage);
   view = createGantt(stage, {
-    onSelect: (id) => select(id, { tellGrist: true }),
+    onSelect: (id, mods) => select(id, { tellGrist: true, mods }),
+    onSelectMany: (ids, o) => selectMany(ids, o),
     onOpen: (id) => openCard(id),
     onQuickEdit: (id) => openQuick(id),
     onEdit: (e) => editDates(e),
@@ -187,7 +197,8 @@ function ensureBoard() {
   dropOthers('board');
   clear(stage);
   boardView = createBoard(stage, {
-    onSelect: (id) => select(id, { tellGrist: true }),
+    onSelect: (id, mods) => select(id, { tellGrist: true, mods }),
+    onSelectMany: (ids, o) => selectMany(ids, o),
     onOpen: (id) => openCard(id),
     onQuickEdit: (id) => openQuick(id),
     onMove: (m) => moveCard(m),
@@ -205,7 +216,8 @@ function ensureTimeline() {
   dropOthers('timeline');
   clear(stage);
   timelineView = createTimeline(stage, {
-    onSelect: (id) => select(id, { tellGrist: true }),
+    onSelect: (id, mods) => select(id, { tellGrist: true, mods }),
+    onSelectMany: (ids, o) => selectMany(ids, o),
     onOpen: (id) => openCard(id),
     onQuickEdit: (id) => openQuick(id),
     onEdit: (e) => editTimeline(e),
@@ -221,7 +233,8 @@ function ensureBooking() {
   dropOthers('booking');
   clear(stage);
   bookingView = createBooking(stage, {
-    onSelect: (id) => select(id, { tellGrist: true }),
+    onSelect: (id, mods) => select(id, { tellGrist: true, mods }),
+    onSelectMany: (ids, o) => selectMany(ids, o),
     onOpen: (id) => openCard(id),
     onQuickEdit: (id) => openQuick(id),
     onMove: (m) => moveBooking(m),
@@ -237,7 +250,7 @@ function ensureWorkload() {
   dropOthers('workload');
   clear(stage);
   workloadView = createWorkload(stage, {
-    onSelect: (id) => select(id, { tellGrist: true, reveal: false }),
+    onSelect: (id, mods) => select(id, { tellGrist: true, reveal: false, mods }),
     onQuickEdit: (id) => openQuick(id),
     onAnnounce: (text) => announce(text),
     onUndo: () => undo(),
@@ -251,7 +264,7 @@ function ensureCalendar() {
   dropOthers('calendar');
   clear(stage);
   calendarView = createCalendar(stage, {
-    onSelect: (id) => select(id, { tellGrist: true, reveal: false }),
+    onSelect: (id, mods) => select(id, { tellGrist: true, reveal: false, mods }),
     onQuickEdit: (id) => openQuick(id),
     onMove: (m) => moveCalendar(m),
     onNav: (dir) => calNav(dir),
@@ -272,6 +285,7 @@ function ensureAgenda() {
   dropOthers('agenda');
   clear(stage);
   agendaView = createAgenda(stage, {
+    onSelect: (id, mods) => select(id, { tellGrist: true, mods }),
     onQuickEdit: (id) => openQuick(id),
     onAnnounce: (text) => announce(text),
   });
@@ -743,6 +757,7 @@ function toggleDisplay() {
 }
 
 function drawToolbar(model = null, level = 'full') {
+  bulkBar.update({ count: S.multi.size, canEdit: canEdit(), canDone: !!(S.roles.done || S.roles.status || S.roles.progress), canShift: ganttReady(S.roles) });
   // a view with no Display (the agenda, the workload) closes the panel
   if (displayPanel && !DISPLAY_SECTIONS[S.mode]) displayPanel.close();
   else if (displayPanel) displayPanel.refresh(displayState());
@@ -868,6 +883,10 @@ const pushModel = () => (S.mode === 'gantt' && !S.find.keep && S.model ? S.model
 
 function recompute() {
   if (!S.ready) return;
+  if (S.multi.size) {
+    const kept = pruneSelection({ multi: S.multi, primary: S.selectedId, anchor: S.anchor }, (id) => !!rowById(id));
+    if (kept.multi.size !== S.multi.size) { S.multi = kept.multi; if (kept.primary != null || !S.multi.size) S.selectedId = kept.primary; }
+  }
   S.find = findNow();
   showDueHint(false);
   showHoursHint(false);
@@ -914,7 +933,7 @@ function recompute() {
   drawToolbar(m);
   const editable = canEdit();
   const titleCol = S.columns.find((c) => c.id === S.roles.title);
-  const sig = [S.zoom, weekStart(), S.selectedId, titleCol?.label, editable, S.view.critical, S.gantt.holidays, S.gantt.durationUnit,
+  const sig = [S.zoom, weekStart(), S.selectedId, multiKey(), titleCol?.label, editable, S.view.critical, S.gantt.holidays, S.gantt.durationUnit,
     [...S.view.collapsed].join(','), groupCol()?.id, JSON.stringify(disp()),
     ...(disp().cols.length ? m.entries.map((e) => (e.kind === 'task' ? listTexts(e.task).join('\u0003') : '')) : []),
     ...m.entries.map((e) => (e.kind === 'group' ? 'g' + e.key + e.collapsed : e.task.id + '\u0002' + e.task.hash + (e.summary ? `${e.summary.start}-${e.summary.end}` : ''))),
@@ -928,7 +947,7 @@ function recompute() {
     linkTitle: (l) => linkText(l, names.get(l.from) || '', names.get(l.to) || ''),
     holidays: m.cal.holidays, length: m.cal.length, workdays: m.cal.workdays,
     caps: (task) => capabilities(task, c), linkable: canLink(c), editable, showCritical: S.view.critical,
-    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), selectedId: S.selectedId,
+    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), selectedId: S.selectedId, multi: S.multi,
     titleLabel: titleCol ? titleCol.label : t('Task'),
     timeText: (task) => timeText(task),
     ...displayProps(true),
@@ -984,7 +1003,7 @@ function recomputeBoard() {
   const order = orderCol();
   const swim = swimCol();
   const folded = foldedLanes(lane);
-  const sig = ['b', lane.id, swim?.id, [...folded].join(','), S.selectedId, editable, order?.id, S.board.hideEmpty, todayDay(),
+  const sig = ['b', lane.id, swim?.id, [...folded].join(','), S.selectedId, multiKey(), editable, order?.id, S.board.hideEmpty, todayDay(),
     ...(swim ? b.swims.map((s) => `${s.key}|${s.label}`) : []),
     ...b.lanes.map((l) => `${l.key}|${l.label}|${l.colour}|${l.limit}|${l.over}|` + l.cards.map((c) => c.id + '\u0002' + c.hash).join('\u0003'))].join('\n');
   const v = ensureBoard();
@@ -994,7 +1013,7 @@ function recomputeBoard() {
   v.update({
     lanes: b.lanes, swims: b.swims, swimmed: b.swimmed, swimLabel: swim?.label, swimLocked: !!swim?.isFormula, folded,
     editable, laneLocked: lane.isFormula, canAdd: editable && !!colById(S.roles.title) && !colById(S.roles.title).isFormula,
-    canLimit: editable || S.demo, selectedId: S.selectedId, laneLabel: lane.label, today: todayDay(), fmtDay: fmtShort, fmtRange: fmtShortRange, fmtHours,
+    canLimit: editable || S.demo, selectedId: S.selectedId, multi: S.multi, laneLabel: lane.label, today: todayDay(), fmtDay: fmtShort, fmtRange: fmtShortRange, fmtHours,
   });
 }
 
@@ -1021,7 +1040,7 @@ function recomputeTimeline() {
   S.fitNext = false;
   drawToolbar();
   const editable = canEdit();
-  const sig = ['t', lane.id, S.zoom, weekStart(), S.selectedId, editable, S.gantt.holidays, todayDay(), JSON.stringify(disp()),
+  const sig = ['t', lane.id, S.zoom, weekStart(), S.selectedId, multiKey(), editable, S.gantt.holidays, todayDay(), JSON.stringify(disp()),
     ...tl.lanes.map((l) => `${l.key}|${l.label}|${l.tracks}|` + l.bars.map((b) => b.task.id + '@' + b.track + (b.clash ? '!' : '') + '\u0002' + b.task.hash).join('\u0003'))].join('\n');
   if (sig === S.signature && !fitNow) return;
   S.signature = sig;
@@ -1029,7 +1048,7 @@ function recomputeTimeline() {
   v.update({
     lanes: tl.lanes, tracks: tl.tracks, span, holidays: cal.holidays, length: cal.length, workdays: cal.workdays,
     caps: (task) => capabilities(task, c), editable, laneMovable: editable && !lane.isFormula,
-    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), selectedId: S.selectedId,
+    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), selectedId: S.selectedId, multi: S.multi,
     laneLabel: lane.label, noneLabel: t('No {col}', { col: lane.label }),
     ...displayProps(false),
   }, { first: S.firstDraw, fit: fitNow });
@@ -1285,13 +1304,13 @@ function recomputeCalendar() {
   const v = ensureCalendar();
   showTip();
   const editable = canEdit();
-  const sig = ['k', mode, grid.from, S.selectedId, today, dateLocale(gristCulture()), editable, S.holidayDays.size, S.gantt.holidays,
+  const sig = ['k', mode, grid.from, S.selectedId, multiKey(), today, dateLocale(gristCulture()), editable, S.holidayDays.size, S.gantt.holidays,
     ...grid.weeks.map((w) => w.segments.map((s) => s.task.id + '|' + s.task.hash + '|' + s.task.finished + '|' + s.col0 + '|' + s.col1 + '|' + s.track).join(',') + '/' + w.more.join(''))].join('\n');
   if (sig === S.signature) return;
   S.signature = sig;
   const c = ctx();
   v.update({
-    grid, mode, maxTracks: MONTH_TRACKS, today, selectedId: S.selectedId, canAdd: canEdit() && ganttReady(S.roles),
+    grid, mode, maxTracks: MONTH_TRACKS, today, selectedId: S.selectedId, multi: S.multi, canAdd: canEdit() && ganttReady(S.roles),
     title: calTitle(mode, grid),
     weekdays: grid.weeks[0].days.map((d) => calFormat('wd').format(dateFromDay(d))),
     canDrag: (task) => editable && capabilities(task, c).move,
@@ -1391,11 +1410,11 @@ function recomputeAgenda() {
   const empty = ag.open ? null : me != null
     ? { title: t('Nothing for {name}', { name: me }), body: t('No open task is assigned to {name}. Switch to Everyone to see the rest.', { name: me }) }
     : { title: t('Nothing to do'), body: t('Tasks that are not done show up here, under the day they need someone.') };
-  const sig = ['a', who, me, doable, S.selectedId, today, dateLocale(gristCulture()),
+  const sig = ['a', who, me, doable, S.selectedId, multiKey(), today, dateLocale(gristCulture()),
     ...ag.groups.map((g) => g.id + ':' + g.items.map((i) => i.task.id + '|' + i.task.hash + '|' + i.day + '|' + i.late).join(','))].join('\n');
   if (sig === S.signature) return;
   S.signature = sig;
-  v.update({ groups: ag.groups, selectedId: S.selectedId, fmtDay: fmtDayWd, empty });
+  v.update({ groups: ag.groups, selectedId: S.selectedId, multi: S.multi, fmtDay: fmtDayWd, empty });
 }
 
 // ---- add to calendar (M11) -----------------------------------------------------------------------------------
@@ -1580,8 +1599,12 @@ let pending = 0;
 const schedule = () => { if (!pending) pending = requestAnimationFrame(() => { pending = 0; recompute(); }); };
 
 // ---- selection, zoom, folding --------------------------------------------------------------------------
-function select(id, { tellGrist = false, reveal = true } = {}) {
-  if (id === S.selectedId) { if (reveal) current()?.reveal(id); return; }
+function select(id, { tellGrist = false, reveal = true, mods = null } = {}) {
+  if (mods && (mods.ctrl || mods.shift) && S.mode !== 'booking' && S.mode !== 'workload') { clickSelect(id, mods); return; }
+  const hadMany = S.multi.size > 0;
+  if (hadMany) S.multi = new Set();
+  S.anchor = id;
+  if (id === S.selectedId && !hadMany) { if (reveal) current()?.reveal(id); return; }
   S.selectedId = id;
   recompute();
   if (reveal) current()?.reveal(id);
@@ -1679,10 +1702,11 @@ async function pushedAlong(changed, extraLinks = [], replaceInto = null) {
     const plan = task && row ? planDates(task, row, c, 'move', p.start, p.end) : { error: 'gone' };
     if (plan.error) stuck.push(task?.title || p.id); else items.push({ id: p.id, plan });
   }
-  const name = taskById(changed.id)?.title || t('(no name)');
+  const many = Array.isArray(changed);
+  const name = many ? '' : taskById(changed.id)?.title || t('(no name)');
   const yes = await confirmBox(shell, {
-    title: tn(push.length, 'Move the task that depends on “{name}”?', 'Move the {n} tasks that depend on “{name}”?').replace('{name}', name),
-    body: (push.length === 1 ? t('It would start before “{name}” ends. Moving it keeps its length.', { name })
+    title: many ? tn(push.length, 'Move the task that waits for these?', 'Move the {n} tasks that wait for these?') : tn(push.length, 'Move the task that depends on “{name}”?', 'Move the {n} tasks that depend on “{name}”?').replace('{name}', name),
+    body: (!many && push.length === 1 ? t('It would start before “{name}” ends. Moving it keeps its length.', { name })
       : t('They would start before the work they wait for ends. Moving them keeps their lengths.'))
       + (stuck.length ? ' ' + t('Not movable (their dates are formulas): {list}.', { list: stuck.join(', ') }) : ''),
     ok: push.length === 1 ? t('Move it too') : t('Move them too'),
@@ -1701,6 +1725,8 @@ async function editDates({ id, mode, start, end }) {
   const task = taskById(id);
   const row = rowById(id);
   if (!task || !row) return;
+  // a bar that is one of several selected takes the others with it, by the same number of days
+  if (mode === 'move' && S.multi.size > 1 && S.multi.has(id)) { moveTogether(selectedIds(), start - task.start); return; }
   const plan = planDates(task, row, ctx(), mode, start, end);
   if (plan.error) { toast(plan.error === 'endBeforeStart' ? t('The end can’t be before the start.') : t('These dates come from formulas, so they can’t be changed here.')); S.signature = ''; recompute(); return; }
   const when = mode === 'start' ? fmtDay(start) : mode === 'end' ? fmtDay(end) : fmtRange(start, end);
@@ -2612,6 +2638,11 @@ const printCard = (c) => ({
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startPrint(); return; }
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '') || e.target?.isContentEditable;
+  // Ctrl+A selects every task drawn; Esc lets go of several; Delete deletes them all
+  const nothingOpen = !shell.querySelector('.ps-dialog, .ps-drawer, .ps-menu');
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'a' && !typing && nothingOpen && ['gantt', 'timeline', 'board', 'calendar', 'agenda'].includes(S.mode)) { e.preventDefault(); selectAllShown(); return; }
+  if (e.key === 'Escape' && !typing && nothingOpen && S.multi.size) { clearMulti(); return; }
+  if (e.key === 'Delete' && !e.ctrlKey && !e.metaKey && !e.altKey && !typing && nothingOpen && S.multi.size > 1 && canEdit()) { e.preventDefault(); bulkDelete(); return; }
   if (e.key === '?' && !e.ctrlKey && !e.metaKey && !typing && !shell.querySelector('.ps-dialog, .ps-drawer')) {
     e.preventDefault();
     openHelpPanel();
@@ -2785,7 +2816,12 @@ async function deleteTask(id) {
   const extra = [plan.moved ? tn(plan.moved, '{n} sub-task moved up.', '{n} sub-tasks moved up.') : null,
     plan.removed.length > 1 ? tn(plan.removed.length - 1, '{n} sub-task deleted with it.', '{n} sub-tasks deleted with it.') : null].filter(Boolean).join(' ');
   const message = [t('Deleted “{name}”.', { name }), extra].filter(Boolean).join(' ');
-  if (S.selectedId === id || plan.removed.includes(S.selectedId)) S.selectedId = null;
+  await commitDelete(plan, message);
+}
+
+/** Write a delete plan ({updates, removed}) as one action, and say so with an Undo. */
+async function commitDelete(plan, message) {
+  if (plan.removed.includes(S.selectedId)) S.selectedId = null;
   if (S.demo) {
     const steps = [];
     for (const u of plan.updates) { const row = rowById(u.id); if (row) { steps.push({ id: u.id, fields: u.fields, before: Object.fromEntries(Object.keys(u.patch).map((k) => [k, row[k] ?? null])), after: u.patch }); replaceRow(u.id, { ...row, ...u.patch }); } }
@@ -3018,6 +3054,7 @@ shell.addEventListener('contextmenu', (e) => {
   const id = Number(n.dataset.id);
   if (!taskById(id)) return;
   e.preventDefault();
+  if (S.multi.size > 1 && S.multi.has(id)) { openMenu(shell, { x: e.clientX, y: e.clientY, items: bulkMenuItems(), label: t('Selected tasks') }); return; }
   select(id, { tellGrist: true });
   openMenu(shell, { x: e.clientX, y: e.clientY, items: taskMenuItems(id), label: taskById(id)?.title || '' });
 });
@@ -3046,7 +3083,7 @@ function foldAll(fold) {
 /** The tasks on show as a table of text: outline number, name, dates, days, status, people, progress. */
 function planTable() {
   if (!S.built) return null;
-  const list = [...S.built.tasks, ...S.built.unscheduled];
+  const list = [...S.built.tasks, ...S.built.unscheduled].filter((x) => S.multi.size < 2 || S.multi.has(x.id));
   const { entries } = arrange(list, { group: null, collapsed: new Set(), sort: taskSorter(disp().sort, { columns: S.columns, rowOf: rowById, labels: S.labels }) });
   return {
     head: [t('No.'), t('Task'), t('Start'), t('End'), t('Days'), t('Status'), t('Assigned to'), t('Progress %')],
@@ -3105,6 +3142,144 @@ function openMore(btn) {
       S.mode !== 'agenda' ? { label: t('Print…'), hint: t('Ctrl+P'), onClick: () => startPrint() } : null,
     ],
   });
+}
+
+// ---- selecting several tasks (M26) ---------------------------------------------------------------------------------
+const multiKey = () => [...S.multi].join(',');
+const selectedIds = () => [...S.multi].filter((id) => rowById(id));
+
+/** The tasks of the view on show, in the order they are drawn (what a Shift click counts between). */
+function visibleIds() {
+  if (S.mode === 'gantt') return (S.model?.entries || []).filter((e) => e.kind === 'task').map((e) => e.task.id);
+  if (S.mode === 'board' && S.boardModel) return S.boardModel.swims.flatMap((s) => s.lanes.flatMap((l) => l.cards.map((c) => c.id)));
+  if (S.mode === 'agenda' && S.agendaModel) return S.agendaModel.ag.groups.flatMap((g) => g.items.map((it) => it.task.id));
+  if (S.mode === 'timeline' && S.tlModel) return S.tlModel.lanes.flatMap((l) => l.bars.map((b) => b.task.id));
+  return [...(S.built?.tasks || [])].sort((a, b) => a.start - b.start || a.index - b.index).map((x) => x.id);
+}
+
+/** Take a new selection (the model's: {multi, primary, anchor}) and draw it. */
+function applySelection(next, { say = true } = {}) {
+  S.multi = next.multi;
+  S.selectedId = next.primary;
+  S.anchor = next.anchor;
+  recompute();
+  if (say) announce(S.multi.size > 1 ? tn(S.multi.size, '{n} task selected', '{n} tasks selected') : describeTask(S.selectedId));
+}
+function clickSelect(id, mods) {
+  applySelection(clickSelection({ multi: S.multi, primary: S.selectedId, anchor: S.anchor }, { id, ctrl: !!mods.ctrl, shift: !!mods.shift, order: visibleIds() }));
+  if (S.live && S.selectedId != null) moveCursor(S.selectedId).catch(() => {});
+}
+/** The tasks a box drew over (Gantt chart): replace the selection, or add to it when Ctrl was held. */
+function selectMany(ids, { add = false } = {}) {
+  const all = new Set([...(add ? (S.multi.size ? S.multi : S.selectedId != null ? [S.selectedId] : []) : []), ...ids]);
+  if (all.size < 2) { if (all.size === 1) select([...all][0], { tellGrist: true }); return; }
+  applySelection({ multi: all, primary: ids[ids.length - 1] ?? [...all].pop(), anchor: ids[0] ?? null });
+}
+function selectAllShown() {
+  const order = visibleIds();
+  if (order.length) applySelection(selectAll(order));
+}
+function clearMulti() {
+  if (!S.multi.size) return false;
+  applySelection({ multi: new Set(), primary: S.selectedId, anchor: S.anchor }, { say: false });
+  return true;
+}
+
+/** Set a column to the same value on every selected task. */
+async function bulkSet() {
+  const ids = selectedIds();
+  if (ids.length < 2 || !canEdit()) return;
+  // data columns that have an input here; never the name, the dates a task is drawn from, links or a formula
+  const skip = new Set(['title', 'start', 'end', 'due', 'duration', 'parent', 'dependsOn', 'baselineStart', 'baselineEnd', 'doneOn'].map((r) => S.roles[r]).filter(Boolean));
+  const kinds = ['Choice', 'ChoiceList', 'Ref', 'RefList', 'Bool', 'Numeric', 'Int', 'Text', 'Date', 'DateTime'];
+  const columns = S.columns
+    .filter((c) => !c.isFormula && !skip.has(c.id) && kinds.includes(c.kind) && c.refTable !== S.tableId && (!(c.kind === 'Ref' || c.kind === 'RefList') || S.labels[c.id]))
+    .map((c) => ({ col: c, labels: S.labels[c.id] }));
+  if (!columns.length) { toast(t('There is no column here that can be set on several tasks at once.')); return; }
+  const pick = await setBox(shell, { count: ids.length, columns });
+  if (!pick) return;
+  const items = [];
+  for (const id of ids) {
+    const row = rowById(id);
+    const [value, cell] = encodeInput(pick.col, pick.value, row[pick.col.id]);
+    items.push({ id, plan: { fields: { [pick.col.id]: value }, patch: { [pick.col.id]: cell } } });
+  }
+  writeMany(items, tn(ids.length, '“{col}” set on {n} task.', '“{col}” set on {n} tasks.').replace('{col}', pick.col.label));
+}
+
+/** Move the selected tasks by the same number of days (a drag of one of them, or the Move dates… button). */
+async function moveTogether(ids, delta, working = false) {
+  const cal = calendar(), c = ctx();
+  const items = [], changes = [];
+  for (const id of ids) {
+    const task = taskById(id), row = rowById(id);
+    // a parent whose bar only sums its sub-tasks has no dates of its own to move
+    if (!task || !row || task.start == null || !capabilities(task, c).move) continue;
+    const start = working ? cal.shift(task.start, delta) : task.start + delta;
+    const end = working ? cal.endAfter(start, cal.length(task.start, task.end)) : task.end + delta;
+    const plan = planDates(task, row, c, 'move', start, end);
+    if (!plan.error) { items.push({ id, plan }); changes.push({ id, start, end }); }
+  }
+  if (!items.length) { toast(t('None of these tasks has dates that can be moved.')); S.signature = ''; recompute(); return; }
+  const moved = new Set(changes.map((x) => x.id));
+  const extra = (await pushedAlong(changes)).filter((x) => !moved.has(x.id));
+  const when = delta > 0 ? tn(delta, '{n} day later', '{n} days later') : tn(-delta, '{n} day earlier', '{n} days earlier');
+  writeMany([...items, ...extra], tn(items.length, 'Moved {n} task {when}.', 'Moved {n} tasks {when}.').replace('{when}', when)
+    + (extra.length ? ' ' + tn(extra.length, '{n} task moved along.', '{n} tasks moved along.') : ''));
+}
+async function bulkShift() {
+  const ids = selectedIds();
+  if (ids.length < 2 || !canEdit()) return;
+  const working = calendar().workdays;
+  const n = await daysBox(shell, {
+    title: tn(ids.length, 'Move {n} task', 'Move {n} tasks'),
+    body: t('Every selected task keeps its length and moves by the same number of days. A negative number moves them earlier; the tasks that wait for them are offered a move too.'),
+    unit: working ? t('Working days') : t('Days'), ok: t('Move'),
+  });
+  if (n) moveTogether(ids, n, working);
+}
+
+/** Delete the selected tasks: their sub-tasks that are not selected move up a level or go too; one action, one Undo. */
+async function bulkDelete() {
+  const ids = selectedIds();
+  if (ids.length < 2 || !canEdit()) return;
+  const list = allTasks();
+  const below = new Set();
+  for (const id of ids) for (const d of descendantsOf(list, id)) if (!ids.includes(d)) below.add(d);
+  let children = 'keep';
+  const title = tn(ids.length, 'Delete {n} task?', 'Delete {n} tasks?');
+  if (below.size) {
+    children = await chooseBox(shell, {
+      title, body: tn(below.size, 'They have {n} more sub-task.', 'They have {n} more sub-tasks.') + ' ' + t('Grist’s Undo brings it all back.'),
+      label: t('What happens to them'), value: 'keep', ok: t('Delete'),
+      options: [{ value: 'keep', label: t('Keep them, one level up') }, { value: 'delete', label: t('Delete them too') }],
+    });
+    if (!children) return;
+  } else if (!(await confirmBox(shell, { title, body: t('The tasks are removed from {table}. Grist’s Undo brings them back.', { table: S.tableId || t('the table') }), ok: t('Delete') }))) return;
+  const plan = planDeleteMany(ctxRows(), list, ids, { children });
+  if (plan.error === 'parentFormula') { toast(t('Their sub-tasks can’t be moved up: “{col}” is a formula. Delete them too, or change that column.', { col: colById(S.roles.parent)?.label || '' })); return; }
+  if (plan.error) return;
+  const extra = [plan.moved ? tn(plan.moved, '{n} sub-task moved up.', '{n} sub-tasks moved up.') : null,
+    plan.removed.length > ids.length ? tn(plan.removed.length - ids.length, '{n} sub-task deleted with them.', '{n} sub-tasks deleted with them.') : null].filter(Boolean).join(' ');
+  S.multi = new Set();
+  await commitDelete(plan, [tn(ids.length, 'Deleted {n} task.', 'Deleted {n} tasks.'), extra].filter(Boolean).join(' '));
+}
+
+/** What a right-click on one of several selected tasks offers: the same things as the strip above. */
+function bulkMenuItems() {
+  const edit = canEdit();
+  const canDone = !!(S.roles.done || S.roles.status || S.roles.progress);
+  return [
+    { label: tn(S.multi.size, '{n} task selected', '{n} tasks selected'), disabled: true, onClick: () => {} },
+    { separator: true },
+    edit && canDone ? { label: t('Mark done'), onClick: () => markDone(selectedIds(), true) } : null,
+    edit && canDone ? { label: t('Mark open'), onClick: () => markDone(selectedIds(), false) } : null,
+    edit ? { label: t('Set…'), onClick: () => bulkSet() } : null,
+    edit && ganttReady(S.roles) ? { label: t('Move dates…'), onClick: () => bulkShift() } : null,
+    { separator: true },
+    edit ? { label: t('Delete…'), hint: t('Del'), danger: true, onClick: () => bulkDelete() } : null,
+    { label: t('Clear'), hint: t('Esc'), onClick: () => clearMulti() },
+  ];
 }
 
 function openPending() {

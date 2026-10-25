@@ -731,3 +731,11 @@ button, input, select { font: inherit; color: inherit; }
 .ps-menu__item.is-checked::before { border-color: var(--ps-ok); }
 .ps-menu__item[aria-checked] { justify-content: flex-start; }
 .ps-menu__item[aria-checked] .ps-menu__text { flex: 1; }
+
+/* ---- several tasks selected (M26) ---- */
+.ps-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px 12px; background: var(--ps-surface-2); border-bottom: 1px solid var(--ps-line); }
+.ps-bulk[hidden] { display: none; }
+.ps-bulk__count { margin-right: 6px; font-size: 13px; font-weight: 600; }
+.ps-bulk .ps-spacer { flex: 1; }
+/* the box drawn over the chart with Shift held: what it touches is selected */
+.ps-lasso { position: absolute; z-index: 5; pointer-events: none; box-sizing: border-box; border: 1px solid var(--ps-focus); background: rgba(20, 80, 155, 0.12); border-radius: 2px; }

@@ -88,6 +88,17 @@ eq('…and ending the same day is not', Sc.isLate(Sc.linksOf(ffOk)[0], new Map(f
   eq('working days: a lag of one working day after a Friday end is the Tuesday', wdMove.map((m) => [m.id, iso(m.start), iso(m.end)]), [[2, '2026-11-10', '2026-11-11']]);
 }
 
+// ---- several tasks moved together
+{
+  const plan = [T(1, '2026-11-02', '2026-11-04'), T(2, '2026-11-02', '2026-11-04'), T(3, '2026-11-05', '2026-11-06', { deps: [1, 2] }), T(4, '2026-11-06', '2026-11-06', { deps: [3] })];
+  const links = Sc.linksOf(plan);
+  const both = Sc.pushPlan(plan, links, [{ id: 1, start: day('2026-11-09'), end: day('2026-11-11') }, { id: 2, start: day('2026-11-16'), end: day('2026-11-18') }], plain);
+  eq('a task that waits for two that moved is pushed by the later one, and what waits for it after that', both.map((m) => [m.id, iso(m.start), iso(m.end)]), [[3, '2026-11-19', '2026-11-20'], [4, '2026-11-21', '2026-11-21']]);
+  const mates = Sc.pushPlan(plan, [{ from: 1, to: 2, type: 'fs', lag: 0 }], [{ id: 1, start: day('2026-11-09'), end: day('2026-11-11') }, { id: 2, start: day('2026-11-10'), end: day('2026-11-12') }], plain);
+  eq('a task that moved with the one it waits for is not pushed by it (the person moved both)', mates, []);
+  eq('a list with nothing that is here pushes nothing', Sc.pushPlan(plan, links, [{ id: 99, start: 1, end: 2 }], plain), []);
+}
+
 // ---- the critical path
 {
   // A (Mon 2 – Wed 4) ; B waits for A start to start with lag 1 (Tue 3 – Fri 6) ; plan ends Fri 6: A is on the path through B only when B can't slip

@@ -26,7 +26,7 @@ export function createNavigation(o) {
   // ---- drag to move across ------------------------------------------------------------------------------
   let pan = null;
   chart.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0 || e.pointerType === 'touch' || e.defaultPrevented) return;
+    if (e.button !== 0 || e.pointerType === 'touch' || e.defaultPrevented || e.shiftKey) return;   // Shift and drag draws a box (view.js)
     if (e.target.closest && e.target.closest('[data-id], [data-toggle], .ps-arrow__hit')) return;
     e.preventDefault();   // no text selection while dragging
     scroll.focus({ preventScroll: true });
