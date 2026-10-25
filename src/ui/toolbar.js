@@ -37,7 +37,7 @@ const button = (text, title, onclick, cls = '') => el('button', { type: 'button'
  *          timer: {title, since, elapsed} | null, hasTime, display: {available, changed, open}, examples, example}} s
  * @param {{onMode, onZoom, onFit, onToday, onColumns, onNew, onUndated, onGroup, onCritical, onLanes, onTlLanes,
  *          onRows, onPeriods, onFilter, onClash, onWlRows, onWlUnit, onWlMeasure, onAgendaWho, onCalendar, onReminders, onViews, onDisplay, onLevel, onOverload, onStopTimer, onTimesheet, onExample,
- *          onPrint, onKeys}} on
+ *          onPrint, onHelp}} on
  */
 export function renderToolbar(host, s, on) {
   const view = s.mode;
@@ -157,7 +157,7 @@ export function renderToolbar(host, s, on) {
       }) : null,
       level === 'full' ? button(t('Views'), t('Saved views: a view as you set it up, under a name'), on.onViews) : null,
       level === 'full' && view !== 'agenda' ? button(t('Print'), t('Print or save as PDF (Ctrl+P)'), on.onPrint, ' ps-hide-narrow') : null,
-      level === 'bare' ? null : el('button', { type: 'button', class: 'ps-btn ps-btn--key ps-hide-narrow', text: '?', title: t('Keyboard shortcuts (?)'), 'aria-label': t('Keyboard shortcuts'), onclick: on.onKeys }),
+      level === 'bare' ? null : el('button', { type: 'button', class: 'ps-btn ps-btn--key ps-hide-narrow', text: '?', title: t('Help and keyboard shortcuts (?)'), 'aria-label': t('Help'), onclick: on.onHelp }),
       level === 'bare' ? null : button(t('Settings'), t('Columns, how dates are read, and what each view shows'), on.onColumns, ' ps-columns-btn'),
     ]),
   );

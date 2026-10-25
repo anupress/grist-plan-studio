@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.7.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.8.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -92,6 +92,10 @@ what it found and lets you change it:
   offers **Add a column for it**.
 - An empty table (Grist's new Table1) offers three starter templates: a project plan, an event
   booking plan and a room booking. Each asks first, and Grist's Undo takes it back.
+- When it cannot tell which columns hold the dates, the message offers **Set up my plan**: three questions in plain
+  words (which column says when a task starts, when it ends or is due, and who does it), the plan's own sentence
+  and “3 of 4 tasks have a date and will be drawn” updating under them, and **Show my plan** saves the mapping as
+  Settings would. **More options in Settings** is one click away.
 
 ### Settings
 
@@ -139,13 +143,21 @@ a picture for a slide or a message. It is drawn by the browser from the printout
 printout, in light colours whatever the theme; a plan too large for a picture says so and points to the PDF.
 Tested in Chrome: a browser that will not draw it says so too. The agenda has no printout.
 
+## First use and help
+
+Each view opens with a one-sentence **tip** over it that says what to try (“Drag a bar to move a task, or its edge to
+change its length”), with a **Help** button. It comes once per view, and stays away in this browser once it is closed or
+the help has been opened. **?** (the key, the toolbar's button, or the tip's Help) opens the help: what the view is for,
+what can be done in it, what search, Display and Settings do and do not do (they never change your table, and every
+change is one step in Grist's Undo), and the keys.
+
 ## Languages and keys
 
 English, German and French, following Grist's language (or chosen in Settings). Dates, week
 numbers and key names follow the language.
 
 The main actions have keys: arrows select, Alt+arrows move, Enter opens quick edit, Ctrl+Z
-undoes. **?** lists the keys of the view on show. Dialogs keep the focus and give it back, a
+undoes. **?** opens the help: what the view is for, what to try, and the keys of the view on show. Dialogs keep the focus and give it back, a
 selection is announced to screen readers, and the booking grid has a cell cursor.
 
 ## Time tracking
@@ -250,6 +262,8 @@ sight, so each choice shows at once. The same table can be a dense list for one 
 
 These are this browser's choices, per table; a saved view keeps them; nothing is written to the document.
 **Back to the defaults** undoes them all.
+
+![Display: compact rows, Status and Owner beside the names, and the panel](docs/images/display.png)
 
 ## Saved views, and moving over from another widget
 

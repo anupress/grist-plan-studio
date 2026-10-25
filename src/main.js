@@ -13,7 +13,8 @@ import {
 } from './grist/connect.js';
 import { loadColumns, loadForeignMapping, loadLabels, loadOwnSection, loadHolidayDays, loadDaysOff, listDatedTables, loadTable, listTables, columnRefs, forgetMeta, listTablesWithColumns, docTimeZone } from './data/live.js';
 import { templates, structureActions, dataActions, columnForRole } from './model/templates.js';
-import { detectRoles, ganttReady, fromStored, toStored } from './model/roles.js';
+import { detectRoles, ganttReady, fromStored, toStored, fits, nameScore } from './model/roles.js';
+import { previewLines } from './model/settingsmap.js';
 import { buildTasks, spanOf } from './model/tasks.js';
 import { arrange } from './model/tree.js';
 import { linksOf, isLate, pushPlan, criticalPath, wouldLoop } from './model/schedule.js';
@@ -36,7 +37,8 @@ import { renderTimePrint, renderBoardPrint, renderBookingPrint, renderWorkloadPr
 import { nodeToPng } from './print/png.js';
 import { pageRule } from './print/layout.js';
 import { openPrint } from './ui/printpanel.js';
-import { openKeys } from './ui/keys.js';
+import { openHelp, tipFor, HELP_VIEWS } from './ui/help.js';
+import { openSetup } from './ui/setup.js';
 import { createGantt } from './views/gantt/view.js';
 import { createBoard } from './views/board/view.js';
 import { createTimeline } from './views/timeline/view.js';
@@ -131,6 +133,8 @@ let calendarView = null;
 const current = () => view || boardView || timelineView || bookingView || workloadView || agendaView || calendarView;
 /** Take down every view but `keep` ('gantt', 'board', 'timeline', 'booking', 'workload', 'agenda', 'calendar'; null for all). */
 function dropOthers(keep) {
+  // the stage is about to be cleared, and a note on it with it
+  stage.classList.remove('has-banner');
   if (keep !== 'gantt') dropView();
   if (keep !== 'board') dropBoard();
   if (keep !== 'timeline' && timelineView) { timelineView.destroy(); timelineView = null; S.signature = ''; S.firstDraw = true; }
@@ -739,7 +743,7 @@ function drawToolbar(model = null, level = 'full') {
     onTimesheet: () => openTimesheetPanel(),
     onExample: (id) => bootDemo(id),
     onPrint: () => startPrint(),
-    onKeys: () => openKeys(shell, S.mode),
+    onHelp: () => openHelpPanel(),
   });
 }
 const saveView = () => rememberView(S.tableId, {
@@ -797,10 +801,10 @@ function recompute() {
     const hasDates = S.columns.some((c) => c.kind === 'Date' || c.kind === 'DateTime');
     const toBoard = boardPossible() ? [[t('Show the board'), () => setMode('board')]] : [];
     emptyState(t('Which columns hold the dates?'), hasDates
-      ? t('Plan Studio draws each task from a name and a date. Pick the columns in Settings.')
+      ? t('Plan Studio draws each task from a name and a date. Three questions are enough to tell it which columns they are in.')
       : t('This table has no Date column yet. Add one (a start date, an end or a due date), or show another table in this widget.')
         + (toBoard.length ? ' ' + t('The board needs no dates.') : ''),
-    hasDates ? [[t('Choose columns'), () => openColumns('columns')], ...toBoard] : toBoard);
+    hasDates ? [...datesActions(), ...toBoard] : toBoard);
     return;
   }
   const m = buildModel();
@@ -812,6 +816,7 @@ function recompute() {
     return;
   }
   const v = ensureView();
+  showTip();
   // Grist's own task templates have a due date and no start: their tasks are
   // milestones until there is a start date to draw a bar from.
   showDueHint(!!(S.roles.due && !S.roles.start && S.live && canEdit()));
@@ -879,6 +884,7 @@ function recomputeBoard() {
   const sig = ['b', lane.id, S.selectedId, editable, order?.id, S.board.hideEmpty, todayDay(),
     ...b.lanes.map((l) => `${l.key}|${l.label}|${l.colour}|${l.limit}|${l.over}|` + l.cards.map((c) => c.id + '\u0002' + c.hash).join('\u0003'))].join('\n');
   const v = ensureBoard();
+  showTip();
   if (sig === S.signature) return;
   S.signature = sig;
   v.update({
@@ -894,7 +900,7 @@ function recomputeTimeline() {
     S.built = null;
     drawToolbar(null, 'switch');
     if (!lane) emptyState(t('Which column makes the lanes?'), t('The timeline draws a band for each person, room or project: a Reference, Choice or Text column. Pick it in Settings.'));
-    else emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Pick the columns in Settings.'));
+    else emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Three questions are enough to tell it which columns they are in.'), datesActions());
     return;
   }
   const cal = calendar();
@@ -904,6 +910,7 @@ function recomputeTimeline() {
   S.tlModel = tl;
   const span = spanOf(S.built.tasks);
   const v = ensureTimeline();
+  showTip();
   let fitNow = S.fitNext;
   if (S.zoom == null) { S.zoom = fitZoom(span, v.chartWidth() || 800); fitNow = true; }
   S.fitNext = false;
@@ -983,6 +990,7 @@ function recomputeBooking() {
   S.bookModel = { ...g, periods, periodCol, unit };
   drawToolbar();
   const v = ensureBooking();
+  showTip();
   const editable = canEdit();
   const lab = bookLabelCol();
   const labelOf = (task) => (lab ? cellText(rowById(task.id) || {}, lab, S.labels, fmtShort) : task.title) || '';
@@ -1072,7 +1080,7 @@ function recomputeWorkload() {
     S.built = null;
     drawToolbar(null, 'switch');
     if (!person) emptyState(t('Whose work is it?'), t('The workload has a row for each person: the column that says who a task is assigned to, such as Owner. Pick it as “Assigned to” in Settings.'));
-    else emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Pick the columns in Settings.'));
+    else emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Three questions are enough to tell it which columns they are in.'), datesActions());
     return;
   }
   const cal = calendar();
@@ -1106,6 +1114,7 @@ function recomputeWorkload() {
   S.wlModel = { wl, measure, periods, unit, people, ahead, missing: wl.missing, cellOf: (o) => ({ ri: rowOf.get(o.key), pi: periodOf(o.day) }) };
   drawToolbar();
   const v = ensureWorkload();
+  showTip();
   showHoursHint(measure !== 'logged' && !effortCol());
   showNoTimeHint(measure === 'logged' && !people.some((p) => p.totals.some((x) => x.load > 0.004)));
   const sig = ['w', person.id, unit, measure, periods[0].key, periods.length, S.selectedId, S.workload.hoursPerDay, todayDay(), dateLocale(gristCulture()),
@@ -1157,7 +1166,7 @@ function recomputeCalendar() {
   if (!ganttReady(S.roles)) {
     S.built = null;
     drawToolbar(null, 'switch');
-    emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Pick the columns in Settings.'));
+    emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Three questions are enough to tell it which columns they are in.'), datesActions());
     return;
   }
   const cal = calendar();
@@ -1167,6 +1176,7 @@ function recomputeCalendar() {
   S.calModel = { grid, mode, anchor };
   drawToolbar();
   const v = ensureCalendar();
+  showTip();
   const editable = canEdit();
   const sig = ['k', mode, grid.from, S.selectedId, today, dateLocale(gristCulture()), editable, S.holidayDays.size, S.gantt.holidays,
     ...grid.weeks.map((w) => w.segments.map((s) => s.task.id + '|' + s.task.hash + '|' + s.task.finished + '|' + s.col0 + '|' + s.col1 + '|' + s.track).join(',') + '/' + w.more.join(''))].join('\n');
@@ -1241,6 +1251,7 @@ function recomputeAgenda() {
   S.agendaModel = { ag, today, who, doable };
   drawToolbar();
   const v = ensureAgenda();
+  showTip();
   const empty = ag.open ? null : me != null
     ? { title: t('Nothing for {name}', { name: me }), body: t('No open task is assigned to {name}. Switch to Everyone to see the rest.', { name: me }) }
     : { title: t('Nothing to do'), body: t('Tasks that are not done show up here, under the day they need someone.') };
@@ -2043,21 +2054,78 @@ async function addColumnFor(role) {
 
 // A note above the view, dismissed per table in this browser: the due-date note over the Gantt chart, and the
 // workload's note that, with no hours to go on, it counts each task as a full day.
-function showBanner(name, on, text, action) {
-  const key = 'planStudio.' + name + '.' + (S.tableId || 'demo');
+function showBanner(name, on, text, action, everywhere = false) {
+  const key = 'planStudio.' + name + (everywhere ? '' : '.' + (S.tableId || 'demo'));
   let bar = stage.querySelector(':scope > .ps-banner');
   let off = false;
   try { off = localStorage.getItem(key) === 'off'; } catch { /* private window */ }
-  if (!on || off) { if (bar?.dataset.name === name) { bar.remove(); stage.classList.remove('has-banner'); } return; }
+  if (!on || off) { if (bar?.dataset.name === name) { dropBanner(bar); stage.classList.remove('has-banner'); } return; }
   if (bar?.dataset.name === name) return;
-  bar?.remove();
+  if (bar) dropBanner(bar);
   bar = el('div', { class: 'ps-banner', role: 'note', dataset: { name } }, [
     el('span', { text }),
     action ? el('button', { type: 'button', class: 'ps-btn ps-btn--sm', text: action.label, onclick: action.run }) : null,
-    el('button', { type: 'button', class: 'ps-icon-btn ps-banner__close', 'aria-label': t('Close'), text: '×', onclick: () => { try { localStorage.setItem(key, 'off'); } catch { /* fine */ } showBanner(name, false); } }),
+    el('button', { type: 'button', class: 'ps-icon-btn ps-banner__close', 'aria-label': t('Close'), text: '×', onclick: () => { try { localStorage.setItem(key, 'off'); } catch { /* fine */ } showBanner(name, false, '', null, everywhere); } }),
   ]);
   stage.prepend(bar);
   stage.classList.add('has-banner');
+  // the view below starts where the note ends, however many lines the words take at this width
+  const fit = () => stage.style.setProperty('--banner-h', bar.offsetHeight + 'px');
+  fit();
+  if (typeof ResizeObserver === 'function') { bar._ro = new ResizeObserver(fit); bar._ro.observe(bar); }
+}
+function dropBanner(bar) { bar._ro?.disconnect(); bar.remove(); }
+// ---- help for first use (M16) --------------------------------------------------------------------------------
+// A one-sentence tip over each view, once per browser, until it is closed or Help is opened; "?" opens the help.
+function showTip() {
+  if (!HELP_VIEWS.includes(S.mode) || stage.querySelector(':scope > .ps-banner')) return;   // a note about this table comes first
+  showBanner('tip.' + S.mode, true, tipFor(S.mode), { label: t('Help'), run: () => openHelpPanel() }, true);
+}
+function openHelpPanel() {
+  if (shell.querySelector('.ps-dialog, .ps-drawer')) return;
+  // looking at the help is reading the tip
+  try { localStorage.setItem('planStudio.tip.' + S.mode, 'off'); } catch { /* private window */ }
+  showBanner('tip.' + S.mode, false, '', null, true);
+  openHelp(shell, S.mode, t(VIEW_NAMES[S.mode] || 'Gantt chart'));
+}
+/** The two buttons of the "which columns hold the dates?" message: three questions, or everything in Settings. */
+const datesActions = () => [[t('Set up my plan'), () => openGuided()], [t('Settings'), () => openColumns('columns')]];
+function openGuided() {
+  if (dialogOpen) return;
+  dialogOpen = true;
+  const label = (id) => S.columns.find((c) => c.id === id)?.label || id;
+  const options = (role) => S.columns.filter((c) => fits(role, c, S.tableId)).map((c) => ({ id: c.id, label: c.label }));
+  // a column its name says is the start, or the end: not a guess from the first date there is
+  const named = (role) => S.columns.find((c) => fits(role, c, S.tableId) && nameScore(role, c) > 0)?.id || null;
+  const roles = { title: S.roles.title || named('title'), start: S.roles.start || named('start'), end: S.roles.end || S.roles.due || named('end'), assignee: S.roles.assignee || null };
+  openSetup(shell, {
+    roles, options: { title: options('title'), start: options('start'), end: options('end'), assignee: options('assignee') }, canSave: canEdit() || S.demo,
+    preview: (r) => {
+      const built = buildTasks(S.rows, { roles: r, columns: S.columns, labels: S.labels, calendar: calendar(), settings: { ...S.gantt, autoColour: false } });
+      return { lines: previewLines(r, label).map((l) => t(l.key, l.vars)), drawn: built.tasks.length, total: S.rows.length };
+    },
+  }, {
+    onSave: (r) => applySetup(r),
+    onSettings: () => openColumns('columns'),
+    onClose: () => { dialogOpen = false; },
+  });
+}
+/** The answers of the guided setup become the column mapping, saved as Settings would save it. */
+async function applySetup(r) {
+  const next = { ...S.roles };
+  for (const k of ['title', 'start', 'end', 'due', 'assignee']) delete next[k];
+  S.roles = { ...next, ...r };
+  S.source = { kind: 'saved' };
+  if (S.live) {
+    S.labels = await loadLabels(S.columns, labelRoles()).catch(() => S.labels);
+    if (canEdit()) {
+      const options = writeOptions(S.options, { storedRoles: toStored(S.roles, S.columns) });
+      try { await setOptions(options); S.options = options; toast(t('Saved for this widget.')); }
+      catch (e) { toast(t('Could not save: {msg}', { msg: errText(e) })); }
+    }
+  }
+  S.signature = '';
+  recompute();
 }
 const showDueHint = (on) => showBanner('dueHint', on, t('These tasks have only a due date, so they show as milestones. With a start date they become bars.'),
   { label: t('Add a Start column'), run: () => addColumnFor('start') });
@@ -2254,7 +2322,7 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startPrint(); return; }
   if (e.key === '?' && !e.ctrlKey && !e.metaKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '') && !shell.querySelector('.ps-dialog, .ps-drawer')) {
     e.preventDefault();
-    openKeys(shell, S.mode);
+    openHelpPanel();
   }
 });
 

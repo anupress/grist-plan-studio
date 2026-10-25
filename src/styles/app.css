@@ -466,12 +466,14 @@ button, input, select { font: inherit; color: inherit; }
 .ps-starter__hint { color: var(--ps-muted); font-size: 12.5px; }
 .ps-starter__or { margin: 6px 0 0; }
 .ps-banner {
-  position: absolute; left: 0; right: 0; top: 0; height: 40px; z-index: 9; box-sizing: border-box; padding: 0 8px 0 14px;
+  position: absolute; left: 0; right: 0; top: 0; min-height: 40px; z-index: 9; box-sizing: border-box; padding: 4px 8px 4px 14px;
   display: flex; align-items: center; gap: 12px; background: var(--ps-note); border-bottom: 1px solid var(--ps-line); font-size: 12.5px;
 }
 .ps-banner > span { flex: 1; min-width: 0; }
 .ps-banner__close { width: 28px; height: 28px; font-size: 18px; }
-.ps-stage.has-banner > .ps-gantt, .ps-stage.has-banner > .ps-wl { top: 40px; }
+/* every view is placed over the whole stage: with a note up, below it */
+.ps-stage.has-banner > .ps-gantt, .ps-stage.has-banner > .ps-book, .ps-stage.has-banner > .ps-board,
+.ps-stage.has-banner > .ps-ag, .ps-stage.has-banner > .ps-cal { top: var(--banner-h, 40px); }
 
 /* ---- keyboard and screen readers (M6) ---- */
 .ps-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
@@ -647,3 +649,22 @@ button, input, select { font: inherit; color: inherit; }
 @media (max-width: 600px) {
   .ps-disp { right: 8px; left: 8px; width: auto; max-width: none; }
 }
+
+/* ---- help for first use (M16) ---- */
+/* The help is a dialog that may be longer than the widget: it scrolls inside itself, and its footer stays. */
+.ps-dialog--help { top: 20px; max-height: calc(100% - 40px); display: flex; flex-direction: column; overflow: hidden; width: min(540px, calc(100% - 32px)); }
+.ps-dialog--help .ps-help__body { flex: 1 1 auto; min-height: 0; overflow: auto; padding-right: 4px; }
+.ps-dialog--help h3 { margin: 16px 0 6px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ps-muted); }
+.ps-dialog--help .ps-help__about { margin: 0; color: var(--ps-ink); font-size: 13px; line-height: 1.5; }
+.ps-help__list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5; }
+.ps-help__list li + li { margin-top: 4px; }
+.ps-dialog--help .ps-keys { margin-bottom: 8px; }
+.ps-dialog--help .ps-dialog__foot { padding-top: 10px; border-top: 1px solid var(--ps-line); margin-top: 8px; }
+/* The guided setup: three questions and the plan's own sentence under them. */
+.ps-dialog--setup { top: 20px; width: min(480px, calc(100% - 32px)); max-height: calc(100% - 40px); overflow: auto; }
+.ps-setup .ps-field { margin: 12px 0; }
+.ps-setup .ps-field label { display: block; margin-bottom: 4px; font-weight: 600; }
+.ps-setup .ps-previewbox { margin-top: 16px; }
+.ps-preview__foot.is-warn { color: var(--ps-today-ink); }
+.ps-dialog--setup .ps-dialog__foot { align-items: center; margin-top: 14px; }
+.ps-setup__more { padding: 4px 2px; margin: -4px -2px; }

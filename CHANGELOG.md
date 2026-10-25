@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.8.0
+
+Help for first use. Tested in Grist 1.7.20 (a table with columns nobody could have guessed, and the Project Management template).
+
+- **Set up my plan**: when the dates are not found, the message offers three questions in plain words (which column starts a
+  task, which ends it or when it is due, who does it), with the plan's own sentence and a count under them (“3 of 4 tasks have
+  a date and will be drawn”). It sets the same mapping Settings does and saves it for the widget; a name question comes
+  first only when no column was taken for the name, and the who question is left out when no column could name a person.
+- **A tip for each view**, once: one sentence over the view that says what to try, with a **Help** button. It is closed with ×,
+  or by opening the help, and stays away in this browser (each view has its own).
+- **? opens the help**, and the toolbar's ? button too: what the view is for, what can be done in it, what search, Display and
+  Settings do and do not do, and the keys of the view, in a dialog that scrolls.
+- The README's pictures are new: they show the strip, Display and Settings as they are now, and there is one of Display.
+- German and French for every new word.
+
 ## 1.7.0
 
 More control over how the views look, from the toolbar. Tested in Grist 1.7.20 (the Project Management template).
