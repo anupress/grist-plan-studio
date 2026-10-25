@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.13.0
+
+Getting around the Gantt chart and the timeline. Tested in Grist 1.7.20 with real mouse, wheel and key events.
+
+- **Drag the empty chart** to move across it; a drag that starts on a bar still moves the bar, and nothing is written.
+- **Ctrl and the wheel** (or a pinch) zoom around the pointer: the day under it stays under it.
+- **The names column has a splitter** in the heading: drag it, use the arrow keys (Shift for big steps), double-click or Home to
+  go back to the automatic width. Kept in this browser per chart and carried by a saved view.
+- German and French for every new word.
+
 ## 1.12.0
 
 Delete and duplicate. Tested in Grist 1.7.20 (a table of 12 tasks with sub-tasks and links; the rows read back and Grist's Undo clicked after each step).

@@ -827,6 +827,10 @@ export const FR = {
   'Planned start': 'Début prévu',
   'Planned end': 'Fin prévue',
   'Plan under the bars': 'Plan sous les barres',
+  // getting around (1.13)
+  'Width of the names': 'Largeur des noms',
+  'Drag to change the width of the names. Double-click to reset.': 'Faites glisser pour changer la largeur des noms. Un double-clic la rétablit.',
+  'Drag the empty part of the chart to move across it. Ctrl and the wheel zoom around the pointer. Drag the edge of the names, in the heading, to widen them.': 'Faites glisser la partie vide du diagramme pour vous y déplacer. Ctrl et la molette zooment autour du pointeur. Faites glisser le bord des noms, dans l’en-tête, pour les élargir.',
   // delete and duplicate (1.12)
   'Del': 'Suppr',
   'Delete the selected task (it asks first)': 'Supprimer la tâche sélectionnée (après confirmation)',

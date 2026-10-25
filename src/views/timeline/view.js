@@ -12,6 +12,7 @@
 import { el, clear } from '../../core/util.js';
 import { onColor } from '../../core/theme/apply.js';
 import { makeFrame, barBox, rowWindow, scrollLeftFor, xOf, dayAt, ROW_H, BAR_H } from '../gantt/layout.js';
+import { createNavigation, clampNames } from '../gantt/navigate.js';
 import { formatters, rangeText, drawScale, drawShade } from '../gantt/scale.js';
 import { laneAtTrack } from '../../model/timeline.js';
 import { t, tn } from '../../i18n/index.js';
@@ -41,6 +42,11 @@ export function createTimeline(host, on = {}) {
   const tip = el('div', { class: 'ps-tip', role: 'tooltip', hidden: true });
   const root = el('div', { class: 'ps-gantt ps-tl' }, [scroll, tip]);
   clear(host).appendChild(root);
+  const nav = createNavigation({
+    scroll, chart, root, getFrame: () => frame, getNamesW: () => listW,
+    setNamesLive: (w) => { listW = w; canvas.style.setProperty('--list-w', w + 'px'); nav.splitter.setAttribute('aria-valuenow', String(w)); drawn = ''; draw(true); },
+    onZoomStep: (d) => on.onZoomStep?.(d), onNamesWidth: (w) => on.onLaneWidth?.(w),
+  });
 
   // {lanes, tracks, span, holidays, caps(task), length(a, b), workdays, editable, laneMovable, today,
   //  zoom, weekStart, locale, selectedId, laneLabel, noneLabel}
@@ -69,8 +75,9 @@ export function createTimeline(host, on = {}) {
 
   let RH = ROW_H, BH = BAR_H;   // this person's row and bar heights (model/display.js)
   function size() {
-    listW = listWidthFor(scroll.clientWidth || 900);
+    listW = model?.laneW ? clampNames(model.laneW, scroll.clientWidth || 900) : listWidthFor(scroll.clientWidth || 900);
     canvas.style.setProperty('--list-w', listW + 'px');
+    nav.splitter.setAttribute('aria-valuenow', String(listW));
     canvas.style.setProperty('--chart-w', frame.width + 'px');
     canvas.style.setProperty('--head-h', HEAD_H + 'px');
     canvas.style.setProperty('--body-h', Math.max(1, model.tracks) * RH + 'px');
@@ -327,14 +334,14 @@ export function createTimeline(host, on = {}) {
     RH = next.rowH || ROW_H;
     BH = next.barH || BAR_H;
     F = formatters(next.locale);
-    corner.textContent = next.laneLabel || '';
+    clear(corner).append(next.laneLabel || '', nav.splitter);
     root.classList.toggle('is-editable', !!next.editable);
     frame = makeFrame(next.span, next.today, next.zoom, next.weekStart);
     size();
     const span = next.span;
     if (fit && span) scroll.scrollLeft = Math.max(0, xOf(frame, span.from) - 24);
     else if (first) scrollToDay(!span || (next.today >= span.from - 30 && next.today <= span.to + 30) ? next.today : span.from);
-    else if (zoomChanged && keep != null) scroll.scrollLeft = Math.max(0, xOf(frame, keep) - chartViewW() / 2);
+    else if (zoomChanged && keep != null) { const a = nav.takeAnchor(); scroll.scrollLeft = Math.max(0, a ? xOf(frame, a.day) - a.x : xOf(frame, keep) - chartViewW() / 2); }
     drawn = '';
     draw(true);
   }

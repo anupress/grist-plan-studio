@@ -14,6 +14,7 @@
 //   click an arrow        remove the link    click a ▸ / ▾                  fold or unfold a parent or group
 //   Alt+←/→               move by a day      Alt+Shift+←/→                  change the end by a day
 //   drag the ✓ at the day a task was really done                       move that day (M18)
+//   drag the empty chart, Ctrl+wheel, drag the edge of the names        move across, zoom, widen the names (navigate.js, M21)
 // Under a bar that has moved from its plan, a thin bar shows the days it was promised for.
 // The view writes nothing itself: it reports what was done (onEdit, onLink, onArrow, onToggle) and
 // the caller decides what that means for the table.
@@ -22,6 +23,7 @@ import { el, clear } from '../../core/util.js';
 import { onColor } from '../../core/theme/apply.js';
 import { makeFrame, barBox, rowWindow, scrollLeftFor, xOf, dayAt, ROW_H, BAR_H } from './layout.js';
 import { formatters, rangeText, drawScale, drawShade } from './scale.js';
+import { createNavigation, clampNames } from './navigate.js';
 import { dateFromDay } from '../../model/values.js';
 import { drifted } from '../../model/plan.js';
 import { slipText, doneText } from '../../ui/planwords.js';
@@ -58,6 +60,11 @@ export function createGantt(host, on = {}) {
   const tip = el('div', { class: 'ps-tip', role: 'tooltip', hidden: true });
   const root = el('div', { class: 'ps-gantt' }, [scroll, tip]);
   clear(host).appendChild(root);
+  const nav = createNavigation({
+    scroll, chart, root, getFrame: () => frame, getNamesW: () => listW,
+    setNamesLive: (w) => { listW = w; canvas.style.setProperty('--list-w', w + 'px'); nav.splitter.setAttribute('aria-valuenow', String(w)); drawn = ''; draw(true); },
+    onZoomStep: (d) => on.onZoomStep?.(d), onNamesWidth: (w) => on.onListWidth?.(w),
+  });
 
   // {entries, span, links, critical, criticalLinks, holidays, caps(task), length(a, b), workdays,
   //  linkable, editable, showCritical, today, zoom, weekStart, locale, selectedId, titleLabel,
@@ -82,8 +89,9 @@ export function createGantt(host, on = {}) {
   const centreDay = () => (frame ? dayAt(frame, scroll.scrollLeft + chartViewW() / 2) : null);
 
   function size() {
-    listW = listWidthFor(scroll.clientWidth || 900, model?.listCols?.length || 0);
+    listW = model?.listW ? clampNames(model.listW, scroll.clientWidth || 900) : listWidthFor(scroll.clientWidth || 900, model?.listCols?.length || 0);
     canvas.style.setProperty('--list-w', listW + 'px');
+    nav.splitter.setAttribute('aria-valuenow', String(listW));
     canvas.style.setProperty('--chart-w', frame.width + 'px');
     canvas.style.setProperty('--head-h', HEAD_H + 'px');
     canvas.style.setProperty('--body-h', Math.max(1, rows.length) * RH + 'px');
@@ -598,7 +606,7 @@ export function createGantt(host, on = {}) {
     F = formatters(next.locale);
     indexOf.clear();
     rows.forEach((e, i) => { if (e.kind === 'task') indexOf.set(e.task.id, i); });
-    clear(corner).append(el('span', { class: 'ps-corner__title', text: next.titleLabel || t('Task') }), ...(next.listCols || []).map((c) => el('span', { class: 'ps-corner__cell', text: c.label, title: c.label })));
+    clear(corner).append(el('span', { class: 'ps-corner__title', text: next.titleLabel || t('Task') }), ...(next.listCols || []).map((c) => el('span', { class: 'ps-corner__cell', text: c.label, title: c.label })), nav.splitter);
     root.classList.toggle('is-editable', !!next.editable);
     const span = next.span;
     frame = makeFrame(span, next.today, next.zoom, next.weekStart);
@@ -608,7 +616,8 @@ export function createGantt(host, on = {}) {
       const near = !span || (next.today >= span.from - 30 && next.today <= span.to + 30);
       scrollToDay(near ? next.today : span.from);
     } else if (zoomChanged && keep != null) {
-      scroll.scrollLeft = Math.max(0, xOf(frame, keep) - chartViewW() / 2);
+      const a = nav.takeAnchor();   // a Ctrl+wheel zoom keeps the day under the pointer where it was
+      scroll.scrollLeft = Math.max(0, a ? xOf(frame, a.day) - a.x : xOf(frame, keep) - chartViewW() / 2);
     }
     drawn = '';
     draw(true);

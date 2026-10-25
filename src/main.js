@@ -160,6 +160,7 @@ function ensureView() {
     onQuickEdit: (id) => openQuick(id),
     onEdit: (e) => editDates(e),
     onDoneOn: (e) => moveDoneOn(e),
+    onListWidth: (w) => setDisplay({ ...disp(), listW: w }),
     onLink: (l) => addLink(l),
     onArrow: (l) => removeLink(l),
     onToggle: (key) => toggleFold(key),
@@ -197,6 +198,8 @@ function ensureTimeline() {
     onOpen: (id) => openCard(id),
     onQuickEdit: (id) => openQuick(id),
     onEdit: (e) => editTimeline(e),
+    onZoomStep: (dir) => setZoom(ZOOM_ORDER[Math.max(0, Math.min(ZOOM_ORDER.length - 1, ZOOM_ORDER.indexOf(S.zoom) + dir))]),
+    onLaneWidth: (w) => setDisplay({ ...disp(), laneW: w }),
     onUndo: () => undo(),
     onRedo: () => redo(),
   });
@@ -644,7 +647,7 @@ function displayProps(withList) {
   const cols = withList ? listCols() : [];
   return {
     rowH: h.rowH, barH: h.barH, labels: d.labels, show: { weekNumbers: d.weekNumbers, weekends: d.weekends, today: d.today },
-    showPlan: d.plan && hasPlan(), canDoneOn: () => canMoveDoneOn(ctx()),
+    showPlan: d.plan && hasPlan(), canDoneOn: () => canMoveDoneOn(ctx()), listW: d.listW, laneW: d.laneW,
     listCols: cols.map((c) => ({ id: c.id, label: c.label })),
     listText: cols.length ? (task) => listTexts(task) : null,
   };

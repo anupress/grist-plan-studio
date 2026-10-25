@@ -812,6 +812,10 @@ export const DE = {
   'Planned start': 'Geplanter Beginn',
   'Planned end': 'Geplantes Ende',
   'Plan under the bars': 'Plan unter den Balken',
+  // getting around (1.13)
+  'Width of the names': 'Breite der Namensspalte',
+  'Drag to change the width of the names. Double-click to reset.': 'Ziehen, um die Breite der Namen zu ändern. Ein Doppelklick setzt sie zurück.',
+  'Drag the empty part of the chart to move across it. Ctrl and the wheel zoom around the pointer. Drag the edge of the names, in the heading, to widen them.': 'Ziehen Sie auf dem leeren Teil des Diagramms, um sich darin zu bewegen. Strg und das Mausrad zoomen um den Zeiger. Ziehen Sie am Rand der Namen in der Kopfzeile, um sie zu verbreitern.',
   // delete and duplicate (1.12)
   'Del': 'Entf',
   'Delete the selected task (it asks first)': 'Die ausgewählte Aufgabe löschen (mit Rückfrage)',

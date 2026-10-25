@@ -694,3 +694,10 @@ button, input, select { font: inherit; color: inherit; }
 .ps-preview__foot.is-warn { color: var(--ps-today-ink); }
 .ps-dialog--setup .ps-dialog__foot { align-items: center; margin-top: 14px; }
 .ps-setup__more { padding: 4px 2px; margin: -4px -2px; }
+
+/* Getting around (M21): the splitter on the edge of the names, in the heading, and the hand while the chart is dragged. */
+.ps-split { position: absolute; top: 0; right: 0; bottom: 0; width: 9px; cursor: col-resize; touch-action: none; z-index: 9; outline: none; }
+.ps-split::after { content: ""; position: absolute; left: 4px; top: 22%; bottom: 22%; width: 1px; background: var(--ps-line-strong); }
+.ps-split:hover::after, .ps-split:focus-visible::after, .ps-split.is-dragging::after { width: 3px; left: 3px; border-radius: 2px; background: var(--ps-focus); }
+.ps-gantt__chart { cursor: grab; }
+.ps-gantt.is-panning, .ps-gantt.is-panning .ps-gantt__chart { cursor: grabbing; user-select: none; }

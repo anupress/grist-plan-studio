@@ -15,8 +15,8 @@ const eq = (n, got, want) => { if (JSON.stringify(got) === JSON.stringify(want))
 // ---- cleaning ----------------------------------------------------------------------------------------------
 eq('nothing stored is the default', D.cleanDisplay(null), { ...D.DISPLAY_DEFAULTS, cols: [] });
 eq('junk is the default', D.cleanDisplay('compact'), D.cleanDisplay(null));
-eq('a valid choice of each kind is kept', D.cleanDisplay({ density: 'compact', sort: 'col:Status', colourBy: 'Owner', labels: 'beside', weekNumbers: false, weekends: false, today: false, plan: true, cols: ['Status', 'Owner'] }),
-  { density: 'compact', sort: 'col:Status', laneSort: null, colourBy: 'Owner', labels: 'beside', weekNumbers: false, weekends: false, today: false, plan: true, cols: ['Status', 'Owner'] });
+eq('a valid choice of each kind is kept', D.cleanDisplay({ density: 'compact', sort: 'col:Status', colourBy: 'Owner', labels: 'beside', weekNumbers: false, weekends: false, today: false, plan: true, cols: ['Status', 'Owner'], listW: null, laneW: null }),
+  { density: 'compact', sort: 'col:Status', laneSort: null, colourBy: 'Owner', labels: 'beside', weekNumbers: false, weekends: false, today: false, plan: true, cols: ['Status', 'Owner'], listW: null, laneW: null });
 eq('an unknown density, label mode or sort falls back', [D.cleanDisplay({ density: 'huge' }).density, D.cleanDisplay({ labels: 'inside' }).labels, D.cleanDisplay({ sort: 'random' }).sort, D.cleanDisplay({ sort: 'col:' }).sort], ['comfortable', 'auto', null, null]);
 eq('a toggle must be a yes or no', D.cleanDisplay({ weekends: 'no', today: 0 }), D.cleanDisplay(null));
 eq('list columns: strings only, once each, at most three', D.cleanDisplay({ cols: ['a', 'a', 7, 'b', 'c', 'd'] }).cols, ['a', 'b', 'c']);
@@ -85,6 +85,12 @@ eq('the heights the grids used until now are the comfortable ones', D.GRID_HEIGH
 eq('a lane order is kept when it is one of the three', ['name', 'busiest', 'start'].map((k) => D.cleanDisplay({ laneSort: k }).laneSort), ['name', 'busiest', 'start']);
 eq('another lane order falls back to the lanes’ own', [D.cleanDisplay({ laneSort: 'random' }).laneSort, D.cleanDisplay({ laneSort: 3 }).laneSort, D.cleanDisplay(null).laneSort], [null, null, null]);
 eq('a lane order counts as a change from the defaults', [D.isDefaultDisplay({ laneSort: 'name' }), D.isDefaultDisplay(null)], [false, true]);
+
+// ---- the width of the names (1.13)
+eq('a width is kept when it is sensible', [D.cleanDisplay({ listW: 360 }).listW, D.cleanDisplay({ laneW: 200 }).laneW], [360, 200]);
+eq('a width that is too small, too large or not a number falls back to automatic', [D.cleanDisplay({ listW: 20 }).listW, D.cleanDisplay({ listW: 5000 }).listW, D.cleanDisplay({ listW: '300' }).listW, D.cleanDisplay({ laneW: NaN }).laneW], [null, null, null, null]);
+eq('a width is rounded', D.cleanDisplay({ listW: 300.6 }).listW, 301);
+eq('a width counts as a change from the defaults', [D.isDefaultDisplay({ listW: 300 }), D.isDefaultDisplay(null)], [false, true]);
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

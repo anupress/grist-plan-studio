@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.12.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.13.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -301,6 +301,18 @@ These are this browser's choices, per table; a saved view keeps them; nothing is
 **Back to the defaults** undoes them all.
 
 ![Display: compact rows, Status and Owner beside the names, and the panel](docs/images/display.png)
+
+## Getting around
+
+In the Gantt chart and the timeline:
+
+- **Drag the empty part of the chart** to move across it, in any direction (with a mouse or a pen; a finger scrolls it as it
+  always did). A drag that starts on a bar still moves the bar, so nothing is written by moving about.
+- **Ctrl and the wheel** zoom, and so does a pinch on a trackpad, one step at a time. The day under the pointer stays under
+  it, so you zoom into the week you are looking at. The plain wheel and Shift and the wheel scroll as before.
+- **Drag the edge of the names**, in the heading, to widen or narrow them (the arrow keys do it too, Shift for big steps;
+  a double click or Home puts the width back). The Gantt chart and the timeline each keep their own, in this browser, and
+  a saved view carries them.
 
 ## Plan against actual
 
