@@ -78,8 +78,11 @@ export function renderToolbar(host, s, on) {
   // A dot plus a word, never the colour alone, as on Invoice Studio's bar.
   const mode = s.demo ? 'demo' : s.editable ? 'live' : 'ro';
   const modeText = { live: t('Connected'), ro: t('Read only'), demo: t('Demo') }[mode];
+  // the five zooms are a strip on a wide widget and one menu on a narrower one (the stylesheet shows one of them), so the tools keep two rows
   const zoomTools = () => [
-    seg(t('Zoom'), ZOOM_ORDER.map((z) => [z, t(ZOOM_LABELS[z])]), s.zoom, on.onZoom),
+    seg(t('Zoom'), ZOOM_ORDER.map((z) => [z, t(ZOOM_LABELS[z])]), s.zoom, on.onZoom, 'ps-seg--zoom'),
+    el('select', { class: 'ps-input ps-input--inline ps-zoompick', 'aria-label': t('Zoom'), onchange: (e) => on.onZoom(e.target.value) },
+      ZOOM_ORDER.map((z) => el('option', { value: z, text: t(ZOOM_LABELS[z]), selected: z === s.zoom }))),
     button(t('Fit'), t('Zoom so every task fits'), on.onFit),
     button(t('Today'), t('Scroll to today (T)'), on.onToday),
   ];
@@ -90,6 +93,7 @@ export function renderToolbar(host, s, on) {
       tools = [
         s.canAdd ? button(t('+ New task'), null, on.onNew, ' ps-btn--primary') : null,
         s.groupOptions?.length ? picker(t('Group'), t('Group rows by'), s.groupOptions, s.groupBy, on.onGroup, t('No groups')) : null,
+        s.groupBy && s.group2Options?.length ? picker(t('then'), t('Then group each group by'), s.group2Options, s.groupBy2, on.onGroup2, t('No second level')) : null,
         ...zoomTools(),
       ];
     } else if (view === 'calendar') {
@@ -120,6 +124,7 @@ export function renderToolbar(host, s, on) {
       tools = [
         s.ovOptions?.length ? picker(t('By'), t('Break the tasks down by'), s.ovOptions, s.ovBy?.[0], on.onOverBy0) : null,
         s.ovOptions?.length > 1 ? picker(t('And by'), t('A second breakdown, by'), s.ovOptions, s.ovBy?.[1], on.onOverBy1, t('nothing')) : null,
+        s.ovMeasureOptions?.length ? picker(t('Count'), t('Count the tasks, or add up a number column'), s.ovMeasureOptions, s.ovMeasure, on.onOvMeasure, t('Tasks')) : null,
       ];
     } else if (view === 'workload') {
       tools = [

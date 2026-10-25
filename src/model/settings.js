@@ -113,10 +113,11 @@ export const MAX_VIEWS = 30;
 const text = (v) => typeof v === 'string' && v.length > 0 && v.length < 200;
 const oneOf = (...list) => (v) => list.includes(v);
 const SNAPSHOT = {
-  groupBy: text, critical: (v) => v === true, laneBy: text, swimBy: text, tlLaneBy: text, bookRows: text, bookPeriods: text, bookFilter: text,
+  groupBy: text, groupBy2: text, critical: (v) => v === true, laneBy: text, swimBy: text, tlLaneBy: text, bookRows: text, bookPeriods: text, bookFilter: text,
   wlRows: text, wlUnit: oneOf('day', 'week', 'month'), wlMeasure: oneOf('planned', 'logged', 'remaining'),
   agendaWho: oneOf('mine', 'all'), calMode: oneOf('month', 'week'),
   ovBy0: text, ovBy1: text,   // the overview's two breakdowns (M19): a column id; the second may be '-' for none
+  ovMeasure: text,            // the number column the overview adds up instead of counting tasks (M27)
 };
 const ZOOMS = ['day', 'week', 'month', 'quarter', 'year'];
 
@@ -176,7 +177,7 @@ const keep = (key, value) => { try { localStorage.setItem(key, JSON.stringify(va
 const viewKey = (tableId) => 'planStudio.view.' + (tableId || 'demo');
 
 /**
- * {groupBy, critical, collapsed (folded rows, and folded board lanes as 'l:<column ref>|<lane key>'), laneBy (board), swimBy (the board's swimlanes), tlLaneBy (timeline), bookRows, bookPeriods ('day' | 'week' |
+ * {groupBy, groupBy2 (a second level of groups inside the first), critical, collapsed (folded rows, and folded board lanes as 'l:<column ref>|<lane key>'), laneBy (board), swimBy (the board's swimlanes), tlLaneBy (timeline), bookRows, bookPeriods ('day' | 'week' |
  *  'month' | 'col:<colId>' | 'table:<tableId>'), bookFilter ('<colId>=<value>'), wlRows, wlUnit ('day' | 'week' | 'month'),
  *  find (the quick filters, model/find.js), display (row height, order, colours, labels: model/display.js)};
  *  the column ids are null when not chosen
@@ -185,6 +186,7 @@ export function storedView(tableId) {
   const v = local(viewKey(tableId), {});
   return {
     groupBy: typeof v.groupBy === 'string' ? v.groupBy : null,
+    groupBy2: typeof v.groupBy2 === 'string' ? v.groupBy2 : null,
     critical: v.critical === true,
     collapsed: Array.isArray(v.collapsed) ? v.collapsed.filter((x) => typeof x === 'string').slice(0, 2000) : [],
     laneBy: typeof v.laneBy === 'string' ? v.laneBy : null,
@@ -200,6 +202,7 @@ export function storedView(tableId) {
     calMode: ['month', 'week'].includes(v.calMode) ? v.calMode : null,
     ovBy0: typeof v.ovBy0 === 'string' ? v.ovBy0 : null,
     ovBy1: typeof v.ovBy1 === 'string' ? v.ovBy1 : null,
+    ovMeasure: typeof v.ovMeasure === 'string' ? v.ovMeasure : null,
     find: cleanFind(v.find),
     display: cleanDisplay(v.display),
   };

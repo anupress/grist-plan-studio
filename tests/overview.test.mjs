@@ -97,5 +97,33 @@ const ov = (by = [col('Status'), col('Owner')], over = {}) => O.buildOverview(bu
   eq('a table with nothing to break down by', O.pickBreakdowns(columns.filter((c) => c.kind === 'Text' || c.kind === 'Date'), roles, 'Tasks'), [null, null]);
 }
 
+// ---- adding up a number column, and the week a task ends (M27)
+{
+  const { startOfUnit } = await imp('src/views/gantt/layout.js');
+  const withBudget = columnsFromFixture([...columns.map((c) => ({ id: c.id, type: c.type, choices: c.choices })), { id: 'Budget', type: 'Numeric' }, { id: 'Progress', type: 'Numeric' }, { id: 'Name', type: 'Text' }]);
+  const money = { 1: 100, 2: 200, 3: 300, 4: 400, 5: 50, 7: 70, 8: 30, 9: 10, 10: 0 };
+  const rowsB = rows.map((r) => ({ ...r, Budget: money[r.id] ?? 0 }));
+  const rowOfB = (id) => rowsB.find((r) => r.id === id);
+  const budget = withBudget.find((c) => c.id === 'Budget');
+  const weekCol = { id: '@week', label: 'Week it ends', kind: 'Pseudo', pseudo: true };
+  const bucketOf = (c, x) => startOfUnit(x.end, c.id === '@week' ? 'week' : 'month', 1);
+  const o = O.buildOverview(built.tasks, built.unscheduled, { today, doable: true, rowOf: rowOfB, labels, by: [col('Status'), weekCol], valueText: (c, t) => (c.pseudo ? String(t) : text(c, t)), measure: budget, bucketOf });
+  eq('the numbers added up: 1,160 in all, 130 done, 200 late, 830 open', [o.measure.total, o.measure.done, o.measure.late, o.measure.open], [1160, 130, 200, 830]);
+  eq('counts are still counts', [o.total, o.done, o.late], [9, 2, 2]);
+  const done = o.breakdowns[0].groups.find((g) => g.token === 'Done');
+  eq('a group has its tasks and its sum: Done holds two tasks worth 130', [done.total, done.w.total, done.w.done], [2, 130, 130]);
+  eq('every sum adds up to the total', o.breakdowns[0].groups.reduce((a, g) => a + g.w.total, 0), 1160);
+  eq('by the week a task ends: the oldest first, no end last', o.breakdowns[1].groups.map((g) => [g.token === '' ? '-' : new Date(g.token * 864e5).toISOString().slice(5, 10), g.total]), [['10-26', 1], ['11-02', 3], ['11-09', 3], ['11-30', 1], ['-', 1]]);
+  eq('…each week has its sum', o.breakdowns[1].groups.map((g) => g.w.total), [0, 330, 380, 400, 50]);
+  const noMeasure = O.buildOverview(built.tasks, built.unscheduled, { today, doable: true, rowOf, labels, by: [col('Status'), null], valueText: text });
+  eq('without a measure there is no sum', [noMeasure.measure, noMeasure.breakdowns[0].groups.every((g) => g.w === undefined)], [null, true]);
+  eq('the columns that can be added up: a number that is not a progress, an order or a lag', O.measureColumns(withBudget, { ...roles, progress: 'Progress' }, 'Tasks').map((c) => c.id), ['Budget']);
+  eq('the pseudo columns are offered with the real ones', O.pickBreakdowns(columns, roles, 'Tasks', ['@week', undefined], [weekCol])[0].id, '@week');
+  eq('…and are the same column only once', O.pickBreakdowns(columns, roles, 'Tasks', ['@week', '@week'], [weekCol])[1]?.id === '@week', false);
+  const monthCol = { id: '@month', label: 'Month it ends', kind: 'Pseudo', pseudo: true };
+  const byMonth = O.buildOverview(built.tasks, built.unscheduled, { today, doable: true, rowOf, labels, by: [monthCol, null], valueText: () => '', bucketOf });
+  eq('by the month: November (seven), December (one), no end (one)', byMonth.breakdowns[0].groups.map((g) => g.total), [7, 1, 1]);
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

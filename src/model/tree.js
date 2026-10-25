@@ -4,7 +4,7 @@
 // views draw, top to bottom. A parent's bar is a summary: it spans its children (and its own dates,
 // if it has any), so a parent with no dates of its own still shows where its work lies.
 //
-//   {kind: 'group', key, label, count, start, end, collapsed}
+//   {kind: 'group', key, level (0, or 1 for a group inside a group), label, count, start, end, collapsed}
 //   {kind: 'task', task, depth, kids, collapsed, summary: {start, end, count} | null, undated}
 //
 // Rules: a parent link that loops (A under B under A) is ignored at the point it closes; a child sits
@@ -13,14 +13,18 @@
 
 /**
  * @param {Array} tasks  all tasks, each with {id, index, start, end, parentId}
- * @param {{group?: {key: (t) => string|null, label: (k) => string, order?: string[]}, collapsed?: Set<string>, sort?: (a, b) => number}} opts
+ * @param {{group?: {key: (t) => string|null, label: (k) => string, order?: string[]}, group2?: (the same: groups inside the groups), collapsed?: Set<string>, sort?: (a, b) => number}} opts
+ *   a group inside a group has the key 'outer\u0001inner'; with only group2 the tasks are not grouped
  *   sort: the order of siblings (and of the tasks with no dates), in place of the table's own; model/display.js makes it
  * @returns {{entries: Array, summaries: Map<number, {start, end, count}>, visibleIds: Set<number>}}
  */
-export function arrange(tasks, { group = null, collapsed = new Set(), sort = null } = {}) {
+export function arrange(tasks, { group = null, group2 = null, collapsed = new Set(), sort = null } = {}) {
+  if (!group) group2 = null;
   const all = [...tasks].sort(sort || ((a, b) => (a.index ?? 0) - (b.index ?? 0)));
   const byId = new Map(all.map((t) => [t.id, t]));
-  const keyOf = (t) => (group ? group.key(t) ?? '' : '');
+  const outerOf = (t) => (group ? group.key(t) ?? '' : '');
+  const innerOf = (t) => (group2 ? group2.key(t) ?? '' : '');
+  const keyOf = (t) => outerOf(t) + (group2 ? '\u0001' + innerOf(t) : '');
 
   // A parent link counts when the parent is here, in the same group, and the chain does not loop.
   const parentOf = new Map();
@@ -63,19 +67,31 @@ export function arrange(tasks, { group = null, collapsed = new Set(), sort = nul
   for (const t of all) if (kids.has(t.id) && span.get(t.id)) summaries.set(t.id, span.get(t.id));
   const dated = (t) => !!span.get(t.id);
 
-  // Groups, in the order the grouping column defines, then by first appearance; "no value" last.
-  const groups = new Map();
+  // Groups, in the order the grouping column defines, then by first appearance; "no value" last. With a second grouping, each
+  // group holds its own groups.
+  const groups = new Map();   // outer key -> Map(inner key -> top tasks)
   for (const t of all) {
     if (!dated(t) || parentOf.has(t.id)) continue;
-    const k = keyOf(t);
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k).push(t);
+    const ko = outerOf(t), ki = innerOf(t);
+    if (!groups.has(ko)) groups.set(ko, new Map());
+    const inner = groups.get(ko);
+    if (!inner.has(ki)) inner.set(ki, []);
+    inner.get(ki).push(t);
   }
-  const keys = [...groups.keys()];
-  if (group?.order) {
-    const rank = new Map(group.order.map((k, i) => [k, i]));
-    keys.sort((a, b) => (a === '') - (b === '') || (rank.get(a) ?? 1e9) - (rank.get(b) ?? 1e9));
-  } else keys.sort((a, b) => (a === '') - (b === ''));
+  const sortKeys = (list, g) => {
+    const keys = [...list];
+    if (g?.order) {
+      const rank = new Map(g.order.map((k, i) => [k, i]));
+      keys.sort((a, b) => (a === '') - (b === '') || (rank.get(a) ?? 1e9) - (rank.get(b) ?? 1e9));
+    } else keys.sort((a, b) => (a === '') - (b === ''));
+    return keys;
+  };
+  const keys = sortKeys(groups.keys(), group);
+  const spanOfTops = (tops) => {
+    let start = Infinity, end = -Infinity, count = 0;
+    for (const t of tops) { const s = span.get(t.id); start = Math.min(start, s.start); end = Math.max(end, s.end); count += 1 + (summaries.get(t.id)?.count || 0); }
+    return { start, end, count };
+  };
 
   const entries = [];
   const visibleIds = new Set();
@@ -87,15 +103,22 @@ export function arrange(tasks, { group = null, collapsed = new Set(), sort = nul
     if (!isCollapsed) for (const k of ks) walk(k, depth + 1);
   };
   for (const k of keys) {
-    const tops = groups.get(k);
+    const inner = groups.get(k);
+    const tops = [...inner.values()].flat();
     if (group) {
-      let start = Infinity, end = -Infinity, count = 0;
-      for (const t of tops) { const s = span.get(t.id); start = Math.min(start, s.start); end = Math.max(end, s.end); count += 1 + (summaries.get(t.id)?.count || 0); }
       const gc = collapsed.has('g:' + k);
-      entries.push({ kind: 'group', key: k, label: group.label(k), count, start, end, collapsed: gc });
+      entries.push({ kind: 'group', key: k, level: 0, label: group.label(k), ...spanOfTops(tops), collapsed: gc });
       if (gc) continue;
     }
-    for (const t of tops) walk(t, 0);
+    if (group2) {
+      for (const ki of sortKeys(inner.keys(), group2)) {
+        const key2 = k + '\u0001' + ki;
+        const gc2 = collapsed.has('g:' + key2);
+        entries.push({ kind: 'group', key: key2, level: 1, label: group2.label(ki), ...spanOfTops(inner.get(ki)), collapsed: gc2 });
+        if (gc2) continue;
+        for (const t of inner.get(ki)) walk(t, 0);
+      }
+    } else for (const t of tops) walk(t, 0);
   }
   for (const t of all) {
     if (dated(t)) continue;

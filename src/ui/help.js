@@ -59,6 +59,7 @@ export function helpFor(view) {
         t('By and And by, in the toolbar, choose the columns the bars are made by.'),
         t('Click a value to see only its tasks in the view you came from; Clear filters brings the rest back.'),
         t('Click a task under Needs attention or Next milestones to edit it. Print makes a one-page report.'),
+        t('Count, in the toolbar, adds up a number column such as hours or a budget instead of counting tasks. By can also break the plan down by the week or the month tasks end.'),
       ],
     };
     case 'agenda': return {
@@ -76,6 +77,7 @@ export function helpFor(view) {
         t('Drag the dot at the end of a bar onto another bar: that task then starts after this one ends. Click an arrow to set how they are linked (which ends, and a lag in days) or to remove the link.'),
         t('Click ▸ or ▾ to fold a parent or a group. Double-click a task to open Grist’s own card.'),
         t('Drag the empty part of the chart to move across it. Ctrl and the wheel zoom around the pointer. Drag the edge of the names, in the heading, to widen them.'),
+        t('Group, in the toolbar, puts the rows under headings; then lets each group hold groups of its own, such as status and then person.'),
         t('Set baseline remembers today’s dates as the plan. A bar that later moves shows the plan as a thin line under it, and says by how many days.'),
         t('Right-click a task for its menu: add a sub-task, indent it, mark it done, copy it to a later date or repeat it. [ and ] move it one level out or in.'),
         t('Click a task with Ctrl or Shift held to select several, or hold Shift and drag a box over the chart. A bar dragged from the selection takes the others along. The strip above the view marks them done, sets a column on all of them, moves their dates or deletes them.'),

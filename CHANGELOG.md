@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.19.0
+
+Two levels of groups, and more in the overview. Tested in Grist 1.7.20.
+
+- **Group in two levels** in the Gantt chart (status, then person), each level folding on its own.
+- **The overview adds up a number column** (hours, a budget) instead of counting tasks, and can break the plan down by the **week or
+  month tasks end**; print follows.
+- German and French for every new word.
+
 ## 1.18.0
 
 Select several tasks. Tested in Grist 1.7.20.

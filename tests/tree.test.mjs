@@ -91,6 +91,29 @@ const plain = makeCalendar();
   eq('working days: pushed past Good Friday, the weekend and Easter Monday', push.map((p) => [iso(p.start), iso(p.end)]), [['2026-04-02', '2026-04-07']]);
 }
 
+// ---- groups inside groups (M27)
+{
+  const tasks = [
+    T(1, '2026-11-02', '2026-11-03', { status: 'Doing', team: 'Ann' }),
+    T(2, '2026-11-04', '2026-11-08', { status: 'To do', team: 'Ben' }),
+    T(3, '2026-11-01', '2026-11-02', { status: 'Doing', team: 'Ben' }),
+    T(4, '2026-11-09', '2026-11-10', { status: 'To do', team: 'Ann' }),
+    T(5, '2026-11-11', '2026-11-12', { status: 'To do', team: 'Ann', parentId: 4 }),
+    T(6, '2026-11-13', '2026-11-13', { status: 'To do', team: null }),
+  ];
+  const group = { key: (t) => t.status, label: (k) => k || '(none)', order: ['To do', 'Doing'] };
+  const group2 = { key: (t) => t.team, label: (k) => k || '(nobody)' };
+  const r = arrange(tasks, { group, group2 });
+  eq('a group has its own groups: status, then person (no value last)', show(r.entries).map((x) => x), ['[To do:4]', '[Ben:1]', 'T2', '[Ann:2]', 'T4*', '  T5', '[(nobody):1]', 'T6', '[Doing:2]', '[Ann:1]', 'T1', '[Ben:1]', 'T3']);
+  eq('the levels', r.entries.filter((e) => e.kind === 'group').map((e) => e.level), [0, 1, 1, 1, 0, 1, 1]);
+  eq('the inner key carries the outer', r.entries.filter((e) => e.kind === 'group' && e.level === 1).map((e) => e.key.split('')), [['To do', 'Ben'], ['To do', 'Ann'], ['To do', ''], ['Doing', 'Ann'], ['Doing', 'Ben']]);
+  eq('an inner group spans its tasks', (() => { const g = r.entries.find((e) => e.key === 'To doAnn'); return [iso(g.start), iso(g.end), g.count]; })(), ['2026-11-09', '2026-11-12', 2]);
+  eq('a collapsed inner group shows only its header', show(arrange(tasks, { group, group2, collapsed: new Set(['g:To doAnn']) }).entries).slice(0, 5), ['[To do:4]', '[Ben:1]', 'T2', '[Ann:2]', '[(nobody):1]']);
+  eq('a collapsed outer group hides the inner ones too', show(arrange(tasks, { group, group2, collapsed: new Set(['g:To do']) }).entries).slice(0, 3), ['[To do:4]', '[Doing:2]', '[Ann:1]']);
+  eq('a second level with no first level is no grouping', show(arrange(tasks, { group2 }).entries).filter((x) => x.startsWith('[')), []);
+  eq('a child stays under its parent only in the same inner group', show(arrange(tasks.map((t) => (t.id === 5 ? { ...t, team: 'Ben' } : t)), { group, group2 }).entries).slice(0, 8), ['[To do:4]', '[Ben:2]', 'T2', 'T5', '[Ann:1]', 'T4', '[(nobody):1]', 'T6']);
+}
+
 // ---- critical path ---------------------------------------------------------------------------------
 {
   // A(2d) -> B(3d) -> D(2d) is the long chain; A -> C(1d) -> D has slack; E stands alone.

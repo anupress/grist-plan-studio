@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.18.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.19.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -309,6 +309,16 @@ with no lag, as before. The demo has three such links.
   that wait for them are offered a move too, once for all.
 - Selecting works in the Gantt chart, the timeline, the board, the calendar and the agenda. **Copy as text** and **Download as CSV** then
   take only the selected tasks.
+
+## Groups in two levels, and the overview's sums
+
+- **Group** in the Gantt toolbar puts the rows under headings; **then** (it appears once there is a first group) lets each heading hold
+  groups of its own: status, then person; project, then status. Each level folds on its own, and Fold all folds both. A sub-task stays
+  under its parent only inside the same inner group. The choice is kept in this browser and by saved views.
+- **Count** in the Overview's toolbar adds up a number column (hours, a budget, a price) instead of counting tasks: the key figures
+  gain its total and how much of it is done, and every bar is that sum, in words, with the number of tasks beside it.
+- **By** in the Overview also offers **the week** and **the month tasks end**: how many tasks, or how many hours or euros, end in each
+  week, done, late and still open. (A week is not a column of your table, so a click on it filters nothing.)
 
 ## Search and filters
 

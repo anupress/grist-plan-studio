@@ -739,3 +739,10 @@ button, input, select { font: inherit; color: inherit; }
 .ps-bulk .ps-spacer { flex: 1; }
 /* the box drawn over the chart with Shift held: what it touches is selected */
 .ps-lasso { position: absolute; z-index: 5; pointer-events: none; box-sizing: border-box; border: 1px solid var(--ps-focus); background: rgba(20, 80, 155, 0.12); border-radius: 2px; }
+
+/* a group inside a group (M27): indented, a little quieter than the one around it */
+.ps-row--group2 { padding-left: 18px; font-weight: 600; background: var(--ps-surface); }
+
+/* the zoom strip gives way to a menu when the widget is not wide (the toolbar then stays two rows) */
+.ps-zoompick { display: none; }
+@media (max-width: 1180px) { .ps-seg--zoom { display: none; } .ps-zoompick { display: inline-block; } }

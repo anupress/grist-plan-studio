@@ -49,8 +49,8 @@ import { reminderScript, detectEmailColumn } from './model/reminders.js';
 import { detectTimeColumns, findTimeTable, readEntries, loggedByTask, runningOf, planStart, planStop, planLog, toCsv, timeTableSetup, timeTableShowActions } from './model/time.js';
 import { ZOOM_ORDER, ZOOMS, fitZoom, isoWeek, startOfUnit } from './views/gantt/layout.js';
 import { renderTimePrint, renderBoardPrint, renderBookingPrint, renderWorkloadPrint, renderCalendarPrint, renderOverviewPrint, subtitleFor } from './print/render.js';
-import { createOverview, groupWords, dueText } from './views/overview/view.js';
-import { buildOverview, pickBreakdowns, breakdownColumns } from './model/overview.js';
+import { createOverview, groupWords, sumWords, dueText } from './views/overview/view.js';
+import { buildOverview, pickBreakdowns, breakdownColumns, measureColumns } from './model/overview.js';
 import { nodeToPng } from './print/png.js';
 import { pageRule } from './print/layout.js';
 import { openPrint } from './ui/printpanel.js';
@@ -95,7 +95,7 @@ const S = {
   find: { active: false, keep: null, shown: 0, total: 0 },   // what this browser's quick filters keep (model/find.js)
   pinned: new Set(),   // rows added here while a filter is on: shown until the filter changes, so a new task does not vanish
   zoom: null, fitNext: false, selectedId: null, firstDraw: true,
-  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, swimBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, ovBy0: null, ovBy1: null, find: emptyFind(), display: cleanDisplay(null) },   // this browser's view of this table
+  view: { groupBy: null, groupBy2: null, critical: false, collapsed: new Set(), laneBy: null, swimBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, ovBy0: null, ovBy1: null, ovMeasure: null, find: emptyFind(), display: cleanDisplay(null) },   // this browser's view of this table
   calDay: null,        // a day in the month or week the calendar shows; null = today (not saved: looking around)
   example: 'plan',     // the demo's data: 'plan' (a website relaunch) or 'stores' (pop-up stores × weekends)
   multi: new Set(), anchor: null,   // the tasks selected together (M26), and where a Shift click starts
@@ -376,6 +376,8 @@ const colourByCol = () => {
 const GROUP_KINDS = ['Choice', 'ChoiceList', 'Ref', 'RefList', 'Text', 'Bool'];
 const groupable = (c) => GROUP_KINDS.includes(c.kind) && c.refTable !== S.tableId && c.id !== S.roles.title;
 const groupCol = () => (S.view.groupBy ? S.columns.find((c) => c.id === S.view.groupBy && groupable(c)) || null : null);
+/** The second level of groups, inside the first: only with a first, and never the same column. */
+const groupCol2 = () => (groupCol() && S.view.groupBy2 ? S.columns.find((c) => c.id === S.view.groupBy2 && groupable(c) && c.id !== groupCol().id) || null : null);
 
 // ---- the board's columns ----------------------------------------------------------------------------
 const colById = (id) => (id ? S.columns.find((c) => c.id === id) || null : null);
@@ -630,6 +632,10 @@ function patchFind(fn) { const f = cleanFind(S.view.find); fn(f); setFind(f); }
 const clearFind = () => { const f = cleanFind(S.view.find); setFind({ q: '', sel: {}, cols: f.cols }); };
 /** A chosen value as words. */
 function valueText(col, token) {
+  if (col.pseudo) {
+    if (token === NONE) return t('No end date');
+    return col.id === '@week' ? t('Week of {date}', { date: fmtShort(token) }) : new Intl.DateTimeFormat(dateLocale(gristCulture()), { timeZone: 'UTC', month: 'long', year: 'numeric' }).format(dateFromDay(token));
+  }
   if (token === NONE) return t('(none)');
   if (col.kind === 'Bool') return token === '1' ? t('Yes') : t('No');
   if (col.kind === 'Ref' || col.kind === 'RefList') return S.labels[col.id]?.get(Number(token)) ?? `${col.refTable}[${token}]`;
@@ -790,8 +796,10 @@ function drawToolbar(model = null, level = 'full') {
     },
     groupOptions: asOptions(S.columns.filter(groupable)),
     groupBy: groupCol()?.id || null,
+    group2Options: groupCol() ? asOptions(S.columns.filter((c) => groupable(c) && c.id !== groupCol().id)) : [], groupBy2: groupCol2()?.id || null,
     hasLinks: !!(model && gantt && model.links.length), critical: S.view.critical,
-    ovOptions: S.mode === 'overview' ? breakdownColumns(S.columns, S.roles, S.tableId).map((c) => ({ id: c.id, label: c.label })) : [],
+    ovOptions: S.mode === 'overview' ? [...breakdownColumns(S.columns, S.roles, S.tableId), ...ovPseudo()].map((c) => ({ id: c.id, label: c.label })) : [],
+    ovMeasureOptions: S.mode === 'overview' ? measureColumns(S.columns, S.roles, S.tableId).map((c) => ({ id: c.id, label: c.label })) : [], ovMeasure: ovMeasureCol()?.id || null,
     ovBy: S.mode === 'overview' ? ovPicks().map((c) => c?.id ?? null) : [],
     canBaseline: gantt && canEdit() && ganttReady(S.roles) && !!(S.built && S.built.tasks.length),
     laneOptions: asOptions(S.columns.filter(laneable)), laneBy: laneCol()?.id || null,
@@ -820,7 +828,9 @@ function drawToolbar(model = null, level = 'full') {
     onNew: () => newTask(), onMore: (btn) => openMore(btn), onUndated: () => view?.scrollToUndated(), onBaseline: setBaseline,
     onOverBy0: (id) => { S.view.ovBy0 = id || null; saveView(); S.signature = ''; recompute(); },
     onOverBy1: (id) => { S.view.ovBy1 = id || '-'; saveView(); S.signature = ''; recompute(); },
-    onGroup: (id) => { S.view.groupBy = id || null; saveView(); S.signature = ''; recompute(); },
+    onOvMeasure: (id) => { S.view.ovMeasure = id || null; saveView(); S.signature = ''; recompute(); },
+    onGroup: (id) => { S.view.groupBy = id || null; if (!id || S.view.groupBy2 === id) S.view.groupBy2 = null; saveView(); S.signature = ''; recompute(); },
+    onGroup2: (id) => { S.view.groupBy2 = id || null; saveView(); S.signature = ''; recompute(); },
     onCritical: () => { S.view.critical = !S.view.critical; saveView(); S.signature = ''; recompute(); },
     onLanes: (id) => { S.view.laneBy = id || null; if (S.view.swimBy === S.view.laneBy) S.view.swimBy = null; saveView(); S.signature = ''; reload('labels'); },
     onSwims: (id) => { S.view.swimBy = id || null; saveView(); S.signature = ''; reload('labels'); },
@@ -847,10 +857,10 @@ function drawToolbar(model = null, level = 'full') {
   });
 }
 const saveView = () => rememberView(S.tableId, {
-  groupBy: S.view.groupBy, critical: S.view.critical, collapsed: [...S.view.collapsed], laneBy: S.view.laneBy, swimBy: S.view.swimBy,
+  groupBy: S.view.groupBy, groupBy2: S.view.groupBy2, critical: S.view.critical, collapsed: [...S.view.collapsed], laneBy: S.view.laneBy, swimBy: S.view.swimBy,
   tlLaneBy: S.view.tlLaneBy, bookRows: S.view.bookRows, bookPeriods: S.view.bookPeriods, bookFilter: S.view.bookFilter,
   wlRows: S.view.wlRows, wlUnit: S.view.wlUnit, wlMeasure: S.view.wlMeasure, agendaWho: S.view.agendaWho, calMode: S.view.calMode,
-  ovBy0: S.view.ovBy0, ovBy1: S.view.ovBy1,
+  ovBy0: S.view.ovBy0, ovBy1: S.view.ovBy1, ovMeasure: S.view.ovMeasure,
   find: cleanFind(S.view.find),
   display: cleanDisplay(S.view.display),
 });
@@ -858,10 +868,10 @@ const saveView = () => rememberView(S.tableId, {
 /** Everything the chart needs, from the rows. */
 function buildModel(rows = viewRows()) {
   const cal = calendar();
-  const gc = groupCol();
+  const gc = groupCol(), gc2 = groupCol2();
   const built = buildTasks(rows, {
     roles: S.roles, columns: S.columns, labels: S.labels, calendar: cal,
-    settings: { ...S.gantt, colourBy: colourByCol()?.id || null, groupBy: gc?.id || null },
+    settings: { ...S.gantt, colourBy: colourByCol()?.id || null, groupBy: gc?.id || null, groupBy2: gc2?.id || null },
   });
   const all = [...built.tasks, ...built.unscheduled];
   const group = gc ? {
@@ -869,7 +879,12 @@ function buildModel(rows = viewRows()) {
     label: (k) => k || t('(none)'),
     order: gc.kind === 'Choice' || gc.kind === 'ChoiceList' ? gc.choices : null,
   } : null;
-  const { entries, summaries } = arrange(all, { group, collapsed: S.view.collapsed, sort: taskSorter(disp().sort, { columns: S.columns, rowOf: rowById, labels: S.labels }) });
+  const group2 = gc2 ? {
+    key: (task) => task.group2,
+    label: (k) => k || t('(none)'),
+    order: gc2.kind === 'Choice' || gc2.kind === 'ChoiceList' ? gc2.choices : null,
+  } : null;
+  const { entries, summaries } = arrange(all, { group, group2, collapsed: S.view.collapsed, sort: taskSorter(disp().sort, { columns: S.columns, rowOf: rowById, labels: S.labels }) });
   // Links between dated tasks; a parent counts with the span of its children.
   const dated = all.map((x) => (summaries.has(x.id) ? { ...x, start: summaries.get(x.id).start, end: summaries.get(x.id).end, summary: true } : x)).filter((x) => x.start != null);
   const byId = new Map(dated.map((x) => [x.id, x]));
@@ -934,7 +949,7 @@ function recompute() {
   const editable = canEdit();
   const titleCol = S.columns.find((c) => c.id === S.roles.title);
   const sig = [S.zoom, weekStart(), S.selectedId, multiKey(), titleCol?.label, editable, S.view.critical, S.gantt.holidays, S.gantt.durationUnit,
-    [...S.view.collapsed].join(','), groupCol()?.id, JSON.stringify(disp()),
+    [...S.view.collapsed].join(','), groupCol()?.id, groupCol2()?.id, JSON.stringify(disp()),
     ...(disp().cols.length ? m.entries.map((e) => (e.kind === 'task' ? listTexts(e.task).join('\u0003') : '')) : []),
     ...m.entries.map((e) => (e.kind === 'group' ? 'g' + e.key + e.collapsed : e.task.id + '\u0002' + e.task.hash + (e.summary ? `${e.summary.start}-${e.summary.end}` : ''))),
     ...m.links.map((l) => `${l.from}>${l.to}${l.type}${l.lag}${l.late ? '!' : ''}`), ...m.crit.tasks].join('\n');
@@ -1362,7 +1377,12 @@ function fmtDayWd(d) {
 }
 // ---- the overview (M19) ---------------------------------------------------------------------------------------
 /** The two columns the bars are made by: this browser's choice where it still exists, else the status, then the person. */
-const ovPicks = () => pickBreakdowns(S.columns, S.roles, S.tableId, [S.view.ovBy0 || undefined, S.view.ovBy1 === '-' ? null : S.view.ovBy1 || undefined]);
+/** The week and the month a task ends in, as columns to break the plan down by (they are not columns of the table). */
+const ovPseudo = () => (ganttReady(S.roles) ? [{ id: '@week', label: t('Week it ends'), kind: 'Pseudo', pseudo: true }, { id: '@month', label: t('Month it ends'), kind: 'Pseudo', pseudo: true }] : []);
+const ovPicks = () => pickBreakdowns(S.columns, S.roles, S.tableId, [S.view.ovBy0 || undefined, S.view.ovBy1 === '-' ? null : S.view.ovBy1 || undefined], ovPseudo());
+/** The number column the overview adds up, when one is chosen and still there. */
+const ovMeasureCol = () => measureColumns(S.columns, S.roles, S.tableId).find((c) => c.id === S.view.ovMeasure) || null;
+const fmtNumber = (n) => new Intl.NumberFormat(dateLocale(gristCulture()), { maximumFractionDigits: 2 }).format(n);
 function recomputeOverview() {
   if (!S.roles.title) {
     S.built = null;
@@ -1372,12 +1392,15 @@ function recomputeOverview() {
   }
   S.built = buildTasks(viewRows(), { roles: S.roles, columns: S.columns, labels: S.labels, calendar: calendar(), settings: { ...S.gantt, colourBy: null, groupBy: null } });
   const today = todayDay();
-  S.ovModel = buildOverview(S.built.tasks, S.built.unscheduled, { today, doable: isDoable(), rowOf: rowById, labels: S.labels, by: ovPicks(), valueText });
+  S.ovModel = buildOverview(S.built.tasks, S.built.unscheduled, {
+    today, doable: isDoable(), rowOf: rowById, labels: S.labels, by: ovPicks(), valueText, measure: ovMeasureCol(),
+    bucketOf: (c, x) => startOfUnit(x.end, c.id === '@week' ? 'week' : 'month', weekStart()),
+  });
   drawToolbar();
   const v = ensureOverview();
   showTip();
   v.update({
-    ov: S.ovModel, today, fmtDay: fmtDayWd, who: (task) => task.people.join(', '),
+    ov: S.ovModel, today, fmtDay: fmtDayWd, fmtNum: fmtNumber, who: (task) => task.people.join(', '),
     empty: S.ovModel.total ? null : { title: t('No tasks to count'), body: t('The table is empty, or the filters leave nothing to count. Nothing is deleted: clear the filters to see every task again.') },
   });
 }
@@ -2456,7 +2479,7 @@ function printNode({ paper, fit }) {
   if (S.mode === 'gantt' && S.model) {
     const m = S.model;
     const rows = m.entries.map((e) => {
-      if (e.kind === 'group') return { label: e.label || t('(none)'), kind: 'group', bars: Number.isFinite(e.start) ? [{ kind: 'summary', start: e.start, end: e.end, title: '' }] : [] };
+      if (e.kind === 'group') return { label: e.label || t('(none)'), kind: 'group', depth: e.level || 0, bars: Number.isFinite(e.start) ? [{ kind: 'summary', start: e.start, end: e.end, title: '' }] : [] };
       const x = e.task;
       const span = e.summary || x;
       const bars = e.undated ? [] : [{
@@ -2475,14 +2498,16 @@ function printNode({ paper, fit }) {
   if (S.mode === 'overview' && S.ovModel) {
     const o = S.ovModel;
     const kpis = [{ label: t('Open'), value: o.open }, ...(o.doable ? [{ label: t('Late'), value: o.late, late: o.late > 0 }] : []), { label: t('Due in 7 days'), value: o.soon },
-      ...(o.doable ? [{ label: t('Done'), value: o.done }] : []), { label: t('No dates'), value: o.undated }];
+      ...(o.doable ? [{ label: t('Done'), value: o.done }] : []), { label: t('No dates'), value: o.undated },
+      ...(o.measure ? [{ label: o.measure.col.label, value: fmtNumber(o.measure.total) }] : [])];
     const lists = [];
     if (o.doable) lists.push({ heading: t('Needs attention'), none: t('Nothing is late.'), items: o.lateList.map((x) => ({ title: x.task.title || t('(no name)'), who: x.task.people.join(', '), when: tn(x.days, '{n} day late', '{n} days late'), late: true })) });
     lists.push({ heading: t('Next milestones'), none: t('No milestone ahead.'), items: o.milestones.map((x) => ({ title: x.task.title || t('(no name)'), who: x.task.people.join(', '), when: `${fmtDayWd(x.day)} · ${dueText(x.inDays)}` })) });
     return renderOverviewPrint({
       title: printTitle(), subtitle: subtitleFor(view, tn(o.total, '{n} task', '{n} tasks') + (o.share != null && o.doable ? ' · ' + t('{n}% done', { n: Math.round(o.share * 100) }) : ''), locale, today), paper, kpis,
-      blocks: o.breakdowns.map((b) => ({ heading: t('By {col}', { col: b.col.label }), note: b.multi ? t('A task with several values is counted under each of them.') : null,
-        rows: b.groups.map((g) => ({ name: g.label, done: g.done, open: g.open, late: g.late, total: g.total, words: groupWords(g) })) })),
+      blocks: o.breakdowns.map((b) => ({ heading: b.col.pseudo ? b.col.label : t('By {col}', { col: b.col.label }), note: b.multi ? t('A task with several values is counted under each of them.') : null,
+        rows: b.groups.map((g) => (o.measure && g.w ? { name: g.label, done: g.w.done, open: g.w.open, late: g.w.late, total: g.w.total, words: sumWords(g, fmtNumber) }
+          : { name: g.label, done: g.done, open: g.open, late: g.late, total: g.total, words: groupWords(g) })) })),
       lists,
     });
   }

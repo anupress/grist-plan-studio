@@ -212,7 +212,7 @@ export function createGantt(host, on = {}) {
       if (!e) continue;
       if (e.kind === 'group') {
         const label = e.label || t('(none)');
-        list.appendChild(el('div', { class: 'ps-row ps-row--group', role: 'listitem', dataset: { toggle: 'g:' + e.key }, style: { top: i * RH + 'px' } }, [
+        list.appendChild(el('div', { class: 'ps-row ps-row--group' + (e.level ? ' ps-row--group2' : ''), role: 'listitem', dataset: { toggle: 'g:' + e.key }, style: { top: i * RH + 'px' } }, [
           caret('g:' + e.key, e.collapsed, label),
           el('span', { class: 'ps-row__title', text: label }),
           el('span', { class: 'ps-row__when', text: String(e.count) }),

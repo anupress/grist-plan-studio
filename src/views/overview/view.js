@@ -10,8 +10,11 @@
 import { el, clear } from '../../core/util.js';
 import { t, tn } from '../../i18n/index.js';
 
-/** "2 done · 1 late · 4 open", the words of one bar. */
-export const groupWords = (g) => [g.done ? t('{n} done', { n: g.done }) : null, g.late ? t('{n} late', { n: g.late }) : null, g.open ? t('{n} open', { n: g.open }) : null].filter(Boolean).join(' · ');
+/** "2 done · 1 late · 4 open", the words of one bar; the numbers are counts, or sums of a column when `fmt` writes them. */
+export const numbersWords = (g, fmt = String) => [g.done ? t('{n} done', { n: fmt(g.done) }) : null, g.late ? t('{n} late', { n: fmt(g.late) }) : null, g.open ? t('{n} open', { n: fmt(g.open) }) : null].filter(Boolean).join(' · ');
+export const groupWords = (g) => numbersWords(g);
+/** With a column added up: its sums, and in brackets how many tasks they are the sums of (a group may add up to nothing). */
+export const sumWords = (g, fmt) => `${numbersWords(g.w, fmt) || fmt(0)} (${tn(g.total, '{n} task', '{n} tasks')})`;
 /** "Today", "Tomorrow", "In 5 days". */
 export const dueText = (n) => (n === 0 ? t('Today') : n === 1 ? t('Tomorrow') : tn(n, 'In {n} day', 'In {n} days'));
 
@@ -21,7 +24,7 @@ export const dueText = (n) => (n === 0 ? t('Today') : n === 1 ? t('Tomorrow') : 
 export function createOverview(host, on = {}) {
   const root = el('div', { class: 'ps-ov', tabindex: '-1', role: 'region', 'aria-label': t('Overview') });
   clear(host).appendChild(root);
-  // model: {ov (model/overview.js), today, fmtDay(day) -> "Fri 13 Nov", who(task) -> "Ann, Ben", empty: {title, body} | null}
+  // model: {ov (model/overview.js), today, fmtDay(day) -> "Fri 13 Nov", fmtNum(n) -> "12,400", who(task) -> "Ann, Ben", empty: {title, body} | null}
   let m = null;
 
   const kpi = (label, value, tone = null, note = null) => el('div', { class: 'ps-ov__kpi' + (tone ? ' is-' + tone : '') }, [
@@ -30,24 +33,28 @@ export function createOverview(host, on = {}) {
     note ? el('span', { class: 'ps-ov__note', text: note }) : null,
   ]);
 
-  const wordsOf = groupWords;
+  // a group's four numbers: its tasks counted, or (with a number column chosen) added up
+  const unit = (g) => (m.ov.measure && g.w ? g.w : g);
+  const wordsOf = (g) => (m.ov.measure && g.w ? sumWords(g, m.fmtNum) : groupWords(g));
 
   /** A bar as long as its group is big against the biggest, split into done, open and late. */
   function bar(g, max) {
     const pct = (n) => (max ? (n / max) * 100 : 0) + '%';
+    const u = unit(g);
     return el('span', { class: 'ps-ov__bar', role: 'img', 'aria-label': `${tn(g.total, '{n} task', '{n} tasks')}: ${wordsOf(g)}` }, [
-      g.done ? el('span', { class: 'ps-ov__seg ps-ov__seg--done', style: { width: pct(g.done) } }) : null,
-      g.open ? el('span', { class: 'ps-ov__seg ps-ov__seg--open', style: { width: pct(g.open) } }) : null,
-      g.late ? el('span', { class: 'ps-ov__seg ps-ov__seg--late', style: { width: pct(g.late) } }) : null,
+      u.done > 0 ? el('span', { class: 'ps-ov__seg ps-ov__seg--done', style: { width: pct(u.done) } }) : null,
+      u.open > 0 ? el('span', { class: 'ps-ov__seg ps-ov__seg--open', style: { width: pct(u.open) } }) : null,
+      u.late > 0 ? el('span', { class: 'ps-ov__seg ps-ov__seg--late', style: { width: pct(u.late) } }) : null,
     ]);
   }
 
   function breakdown(b, index) {
-    const max = Math.max(1, ...b.groups.map((g) => g.total));
+    const max = Math.max(1, ...b.groups.map((g) => unit(g).total));
     return el('section', { class: 'ps-ov__block', 'aria-labelledby': 'ps-ov-b' + index }, [
-      el('h2', { id: 'ps-ov-b' + index, class: 'ps-ov__h', text: t('By {col}', { col: b.col.label }) }),
+      el('h2', { id: 'ps-ov-b' + index, class: 'ps-ov__h', text: b.col.pseudo ? b.col.label : t('By {col}', { col: b.col.label }) }),
       el('ul', { class: 'ps-ov__rows' }, b.groups.map((g) => el('li', { class: 'ps-ov__row' }, [
-        el('button', {
+        // a week or a month is not a column of the table: there is nothing to filter by, so it is a name and not a button
+        b.col.pseudo ? el('span', { class: 'ps-ov__name', text: g.label }) : el('button', {
           type: 'button', class: 'ps-ov__name', text: g.label, title: t('Show only these tasks'),
           onclick: () => on.onDrill?.({ colId: b.col.id, token: g.token, label: g.label }),
         }),
@@ -84,6 +91,8 @@ export function createOverview(host, on = {}) {
       kpi(t('Due in 7 days'), o.soon),
       ...(o.doable ? [kpi(t('Done'), o.done, null, t('{n}% done', { n: pct }))] : []),
       kpi(t('No dates'), o.undated),
+      // with a number column to add up: its total, and how much of it is done
+      ...(o.measure ? [kpi(o.measure.col.label, m.fmtNum(o.measure.total), null, o.doable && o.measure.total ? t('{n}% done', { n: Math.round((o.measure.done / o.measure.total) * 100) }) : null)] : []),
     ]));
     for (const [i, b] of o.breakdowns.entries()) col.appendChild(breakdown(b, i));
     const lists = [];

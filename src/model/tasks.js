@@ -40,7 +40,7 @@ function choiceFill(col, value) {
 
 // autoColour: hand out palette colours to statuses and projects that have none (off in the booking grid,
 // where a colour that tells nothing apart is only noise)
-export const DEFAULT_SETTINGS = Object.freeze({ endInclusive: true, dueOnly: 'milestone', defaultDays: 1, colourBy: null, groupBy: null, autoColour: true });
+export const DEFAULT_SETTINGS = Object.freeze({ endInclusive: true, dueOnly: 'milestone', defaultDays: 1, colourBy: null, groupBy: null, groupBy2: null, autoColour: true });
 const PLAIN = makeCalendar();
 
 /**
@@ -59,6 +59,7 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
     'assignee', 'project', 'colour', 'parent', 'dependsOn', 'lag', 'linkType', 'baselineStart', 'baselineEnd', 'doneOn'].map((r) => [r, col(r)]));
   const colourBy = byId(S.colourBy);
   const groupBy = byId(S.groupBy);
+  const groupBy2 = byId(S.groupBy2);
   const cell = (row, role) => (C[role] ? row[C[role].id] : undefined);
   const label = (c, id) => (id == null ? null : labels[c.id]?.get(id) ?? `${c.refTable}[${id}]`);
 
@@ -138,6 +139,7 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
       lag: C.lag ? Math.round(num(cell(row, 'lag')) || 0) : 0,
       linkType: C.linkType ? linkTypeOf(plain(cell(row, 'linkType'))) : 'fs',
       group: groupBy ? textOf(row, groupBy, true) : null,
+      group2: groupBy2 ? textOf(row, groupBy2, true) : null,
       title: text(row, 'title') || '',
       start: null, end: null, kind: 'bar', fromDue: false, flag: null,
       // the days it was promised for (inclusive), and the day it was really done; null when the table has no such column or cell
@@ -175,7 +177,7 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
     }
     // What a redraw compares: the drawn facts of this task, nothing else.
     t.hash = [t.title, t.start, t.end, t.kind, t.flag, t.status, t.project, t.colour, t.progress, t.people.join('|'),
-      t.parentId, t.deps.join(','), t.lag, t.linkType, t.group, t.baseStart, t.baseEnd, t.doneOn].join('\u0001');
+      t.parentId, t.deps.join(','), t.lag, t.linkType, t.group, t.group2, t.baseStart, t.baseEnd, t.doneOn].join('\u0001');
     tasks.push(t);
   }
   return { tasks, unscheduled, flagged };
