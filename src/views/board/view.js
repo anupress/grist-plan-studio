@@ -22,7 +22,7 @@ const CAP = 150;   // cards drawn per lane before a "Show all" button
  *            onLimit(laneKey), onUndo(), onRedo()}
  */
 export function createBoard(host, on) {
-  // model: {lanes, editable, rankable, canAdd, canLimit, selectedId, laneLabel, fmtDay(d), fmtRange(a, b), today}
+  // model: {lanes, editable, rankable, canAdd, canLimit, selectedId, laneLabel, fmtDay(d), fmtRange(a, b), today, fmtHours(h)}
   let model = null;
   let pending = null;                // a model that arrived mid-drag, drawn when the drag ends
   let dragging = false;
@@ -59,6 +59,18 @@ export function createBoard(host, on) {
     ]);
   }
 
+  /** Hours logged against the plan (time tracking): "12 of 20 h", and "4 over" in words when it is. */
+  function timeLine(card) {
+    const tm = card.time;
+    if (!tm || !(tm.logged > 0.004) || !model.fmtHours) return null;
+    const H = model.fmtHours;
+    const over = tm.planned && tm.logged > tm.planned + 0.004;
+    return el('p', { class: 'ps-card__time' + (over ? ' is-over' : '') }, [
+      el('span', { text: tm.planned ? t('{logged} of {planned} h logged', { logged: H(tm.logged), planned: H(tm.planned) }) : t('{logged} h logged', { logged: H(tm.logged) }) }),
+      over ? el('span', { class: 'ps-card__over', text: t('{h} over', { h: H(tm.logged - tm.planned) }) }) : null,
+    ]);
+  }
+
   function cardNode(card) {
     const people = card.people.slice(0, 3);
     const more = card.people.length - people.length;
@@ -75,6 +87,7 @@ export function createBoard(host, on) {
       card.fields.length ? el('dl', { class: 'ps-card__fields' }, card.fields.map((f) => el('div', { class: 'ps-card__field' }, [
         el('dt', { text: f.label }), el('dd', { text: f.text }),
       ]))) : null,
+      timeLine(card),
       (() => {
         const when = whenText(card);
         if (!when && !people.length) return null;

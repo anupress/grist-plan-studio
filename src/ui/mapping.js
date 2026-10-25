@@ -43,8 +43,9 @@ function sourceText(source) {
 /**
  * @param host     element the panel opens in
  * @param s        {tableId, columns, roles, source, gantt, board, booking, workload, opensAs, cardFields: [colId], canEdit, canAddColumns, datedTables,
- *                  peopleColumns (of the table the people come from), capacityGuess (its capacity column found by name)}
- * @param on       {onSave({roles, gantt, board, booking, workload, opensAs, language}), onAddColumn(role), onClose()}
+ *                  peopleColumns (of the table the people come from), capacityGuess (its capacity column found by name),
+ *                  time, timeTables (tables that can hold time entries), timeFound (the one found by name), canSetupTime}
+ * @param on       {onSave({roles, gantt, board, booking, workload, time, opensAs, language}), onAddColumn(role), onSetupTime(), onClose()}
  */
 export function openMapping(host, s, on) {
   let roles = { ...s.roles };
@@ -52,6 +53,7 @@ export function openMapping(host, s, on) {
   const board = { ...s.board, wip: { ...(s.board?.wip || {}) } };
   const booking = { ...s.booking };
   const workload = { ...s.workload };
+  const time = { ...(s.time || { table: null, cols: null }) };
   let opensAs = s.opensAs || 'auto';
   let fieldsTouched = false;
   const selects = new Map();
@@ -125,7 +127,7 @@ export function openMapping(host, s, on) {
         sel('ps-holtab', gantt.holidayTable || '', [['', t('none')], ...(s.datedTables || []).map((id) => [id, id])], (e) => { gantt.holidayTable = e.target.value || null; }),
         el('p', { class: 'ps-hint', text: t('Each row with a date is a day off; a second date column makes it a run of days. A row that names a person is that person’s day off, in the workload.') }),
       ]),
-el('h3', { text: t('Board') }),
+      el('h3', { text: t('Board') }),
       el('div', { class: 'ps-field' }, [
         el('label', { for: 'ps-opens', text: t('This widget opens as') }),
         sel('ps-opens', opensAs, [['auto', t('Automatic')], ['gantt', t('Gantt chart')], ['timeline', t('Timeline')], ['board', t('Board')], ['booking', t('Booking grid')], ['workload', t('Workload')]], (e) => { opensAs = e.target.value; }),
@@ -177,6 +179,16 @@ el('h3', { text: t('Board') }),
           ? t('A column of the people table: hours a week (40), or a share (0.5 or 50 %). An empty cell is a full day.')
           : t('When “Assigned to” is a Reference to a people table, a column there can give each person’s hours a week. Without one, everyone has a full day.') }),
       ]),
+      el('h3', { text: t('Time tracking') }),
+      el('div', { class: 'ps-field' }, [
+        el('label', { for: 'ps-timetab', text: t('Time entries are in') }),
+        sel('ps-timetab', time.table || '', [
+          ['', s.timeFound ? t('Automatic ({table})', { table: s.timeFound }) : t('Automatic (none found)')],
+          ...(s.timeTables || []).map((id) => [id, id]),
+        ], (e) => { time.table = e.target.value || null; time.cols = null; }),
+        el('p', { class: 'ps-hint', text: t('A table with a Reference to this one, a date or a start, and hours or a start and an end. Timers and logged hours are written there.') }),
+        s.canSetupTime ? el('button', { type: 'button', class: 'ps-link ps-add-col', text: t('Add a time-entries table'), onclick: () => { close(); on.onSetupTime?.(); } }) : null,
+      ]),
       el('h3', { text: t('Colours') }),
       el('div', { class: 'ps-field' }, [
         el('label', { for: 'ps-colby', text: t('Colour the bars by') }),
@@ -204,7 +216,7 @@ el('h3', { text: t('Board') }),
           board.fields = [...panel.querySelectorAll('.ps-checks input[type=checkbox]:checked')].map((b) => s.columns.find((c) => c.id === b.value)).filter(Boolean).map((c) => ({ ref: c.ref, id: c.id }));
         }
         close();
-        on.onSave({ roles: clean, gantt, board, booking, workload, opensAs, language });
+        on.onSave({ roles: clean, gantt, board, booking, workload, time, opensAs, language });
       } }),
     ]),
   ]);

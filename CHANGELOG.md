@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.2.0
+
+Time tracking: timers on tasks, time logged by hand, logged against planned, and a weekly timesheet.
+Tested in Grist 1.7.20 on docs.getgrist.com.
+
+- **A time-entries table**, beside the tasks: a row per entry with the task, the person, the day, a
+  start and an end or just hours, and a note. Plan Studio finds one by its columns (in English,
+  German or French), or picks the one chosen in Columns. Without one, **Columns → Time tracking → Add
+  a time-entries table** makes it after asking: Task, Person, Date, Started, Stopped, Hours and Note,
+  named in the interface language, with Task and Person showing names. Grist's Undo takes it back in
+  two steps.
+- **Timers.** Start one from a task's quick edit (Enter on a bar or a card). A running timer is a row
+  with a start and no end, so it lives in the document and keeps running through a reload, a closed
+  laptop or another browser. The toolbar shows it, with its task, the time so far and Stop. Starting
+  another stops the first in the same step; a timer stopped within a minute logs nothing. Every start
+  and stop is one Undo.
+- **Logged against planned.** A card says "36 of 60 h logged", and how many hours over when it is;
+  the quick edit and the Gantt bar's tooltip also say how many are left. Planned hours come from the
+  Hours of work column (person-days count as working days of the length set in Columns).
+- **Time logged by hand**, from the quick edit or the timesheet: a day, hours and a note.
+- **The timesheet**: one person's week, or everyone's, a row per task with the hours of each day, day
+  and week totals, and that person's hours for the week. A click on a day logs time there. Today is
+  marked in words, and on a phone the days narrow to their date so the totals stay in view.
+- **CSV** of the week's entries, for a spreadsheet: semicolons and decimal commas in German and French.
+- Grist does not tell a widget who is signed in, so the first timer asks whose it is and this browser
+  remembers the answer.
+- With a side panel open, messages appear at the top so they no longer cover the panel's buttons;
+  the Undo in a message is easier to hit.
+
 ## 1.1.1
 
 - The Project plan starter no longer starts with someone over capacity. Set up on a Saturday or a

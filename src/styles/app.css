@@ -247,7 +247,10 @@ button, input, select { font: inherit; color: inherit; }
 .ps-link { border: 0; background: none; padding: 0; color: var(--ps-focus); cursor: pointer; text-decoration: underline; font-size: inherit; }
 .ps-warn { color: var(--ps-today); }
 .ps-toast { display: flex; align-items: center; gap: 12px; }
-.ps-toast__btn { border: 0; background: none; color: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0; }
+/* With a drawer open the toast goes to the top, over a title: at the bottom it hid the drawer's buttons. */
+.ps-app:has(> .ps-drawer) > .ps-toast { top: 10px; bottom: auto; }
+/* A 24px target that takes no room: the padding reaches out, the margin takes it back. */
+.ps-toast__btn { border: 0; background: none; color: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 3px 4px; margin: -3px -4px; }
 
 .ps-drawer--narrow { width: min(380px, 100%); }
 .ps-field--check { display: flex; align-items: center; gap: 8px; flex-direction: row-reverse; justify-content: flex-end; }
@@ -345,6 +348,52 @@ button, input, select { font: inherit; color: inherit; }
 .ps-toolbar .ps-btn:hover, .ps-toolbar .ps-input:hover { background-color: var(--ps-chrome-soft-2); border-color: var(--ps-chrome-soft-2); }
 .ps-toolbar .ps-btn--primary, .ps-toolbar .ps-btn--primary:hover { background: var(--ps-chrome-ink); border-color: transparent; color: var(--ps-chrome); font-weight: 650; filter: none; }
 .ps-toolbar .ps-btn--primary:hover { background: #fff; }
+/* A running timer on the bar (M10): a still dot and words, not a stopwatch. The dot is the green of
+   the Connected dot, so the bar has one green, meaning live; the task and the time say what runs. */
+.ps-timer { display: inline-flex; align-items: center; gap: 8px; max-width: 320px; height: 30px; box-sizing: border-box; padding: 0 4px 0 10px;
+  border: 1px solid var(--ps-chrome-rule); border-radius: 6px; background: var(--ps-chrome-soft); color: var(--ps-chrome-ink); font-size: 12px; }
+.ps-timer__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #59c98f; }
+.ps-timer__task { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-timer__time { flex: none; font-variant-numeric: tabular-nums; font-weight: 600; }
+.ps-timer__stop { flex: none; height: 24px; padding: 0 8px; border: 0; border-radius: 4px; background: var(--ps-chrome-ink); color: var(--ps-chrome); font: inherit; font-weight: 600; cursor: pointer; }
+.ps-timer__stop:focus-visible { outline: 2px solid var(--ps-chrome-ink); outline-offset: 2px; }
+
+/* quick edit's Time section and the log dialog (M10) */
+.ps-qe-time { padding: 12px 16px 4px; border-top: 1px solid var(--ps-line); }
+.ps-qe-time h3 { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--ps-muted); }
+.ps-qe-time__words { margin: 0 0 8px; font-variant-numeric: tabular-nums; }
+.ps-qe-time__words.is-over { color: var(--ps-crit); font-weight: 600; }
+.ps-qe-time__actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.ps-log { display: grid; grid-template-columns: 1fr 120px; gap: 0 12px; }
+
+/* the timesheet (M10): a spreadsheet's restraint. Hairlines, right-aligned figures, today a faint column. */
+.ps-drawer--wide { width: min(880px, 100%); }
+.ps-ts__bar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; padding: 12px 16px; border-bottom: 1px solid var(--ps-line); }
+.ps-ts__who { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
+.ps-ts__who label { font-size: 12px; color: var(--ps-muted); }
+.ps-ts__nav { display: flex; align-items: center; gap: 8px; }
+.ps-ts__week { min-width: 150px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ps-ts { overflow: auto; }
+.ps-ts__table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.ps-ts__table th, .ps-ts__table td { padding: 0; border-bottom: 1px solid var(--ps-line); text-align: right; font-weight: 400; }
+.ps-ts__table thead th { padding: 6px 8px; font-size: 12px; color: var(--ps-muted); vertical-align: bottom; }
+.ps-ts__table .ps-ts__task { text-align: left; padding: 8px 12px 8px 0; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-ts__table tbody .ps-ts__task { font-weight: 500; }
+.ps-ts__day > span { display: block; }
+.ps-ts__date { font-size: 11px; }
+.ps-ts__h { width: 56px; }
+.ps-ts__table td.ps-ts__h { padding: 8px; }
+.ps-ts__table td.ps-ts__h:has(.ps-ts__log) { padding: 0; }
+.ps-ts__log { display: block; width: 100%; min-height: 34px; padding: 8px; border: 0; background: none; color: inherit; font: inherit; text-align: right; cursor: pointer; }
+.ps-ts__log:hover, .ps-ts__log:focus-visible { background: var(--ps-hover); outline: none; box-shadow: inset 0 0 0 2px var(--ps-focus); }
+.ps-ts__log.is-empty:hover::after, .ps-ts__log.is-empty:focus-visible::after { content: '+'; color: var(--ps-muted); }
+.ps-ts__short { display: none; }
+.ps-ts__table .is-today { background: var(--ps-accent-soft); }
+.ps-ts__table .ps-ts__total { width: 64px; padding: 8px 0 8px 8px; font-weight: 600; }
+.ps-ts__table tfoot th, .ps-ts__table tfoot td { border-top: 1px solid var(--ps-line-strong); border-bottom: 0; font-weight: 600; }
+.ps-ts__empty { margin: 24px 0; color: var(--ps-muted); }
+.ps-ts__sum { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0 0; color: var(--ps-muted); font-variant-numeric: tabular-nums; }
+
 .ps-toolbar .ps-btn.is-on { background-color: var(--ps-chrome-soft-2); border-color: var(--ps-chrome-ink); }
 .ps-toolbar .ps-seg { border-color: var(--ps-chrome-rule); }
 .ps-toolbar .ps-seg__btn { background: transparent; color: var(--ps-chrome-mute); border-left-color: var(--ps-chrome-rule); }
@@ -362,6 +411,14 @@ button, input, select { font: inherit; color: inherit; }
 @media (max-width: 560px) {
   .ps-counts, .ps-brand__name { display: none; }
   .ps-seg__btn { padding: 5px 6px; }
+  /* the timesheet on a phone: the day of the month alone, and narrower days, so Total stays in view */
+  .ps-ts__long { display: none; }
+  .ps-ts__short { display: inline; }
+  .ps-ts__h { width: 34px; }
+  .ps-ts__table td.ps-ts__h, .ps-ts__log { padding: 8px 4px; }
+  .ps-ts__table thead th { padding: 6px 4px; }
+  .ps-ts__table .ps-ts__total { width: 44px; }
+  .ps-ts__table .ps-ts__task { max-width: 120px; }
 }
 
 /* ---- print panel (M6) ---- */

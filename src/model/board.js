@@ -45,11 +45,12 @@ export function laneKeyOf(cell, col) {
  * @param tasks   from buildTasks (tasks and unscheduled together): id, title, colour, people, done, progress,
  *                start, end, fromDue, endFrom
  * @param rows    the same rows, encoded
- * @param ctx     {laneCol, orderCol, labels, fields: [col], hideEmpty, wip: {laneKey: n}, today, cellText(row, col)}
+ * @param ctx     {laneCol, orderCol, labels, fields: [col], hideEmpty, wip: {laneKey: n}, today, cellText(row, col),
+ *                 timeOf(taskId) -> {logged, planned} | null (time tracking, M10)}
  * @returns {{lanes: Array, byId: Map}}  lane: {key, label, value, colour, cards, open, limit, over, none}
  */
 export function buildBoard(tasks, rows, ctx) {
-  const { laneCol, orderCol = null, labels = {}, fields = [], hideEmpty = false, wip = {}, today = null, cellText = null } = ctx;
+  const { laneCol, orderCol = null, labels = {}, fields = [], hideEmpty = false, wip = {}, today = null, cellText = null, timeOf = null } = ctx;
   const rowOf = new Map(rows.map((r) => [r.id, r]));
   const lanes = new Map();
   const add = (key, label, value, colour = null) => {
@@ -81,9 +82,10 @@ export function buildBoard(tasks, rows, ctx) {
       ...when({ ...task, done }, today),
       fields: fields.map((c) => ({ id: c.id, label: c.label, text: cellText ? cellText(row, c) : String(plain(row[c.id]) ?? '') }))
         .filter((f) => f.text != null && f.text !== ''),
+      time: timeOf ? timeOf(task.id) : null,
     };
     card.hash = [card.title, card.lane, card.order, card.colour, card.people.join('|'), card.done, card.progress,
-      card.due, card.span, card.late, ...card.fields.map((f) => f.text)].join('\u0001');
+      card.due, card.span, card.late, card.time ? `${Math.round(card.time.logged * 100)}/${card.time.planned ?? ''}` : '', ...card.fields.map((f) => f.text)].join('\u0001');
     lane.cards.push(card);
     byId.set(card.id, card);
   }

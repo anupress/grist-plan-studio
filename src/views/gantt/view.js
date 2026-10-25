@@ -280,6 +280,9 @@ export function createGantt(host, on = {}) {
     if (task.people.length) lines.push(el('div', { text: task.people.join(', ') }));
     if (task.project) lines.push(el('div', { text: task.project }));
     if (task.progress != null) lines.push(el('div', { text: t('{n}% done', { n: Math.round(task.progress * 100) }) }));
+    // hours logged against the plan, when time is tracked (M10)
+    const timeText = model.timeText?.(task);
+    if (timeText) lines.push(el('div', { text: timeText }));
     if (model.showCritical && model.critical?.has(task.id)) lines.push(el('div', { class: 'ps-tip__crit', text: t('On the critical path: a day late here is a day late at the end') }));
     if (task.flag === 'endBeforeStart') lines.push(el('div', { class: 'ps-tip__warn', text: t('The end date is before the start date. Drawn as one day.') }));
     const c = caps(task);

@@ -4,11 +4,12 @@
 
 import { todayDay } from '../model/values.js';
 import { weekday } from '../views/gantt/layout.js';
+import { kindOf } from '../model/schema.js';
 
 export const SAMPLE_TABLE = 'Tasks';
 
 const col = (ref, id, type, extra = {}) => ({
-  ref, id, label: id.replace(/_/g, ' '), type, kind: /^Ref:/.test(type) ? 'Ref' : /^RefList:/.test(type) ? 'RefList' : type,
+  ref, id, label: id.replace(/_/g, ' '), type, kind: kindOf(type),
   isFormula: false, refTable: (/^Ref(?:List)?:(.+)$/.exec(type) || [])[1] || null, visibleColId: extra.visibleColId || null,
   choices: extra.choices || [], choiceOptions: extra.choiceOptions || {},
 });
@@ -90,6 +91,38 @@ export function sampleRows(today = todayDay()) {
     Order: Number(id) * 10,
     Hours: hours,
   }));
+}
+
+/**
+ * The time entries (M10): what the finished and running tasks have had so far, by hand and by timer,
+ * nothing after today. Sitemap ran an hour over its plan, so one card says so; the tasks still running have hours left.
+ */
+export const SAMPLE_TIME_TABLE = 'Time_entries';
+export const SAMPLE_TIME_COLUMNS = [
+  col(1, 'Task', 'Ref:Tasks', { visibleColId: 'Task' }),
+  col(2, 'Person', 'Ref:People', { visibleColId: 'Name' }),
+  col(3, 'Date', 'Date'),
+  col(4, 'Started', 'DateTime:UTC'),
+  col(5, 'Stopped', 'DateTime:UTC'),
+  col(6, 'Hours', 'Numeric'),
+  col(7, 'Note', 'Text'),
+];
+export function sampleTimeRows(today = todayDay()) {
+  const base = today - ((weekday(today) + 6) % 7) - 21;
+  // [task, person, first day, last day, hours a day, by timer]; working days only
+  const plan = [[6, 2, 1, 4, 6, false], [7, 3, 1, 8, 5, false], [8, 1, 7, 11, 5.8, true], [9, 4, 14, 25, 3, true],
+    [10, 3, 8, 23, 3, true], [12, 4, 9, 23, 1, false]];
+  const rows = [];
+  for (const [task, person, a, b, h, timer] of plan) {
+    for (let n = a; n <= b; n++) {
+      const d = base + n;
+      if (d > today || weekday(d) === 0 || weekday(d) === 6) continue;
+      const start = d * 86400 + 9 * 3600;
+      rows.push({ id: rows.length + 1, Task: ['R', 'Tasks', task], Person: ['R', 'People', person], Date: ['d', d * 86400],
+        Started: timer ? start : null, Stopped: timer ? start + Math.round(h * 3600) : null, Hours: Math.round(h * 100) / 100, Note: '' });
+    }
+  }
+  return rows;
 }
 
 /** Ann's day off in the seventh week, from the holidays table the demo does not have: hatched in her row. */

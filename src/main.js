@@ -11,22 +11,23 @@ import {
   start, accessLevel, selectedTableId, gristCulture, getOptions, setOptions, moveCursor, apply, linkingInfo,
   openRecordCard, undo as gristUndo, redo as gristRedo,
 } from './grist/connect.js';
-import { loadColumns, loadForeignMapping, loadLabels, loadOwnSection, loadHolidayDays, loadDaysOff, listDatedTables, loadTable, listTables, columnRefs, forgetMeta } from './data/live.js';
+import { loadColumns, loadForeignMapping, loadLabels, loadOwnSection, loadHolidayDays, loadDaysOff, listDatedTables, loadTable, listTables, columnRefs, forgetMeta, listTablesWithColumns, docTimeZone } from './data/live.js';
 import { templates, structureActions, dataActions, columnForRole } from './model/templates.js';
 import { detectRoles, ganttReady, fromStored, toStored } from './model/roles.js';
 import { buildTasks, spanOf } from './model/tasks.js';
 import { arrange } from './model/tree.js';
 import { linksOf, isLate, pushPlan, criticalPath, wouldLoop } from './model/schedule.js';
 import { makeCalendar, holidaysBetween } from './model/calendar.js';
-import { todayDay, dateFromDay, plain, dayOf } from './model/values.js';
+import { todayDay, dateFromDay, plain, dayOf, num, isoFromDay, dayFromISO } from './model/values.js';
 import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink } from './model/edits.js';
-import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, VIEWS } from './model/settings.js';
+import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, storedMe, rememberMe, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, TIME_DEFAULTS, VIEWS } from './model/settings.js';
 import { buildBoard, planCardMove, newCardFields, cellText, LANE_KINDS, FIELD_KINDS } from './model/board.js';
-import { LANE_KINDS as TL_KINDS, planLaneChange } from './model/lanes.js';
+import { LANE_KINDS as TL_KINDS, planLaneChange, lanesOf } from './model/lanes.js';
 import { buildTimeline } from './model/timeline.js';
 import { buildBooking, calendarPeriods, tablePeriods, columnPeriods, bookingRange, suggestUnit, planBookingMove, newBookingFields, PERIOD_UNITS } from './model/booking.js';
 import { buildWorkload, periodTotals, teamTotals, tasksIn, levelPlan, effortUnitOf, detectCapacity, capacityMode, capacityPerDay, WL_UNITS } from './model/workload.js';
-import { ZOOM_ORDER, ZOOMS, fitZoom, isoWeek } from './views/gantt/layout.js';
+import { detectTimeColumns, findTimeTable, readEntries, loggedByTask, runningOf, planStart, planStop, planLog, toCsv, timeTableSetup, timeTableShowActions } from './model/time.js';
+import { ZOOM_ORDER, ZOOMS, fitZoom, isoWeek, startOfUnit } from './views/gantt/layout.js';
 import { renderTimePrint, renderBoardPrint, renderBookingPrint, renderWorkloadPrint, subtitleFor } from './print/render.js';
 import { pageRule } from './print/layout.js';
 import { openPrint } from './ui/printpanel.js';
@@ -39,9 +40,10 @@ import { createWorkload } from './views/workload/view.js';
 import { renderToolbar } from './ui/toolbar.js';
 import { openMapping } from './ui/mapping.js';
 import { openQuickEdit } from './ui/quickedit.js';
-import { confirmBox, numberBox } from './ui/dialog.js';
+import { confirmBox, numberBox, chooseBox, logBox } from './ui/dialog.js';
+import { openTimesheet } from './ui/timesheet.js';
 import { t, tn, setLanguage, storedLanguage, dateLocale, weekStartOf } from './i18n/index.js';
-import { SAMPLE_COLUMNS, SAMPLE_LABELS, SAMPLE_TABLE, SAMPLE_PEOPLE, sampleRows, sampleDaysOff } from './demo/sample.js';
+import { SAMPLE_COLUMNS, SAMPLE_LABELS, SAMPLE_TABLE, SAMPLE_PEOPLE, SAMPLE_TIME_TABLE, SAMPLE_TIME_COLUMNS, sampleRows, sampleDaysOff, sampleTimeRows } from './demo/sample.js';
 import { STORES_COLUMNS, STORES_LABELS, STORES_TABLE, STORES_RESOURCES, storesRows } from './demo/stores.js';
 import { SPEED_COLUMNS, SPEED_LABELS, SPEED_TABLE, speedRows } from './demo/speed.js';
 
@@ -52,6 +54,9 @@ const S = {
   periodTable: null, resourceTable: null,   // the booking grid's periods table and resources table, {columns, rows}
   peopleTable: null,                        // the workload's people with their capacity, {columns, rows}
   daysOff: { refTable: null, days: new Map() },   // people's own days off, from the holidays table
+  time: { ...TIME_DEFAULTS },               // the time-entries table picked in Columns (settings)
+  timeTableId: null, timeTable: null, timeCols: null, timeZone: 'UTC',   // the one in use, its rows and columns
+  entries: [], logged: new Map(), me: null, // its entries, hours per task, and who this browser's timers are for
   opensAs: 'auto', mode: 'gantt',   // the view the widget opens in (saved), and the one shown now
   rows: [], labels: {}, holidayDays: new Map(), built: null, signature: '',
   zoom: null, fitNext: false, selectedId: null, firstDraw: true,
@@ -450,6 +455,8 @@ function drawToolbar(model = null, level = 'full') {
     filterOptions: bookFilterOptions(), filterBy: S.view.bookFilter,
     wlRowOptions: asOptions(S.columns.filter(wlRowable)), wlRowsBy: wlRowCol()?.id || null, wlUnit: wlUnit(),
     canLevel: !!(wm && wm.ahead.length && (canEdit() || S.demo)),
+    timer: (() => { const r = myTimer(); return r ? { title: taskById(r.task)?.title || t('(no name)'), since: r.start, elapsed: elapsedText(r.start) } : null; })(),
+    hasTime: hasTime(),
     examples: Object.entries(EXAMPLE_LABELS).map(([id, label]) => ({ id, label: t(label) })), example: S.example,
   }, {
     onMode: setMode,
@@ -467,6 +474,8 @@ function drawToolbar(model = null, level = 'full') {
     onWlUnit: (u) => { S.view.wlUnit = u; saveView(); S.signature = ''; S.firstDraw = true; recompute(); },
     onLevel: () => levelNow(),
     onOverload: () => { const o = S.wlModel?.ahead[0]; if (o) workloadView?.scrollToCell(S.wlModel.cellOf(o)); },
+    onStopTimer: () => stopTimer(),
+    onTimesheet: () => openTimesheetPanel(),
     onExample: (id) => bootDemo(id),
     onPrint: () => startPrint(),
     onKeys: () => openKeys(shell, S.mode),
@@ -554,6 +563,7 @@ function recompute() {
     caps: (task) => capabilities(task, c), linkable: canLink(c), editable, showCritical: S.view.critical,
     today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), selectedId: S.selectedId,
     titleLabel: titleCol ? titleCol.label : t('Task'),
+    timeText: (task) => timeText(task),
   }, { first: S.firstDraw, fit: fitNow });
   S.firstDraw = false;
 }
@@ -572,7 +582,7 @@ function buildBoardModel() {
   const tasks = [...S.built.tasks, ...S.built.unscheduled].sort((a, b) => a.index - b.index);
   return buildBoard(tasks, S.rows, {
     laneCol: lane, orderCol: orderCol(), labels: S.labels, fields: fieldCols(lane), hideEmpty: S.board.hideEmpty,
-    wip: wipFor(lane), today: todayDay(), cellText: (row, col) => cellText(row, col, S.labels, fmtShort),
+    wip: wipFor(lane), today: todayDay(), cellText: (row, col) => cellText(row, col, S.labels, fmtShort), timeOf: (id) => timeOf(id),
   });
 }
 
@@ -597,7 +607,7 @@ function recomputeBoard() {
   S.signature = sig;
   v.update({
     lanes: b.lanes, editable, laneLocked: lane.isFormula, canAdd: editable && !!colById(S.roles.title) && !colById(S.roles.title).isFormula,
-    canLimit: editable || S.demo, selectedId: S.selectedId, laneLabel: lane.label, today: todayDay(), fmtDay: fmtShort, fmtRange: fmtShortRange,
+    canLimit: editable || S.demo, selectedId: S.selectedId, laneLabel: lane.label, today: todayDay(), fmtDay: fmtShort, fmtRange: fmtShortRange, fmtHours,
   });
 }
 
@@ -1098,27 +1108,310 @@ async function setLimit(laneKey) {
   }
 }
 
+// ---- time tracking (M10) ----------------------------------------------------------------------------------
+// The time-entries table is found by its columns (a Reference to this task table, a day, and hours or a
+// start and an end), or picked in Columns. Its rows are read like the other tables beside the task
+// table: on load, after each write, and every 15 seconds, so another person's timer shows up too.
+let timeLookedFor = false;
+const hasTime = () => !!(S.timeTable && S.timeCols);
+const nowSecs = () => Math.floor(Date.now() / 1000);
+async function loadTime({ lookAgain = false } = {}) {
+  if (S.demo) return;
+  if (lookAgain) timeLookedFor = false;
+  if (!timeLookedFor) {
+    timeLookedFor = true;
+    S.timeZone = await docTimeZone();
+    if (S.time.table) S.timeTableId = S.time.table;
+    else S.timeTableId = findTimeTable(await listTablesWithColumns().catch(() => []), S.tableId)?.id || null;
+  }
+  S.timeTable = S.timeTableId ? await loadTable(S.timeTableId).catch(() => null) : null;
+  S.timeCols = S.timeTable ? (S.time.table === S.timeTableId && S.time.cols) || detectTimeColumns(S.timeTable.columns, S.tableId) : null;
+  refreshEntries();
+}
+function refreshEntries() {
+  S.entries = hasTime() ? readEntries(S.timeTable.rows, { cols: S.timeCols, columns: S.timeTable.columns, now: nowSecs(), zone: S.timeZone }) : [];
+  S.logged = loggedByTask(S.entries);
+}
+/** A task's planned hours: its Hours of work (person-days times a working day), or null. */
+function plannedOf(id) {
+  const c = effortCol(), row = rowById(id);
+  const v = c && row ? num(row[c.id]) : null;
+  if (v == null || v <= 0) return null;
+  return effortUnitOf(c, S.workload.effortUnit) === 'days' ? v * S.workload.hoursPerDay : v;
+}
+const timeOf = (id) => (hasTime() ? { logged: S.logged.get(id) || 0, planned: plannedOf(id) } : null);
+// Logged hours to two decimals, as the entries keep them: a quarter hour is 0.25, and sums add up.
+const hourFormats = new Map();
+const fmtHours = (h) => {
+  const locale = dateLocale(gristCulture());
+  if (!hourFormats.has(locale)) hourFormats.set(locale, new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }));
+  return hourFormats.get(locale).format(Math.round(h * 100) / 100);
+};
+/** "12 of 20 hours logged, 8 left": the tooltip's line, or null when nothing is logged. */
+function timeText(task) {
+  const tm = timeOf(task.id);
+  if (!tm || !(tm.logged > 0.004)) return null;
+  const H = fmtHours;
+  if (!tm.planned) return t('{logged} hours logged', { logged: H(tm.logged) });
+  return tm.logged > tm.planned + 0.004
+    ? t('{logged} of {planned} hours logged, {over} over the plan', { logged: H(tm.logged), planned: H(tm.planned), over: H(tm.logged - tm.planned) })
+    : t('{logged} of {planned} hours logged, {left} left', { logged: H(tm.logged), planned: H(tm.planned), left: H(tm.planned - tm.logged) });
+}
+/** "1:05": hours and minutes since a start. */
+function elapsedText(since) {
+  const m = Math.max(0, Math.floor((nowSecs() - since) / 60));
+  return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0');
+}
+let tick = 0;
+function startTimerTick() {
+  if (tick) return;
+  // The bar's running time, every 15 s: minutes are what a timesheet counts, so no ticking seconds.
+  tick = setInterval(() => { for (const n of toolbar.querySelectorAll('.ps-timer__time')) n.textContent = elapsedText(Number(n.dataset.since)); }, 15000);
+}
+
+/** The people a timer can be for: those the tasks are assigned to. */
+function timePeople() {
+  const who = colById(S.roles.assignee);
+  return who ? lanesOf(who, S.rows, S.labels).filter((l) => !l.none).map((l) => ({ value: l.key, label: String(l.label ?? '') })) : [];
+}
+/** A person (a key of the tasks' people) as the time table's Person cell holds them, or null. */
+function entryPerson(key) {
+  const col = S.timeCols?.person ? S.timeTable.columns.find((c) => c.id === S.timeCols.person) : null;
+  if (!col || !key) return null;
+  if (col.kind === 'Ref') { const who = colById(S.roles.assignee); return key.startsWith('r:') && who?.refTable === col.refTable ? key : null; }
+  const label = timePeople().find((p) => p.value === key)?.label;
+  return label ? 'v:' + label : key.startsWith('v:') ? key : null;
+}
+const personName = (entryKey) => timePeople().find((p) => entryPerson(p.value) === entryKey)?.label || (entryKey?.startsWith('v:') ? entryKey.slice(2) : '');
+const myTimer = () => (hasTime() && S.me !== null ? runningOf(S.entries, entryPerson(S.me)) : null);
+/**
+ * Who this browser's timers are for: asked the first time, then remembered here (Grist does not tell a
+ * widget who is signed in). A table without people, or a Person column it cannot fill, times for no one.
+ * @returns {Promise<{ok: boolean, key: string|null}>}
+ */
+async function whoAmI(taskId) {
+  const people = timePeople();
+  if (!S.timeCols?.person || !people.length) return { ok: true, key: null };
+  if (S.me && people.some((p) => p.value === S.me)) return { ok: true, key: S.me };
+  const task = taskById(taskId);
+  const guess = people.find((p) => task?.people?.includes(p.label))?.value || people[0].value;
+  const v = await chooseBox(shell, {
+    title: t('Who is timing?'), body: t('Plan Studio remembers this in this browser, so the timer and the timesheet are yours.'),
+    label: t('I am'), options: people, value: guess, ok: t('That’s me'),
+  });
+  if (!v) return { ok: false, key: null };
+  S.me = v;
+  rememberMe(S.tableId, v);
+  return { ok: true, key: v };
+}
+
+/** Writes to the time table as one action, so one Undo takes them back; the demo keeps them in memory. */
+async function writeTime(actions, message) {
+  if (S.demo) {
+    const steps = [];
+    for (const [kind, , id, fields] of actions) {
+      if (kind === 'AddRecord') {
+        // A new row as Grist makes it: 0 in a Numeric cell, '' in a Text one.
+        const blank = (c) => (c.kind === 'Numeric' || c.kind === 'Int' ? 0 : c.kind === 'Text' ? '' : null);
+        const row = { id: Math.max(0, ...S.timeTable.rows.map((r) => r.id)) + 1, ...Object.fromEntries(S.timeTable.columns.map((c) => [c.id, blank(c)])), ...fields };
+        S.timeTable.rows.push(row);
+        steps.push({ table: 'time', add: row });
+      } else if (kind === 'RemoveRecord') {
+        const row = S.timeTable.rows.find((r) => r.id === id);
+        if (!row) continue;
+        S.timeTable.rows = S.timeTable.rows.filter((r) => r !== row);
+        steps.push({ table: 'time', remove: row });
+      } else {
+        const row = S.timeTable.rows.find((r) => r.id === id);
+        if (!row) continue;
+        steps.push({ table: 'time', id, before: Object.fromEntries(Object.keys(fields).map((k) => [k, row[k] ?? null])), after: { ...fields } });
+        Object.assign(row, fields);
+      }
+    }
+    demoHistory.undo.push(steps);
+    demoHistory.redo.length = 0;
+  } else {
+    try { await apply(actions); } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); return false; }
+    await loadTime();
+  }
+  refreshEntries();
+  timesheetPanel?.refresh(S.entries);
+  S.signature = '';
+  recompute();
+  toast(message, { label: t('Undo'), run: undo });
+  return true;
+}
+function undoTimeStep(s) {
+  if (s.add) S.timeTable.rows = S.timeTable.rows.filter((r) => r.id !== s.add.id);
+  else if (s.remove) S.timeTable.rows.push(s.remove);
+  else { const row = S.timeTable.rows.find((r) => r.id === s.id); if (row) Object.assign(row, s.before); }
+}
+function redoTimeStep(s) {
+  if (s.add) S.timeTable.rows.push(s.add);
+  else if (s.remove) S.timeTable.rows = S.timeTable.rows.filter((r) => r.id !== s.remove.id);
+  else { const row = S.timeTable.rows.find((r) => r.id === s.id); if (row) Object.assign(row, s.after); }
+}
+/** Grist's undo of a time write changes another table, which sends nothing: read it again. */
+function timeAfterUndo() {
+  if (!S.live || !hasTime()) return;
+  setTimeout(() => loadTime().then(() => { timesheetPanel?.refresh(S.entries); S.signature = ''; recompute(); }), 700);
+}
+
+async function startTimer(taskId) {
+  if (!hasTime() || !(canEdit() || S.demo)) return;
+  if (!S.timeCols.start) { toast(t('This time table has no start column, so time can only be logged by hand.')); return; }
+  const me = await whoAmI(taskId);
+  if (!me.ok) return;
+  const person = entryPerson(me.key);
+  const running = runningOf(S.entries, person);
+  const name = taskById(taskId)?.title || t('(no name)');
+  if (running?.task === taskId) { toast(t('Your timer is already running on “{name}”.', { name })); return; }
+  const plan = planStart({ taskId, person, now: nowSecs(), today: todayDay(), cols: S.timeCols, columns: S.timeTable.columns, running });
+  // The running timer stops in the same action; one started within the minute is taken away instead.
+  const stop = !plan.stop ? [] : plan.stop.remove ? [['RemoveRecord', S.timeTableId, plan.stop.id]] : [['UpdateRecord', S.timeTableId, plan.stop.id, plan.stop.fields]];
+  const actions = [...stop, ['AddRecord', S.timeTableId, null, plan.add.fields]];
+  const was = plan.stop ? taskById(running.task)?.title || t('(no name)') : null;
+  await writeTime(actions, was ? t('Timer moved from “{from}” to “{to}”.', { from: was, to: name }) : t('Timer started on “{name}”.', { name }));
+}
+async function stopTimer() {
+  const running = myTimer();
+  if (!running) return;
+  const plan = planStop(running, { now: nowSecs(), cols: S.timeCols });
+  if (plan.remove) { await writeTime([['RemoveRecord', S.timeTableId, running.id]], t('Stopped within a minute, so nothing was logged.')); return; }
+  if (!Object.keys(plan.fields).length) return;
+  const name = taskById(running.task)?.title || t('(no name)');
+  await writeTime([['UpdateRecord', S.timeTableId, running.id, plan.fields]], t('Logged {time} on “{name}”.', { time: elapsedText(running.start), name }));
+}
+/** Time logged by hand on a task; `entryKey` is the person when the timesheet says who, else this browser's. */
+async function logTime(taskId, day = todayDay(), entryKey = undefined) {
+  if (!hasTime() || !(canEdit() || S.demo)) return;
+  if (!S.timeCols.hours) { toast(t('This time table has no Hours column, so time can only be logged with the timer.')); return; }
+  let person = entryKey;
+  if (person === undefined) { const me = await whoAmI(taskId); if (!me.ok) return; person = entryPerson(me.key); }
+  const name = taskById(taskId)?.title || t('(no name)');
+  const who = personName(person);
+  const v = await logBox(shell, { title: t('Log time on “{name}”', { name }), body: who ? t('For {who}.', { who }) : t('Hours worked on this task on one day.'), day, isoOf: isoFromDay, dayOf: dayFromISO });
+  if (!v) return;
+  const plan = planLog({ taskId, person, day: v.day, hours: v.hours, note: v.note, cols: S.timeCols, columns: S.timeTable.columns });
+  if (plan.error) return;
+  await writeTime([['AddRecord', S.timeTableId, null, plan.fields]], t('Logged {h} h on “{name}”.', { h: fmtHours(v.hours), name }));
+}
+
+let timesheetPanel = null;
+async function openTimesheetPanel() {
+  if (!hasTime() || timesheetPanel) return;
+  const assignee = colById(S.roles.assignee);
+  // The people table gives each person's hours a week; outside the workload view it is not read yet.
+  if (S.live && !S.peopleTable && assignee?.refTable) S.peopleTable = await loadTable(assignee.refTable).catch(() => null);
+  if (timesheetPanel) return;
+  const locale = dateLocale(gristCulture());
+  const F = (o) => new Intl.DateTimeFormat(locale, { timeZone: 'UTC', ...o });
+  const wd = F({ weekday: 'short' }), dm = F({ day: 'numeric', month: 'short' }), dn = F({ day: 'numeric' });
+  const people = timePeople().map((p) => ({ value: entryPerson(p.value), label: p.label })).filter((p) => p.value);
+  const cal = calendar();
+  const caps = capacityMap(assignee);
+  timesheetPanel = openTimesheet(shell, {
+    people, person: S.me ? entryPerson(S.me) || '' : '', from: startOfUnit(todayDay(), 'week', weekStart()), entries: S.entries,
+    taskTitle: (id) => taskById(id)?.title || '', today: todayDay(), canLog: (canEdit() || S.demo) && !!S.timeCols.hours,
+    weekLabel: (from) => t('W{n}', { n: isoWeek(from + 3).week }) + ' · ' + fmtRange(from, from + 6),
+    dayLabel: (d) => [wd.format(dateFromDay(d)), dm.format(dateFromDay(d)), dn.format(dateFromDay(d))], hours: fmtHours,
+    capacityOf: (key, from) => {
+      const perDay = (key?.startsWith('r:') ? caps.get(key) : null) ?? S.workload.hoursPerDay;
+      let days = 0;
+      for (let d = from; d < from + 7; d++) if (cal.isWork(d)) days++;
+      return perDay * days;
+    },
+  }, {
+    onClose: () => { timesheetPanel = null; },
+    onLog: async ({ task, day, person }) => {
+      let id = task;
+      if (id == null) {
+        const all = [...(S.built?.tasks || []), ...(S.built?.unscheduled || [])].filter((x) => x.title).sort((a, b) => a.title.localeCompare(b.title));
+        const v = await chooseBox(shell, { title: t('Log time on which task?'), body: t('For {who}.', { who: personName(person) }), label: t('Task'),
+          options: all.map((x) => ({ value: String(x.id), label: x.title })), ok: t('Next') });
+        if (!v) return;
+        id = Number(v);
+      }
+      await logTime(id, day, person);
+    },
+    onCsv: ({ from, person }) => downloadCsv(from, person),
+  });
+}
+
+/** The week's entries as CSV, for a spreadsheet: one row per entry, the person's or everyone's. */
+function downloadCsv(from, person) {
+  const locale = dateLocale(gristCulture());
+  const stamp = (secs) => (secs == null ? '' : new Date(secs * 1000).toLocaleString('sv-SE', { timeZone: S.timeZone || 'UTC' }).slice(0, 16));
+  const list = S.entries.filter((e) => e.day != null && e.day >= from && e.day <= from + 6 && (!person || e.person === person))
+    .sort((a, b) => a.day - b.day || (a.start ?? 0) - (b.start ?? 0));
+  const rows = [[t('Date'), t('Person'), t('Task'), t('Hours'), t('Started'), t('Stopped'), t('Note')],
+    ...list.map((e) => [isoFromDay(e.day), personName(e.person), taskById(e.task)?.title || '', Math.round(e.hours * 100) / 100, stamp(e.start), e.running ? '' : stamp(e.end), e.note])];
+  const url = URL.createObjectURL(new Blob([toCsv(rows, locale)], { type: 'text/csv;charset=utf-8' }));
+  const name = [t('Timesheet'), isoFromDay(from), person ? personName(person) : null].filter(Boolean).join(' ');
+  const a = el('a', { href: url, download: name + '.csv' });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast(tn(list.length, 'Downloaded {n} entry.', 'Downloaded {n} entries.'));
+}
+
+/** A new time-entries table, after asking: two actions (the table, then what its References show). */
+async function setupTime() {
+  if (!S.live || !canEdit()) return;
+  const who = colById(S.roles.assignee);
+  const peopleTable = who && (who.kind === 'Ref' || who.kind === 'RefList') ? who.refTable : null;
+  const zone = await docTimeZone();
+  const setup = timeTableSetup(t, { taskTable: S.tableId, peopleTable, tables: await listTables().catch(() => []), zone });
+  const yes = await confirmBox(shell, {
+    title: t('Track time on tasks?'),
+    body: t('Plan Studio adds a table {table} with Task, Person, Date, Started, Stopped, Hours and Note: timers and logged hours go there. Grist’s Undo takes it back in two steps.', { table: setup.name }),
+    ok: t('Add the table'),
+  });
+  if (!yes) return;
+  try {
+    await apply(setup.actions);
+    const colRef = await columnRefs();
+    const show = timeTableShowActions({ ...setup, taskTable: S.tableId, taskTitle: S.roles.title, peopleTable, peopleShow: who?.visibleColId || null }, { colRef });
+    if (show.length) await apply(show);
+    await loadTime({ lookAgain: true });
+    S.signature = '';
+    recompute();
+    toast(t('Time tracking is set up. Start a timer from a task’s quick edit (Enter).'));
+  } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
+}
+
 async function undo() {
   if (S.demo) {
     const steps = demoHistory.undo.pop();
     if (!steps) return;
-    for (const s of steps) { const row = rowById(s.id); if (row) replaceRow(s.id, { ...row, ...s.before }); }
+    for (const s of steps) {
+      if (s.table === 'time') { undoTimeStep(s); continue; }
+      const row = rowById(s.id); if (row) replaceRow(s.id, { ...row, ...s.before });
+    }
+    if (steps.some((s) => s.table === 'time')) { refreshEntries(); timesheetPanel?.refresh(S.entries); S.signature = ''; }
     demoHistory.redo.push(steps);
     recompute();
     return;
   }
   if (S.live) await gristUndo().catch((e) => toast(errText(e)));
+  timeAfterUndo();
 }
 async function redo() {
   if (S.demo) {
     const steps = demoHistory.redo.pop();
     if (!steps) return;
-    for (const s of steps) { const row = rowById(s.id); if (row) replaceRow(s.id, { ...row, ...s.after }); }
+    for (const s of steps) {
+      if (s.table === 'time') { redoTimeStep(s); continue; }
+      const row = rowById(s.id); if (row) replaceRow(s.id, { ...row, ...s.after });
+    }
+    if (steps.some((s) => s.table === 'time')) { refreshEntries(); timesheetPanel?.refresh(S.entries); S.signature = ''; }
     demoHistory.undo.push(steps);
     recompute();
     return;
   }
   if (S.live) await gristRedo().catch((e) => toast(errText(e)));
+  timeAfterUndo();
 }
 
 // ---- starter templates and the add-column assistant --------------------------------------------------------
@@ -1372,7 +1665,15 @@ function openQuick(id, note = null) {
   for (const role of ['parent', 'dependsOn']) if (S.roles[role]) labels[S.roles[role]] = names;
   openQuickEdit(shell, {
     row, roles: S.roles, columns: S.columns, labels, editable: canEdit(), canOpenCard: S.live, note, booking: S.mode === 'booking',
+    time: {
+      logged: S.logged.get(id) || 0, planned: plannedOf(id), running: myTimer()?.task === id, hours: fmtHours,
+      canTrack: hasTime() && (canEdit() || S.demo), canSetup: S.live && canEdit() && !hasTime(),
+    },
   }, {
+    onStartTimer: () => startTimer(id),
+    onStopTimer: () => stopTimer(),
+    onLogTime: () => logTime(id),
+    onSetupTime: () => setupTime(),
     onClose: () => { dialogOpen = false; },   // focus goes back to what opened it (dialog.js trapFocus)
     onOpenCard: () => openCard(id),
     onSave: (plan) => {
@@ -1460,24 +1761,31 @@ async function openColumns() {
   if (mappingOpen) return;
   mappingOpen = true;
   const datedTables = S.live ? await listDatedTables().catch(() => []) : [];
+  // Tables that can hold time entries for this task table, for the Time tracking section.
+  const timeTables = S.live ? (await listTablesWithColumns().catch(() => [])).filter((tb) => tb.id !== S.tableId && detectTimeColumns(tb.columns, S.tableId)).map((tb) => tb.id) : [];
   // The capacity column lives on the people table: read it, if no view has yet.
   if (S.live && !S.peopleTable) { const who = wlRowCol(); if (who?.refTable) S.peopleTable = await loadTable(who.refTable).catch(() => null); }
   mappingOpen = openMapping(shell, {
     tableId: S.tableId, columns: S.columns, roles: S.roles, source: S.source, gantt: S.gantt, canEdit: canEdit() || S.demo,
     board: S.board, booking: S.booking, workload: S.workload, opensAs: S.opensAs, cardFields: fieldCols(null).map((c) => c.id),
     peopleColumns: S.peopleTable?.columns || [], capacityGuess: capacityCol()?.id || null,
+    time: S.time, timeTables, timeFound: S.time.table ? null : S.timeTableId, canSetupTime: S.live && canEdit() && !hasTime(),
     canAddColumns: S.live && canEdit(),
     datedTables: datedTables.filter((x) => x !== S.tableId),
   }, {
     onClose: () => { mappingOpen = null; },
     onAddColumn: (role) => addColumnFor(role),
-    onSave: async ({ roles, gantt, board, booking, workload, opensAs, language }) => {
+    onSetupTime: () => setupTime(),
+    onSave: async ({ roles, gantt, board, booking, workload, time, opensAs, language }) => {
       setLanguage(language);
       S.roles = roles;
       S.gantt = gantt;
       S.board = board;
       S.booking = booking;
       S.workload = workload;
+      const timeChanged = time.table !== S.time.table;
+      S.time = time;
+      if (timeChanged) await loadTime({ lookAgain: true });
       if (opensAs !== S.opensAs) { S.opensAs = opensAs; S.mode = resolveMode(); }
       S.source = { kind: 'saved' };
       if (S.live) {
@@ -1485,7 +1793,7 @@ async function openColumns() {
         S.holidayDays = await loadHolidayDays(gantt.holidayTable).catch(() => new Map());
         await loadBookingTables();
         if (canEdit()) {
-          const next = writeOptions(S.options, { storedRoles: toStored(roles, S.columns), gantt, board, booking, workload, view: opensAs });
+          const next = writeOptions(S.options, { storedRoles: toStored(roles, S.columns), gantt, board, booking, workload, time, view: opensAs });
           try { await setOptions(next); S.options = next; toast(t('Saved for this widget.')); }
           catch (e) { toast(t('Could not save: {msg}', { msg: errText(e) })); }
         }
@@ -1504,6 +1812,9 @@ async function loadDocState() {
   S.board = opts.board;
   S.booking = opts.booking;
   S.workload = opts.workload;
+  S.time = opts.time;
+  S.me = storedMe(S.tableId);
+  timeLookedFor = false;   // a table made or renamed since: look for the time table again
   S.opensAs = opts.view;
   const saved = opts.roles ? fromStored(opts.roles, S.columns, S.tableId) : {};
   if (Object.keys(saved).length) {
@@ -1536,6 +1847,7 @@ async function loadBookingTables() {
     S.peopleTable = who?.refTable ? await loadTable(who.refTable).catch(() => null) : null;
     S.daysOff = await loadDaysOff(S.gantt.holidayTable).catch(() => ({ refTable: null, days: new Map() }));
   }
+  await loadTime();
 }
 
 // A column added, removed or renamed shows up as a different set of keys in the rows.
@@ -1617,6 +1929,7 @@ function onOptions(options) {
   S.board = o.board;
   S.booking = o.booking;
   S.workload = o.workload;
+  if (o.time.table !== S.time.table) { S.time = o.time; timeLookedFor = false; } else S.time = o.time;
   if (o.view !== S.opensAs) { S.opensAs = o.view; S.mode = resolveMode(); }
   if (o.roles) { S.roles = fromStored(o.roles, S.columns, S.tableId); S.source = { kind: 'saved' }; }
   reload('labels');
@@ -1658,6 +1971,7 @@ async function boot() {
   recompute();
   // Other tables send no change events (M0, question 7): labels are read again now and then.
   setInterval(() => { if (document.visibilityState === 'visible') reload('labels'); }, 15000);
+  startTimerTick();
   window.addEventListener('focus', () => reload('labels'));
 }
 
@@ -1682,6 +1996,15 @@ function bootDemo(example = null) {
   S.peopleTable = stores || speed ? null : SAMPLE_PEOPLE;
   S.daysOff = stores || speed ? { refTable: null, days: new Map() } : sampleDaysOff();
   S.workload = { ...WORKLOAD_DEFAULTS };
+  // The website plan's time entries, kept in memory like everything else in the demo.
+  S.time = { ...TIME_DEFAULTS };
+  S.timeTableId = stores || speed ? null : SAMPLE_TIME_TABLE;
+  S.timeTable = stores || speed ? null : { columns: SAMPLE_TIME_COLUMNS, rows: sampleTimeRows() };
+  S.timeCols = S.timeTable ? detectTimeColumns(S.timeTable.columns, SAMPLE_TABLE) : null;
+  S.timeZone = 'UTC';
+  S.me = storedMe(SAMPLE_TABLE);
+  refreshEntries();
+  startTimerTick();
   S.opensAs = stores ? 'booking' : 'auto';
   S.selectedId = null;
   demoHistory.undo.length = 0;

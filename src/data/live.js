@@ -191,6 +191,23 @@ export async function columnRefs() {
   };
 }
 
+/** Every table a person made, with its columns: where a time-entries table is looked for. */
+export async function listTablesWithColumns() {
+  const m = await meta();
+  return m.tables
+    .filter((t) => !t.summarySourceTable && !/^_grist|^GristHidden/.test(t.tableId))
+    .map((t) => ({ id: t.tableId, columns: tableColumns(t.tableId, m.tables, m.columns) }));
+}
+
+/** The document's time zone (Document settings), for new DateTime columns; the browser's when it has none. */
+export async function docTimeZone() {
+  try {
+    const info = await fetchRows('_grist_DocInfo');
+    if (info?.[0]?.timezone) return info[0].timezone;
+  } catch { /* fall through */ }
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; }
+}
+
 /** Tables that could hold days off: those with at least one date column. */
 export async function listDatedTables() {
   metaCache = null;   // asked when the Columns panel opens: tables may have come and gone since

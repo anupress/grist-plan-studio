@@ -3,13 +3,13 @@
 // In the widget's options (saved in the document, shared by everyone who opens the page, written
 // only when someone presses Save in the Columns panel): the column mapping, how dates are read,
 // which view the widget opens in, what a board card shows and the lanes' limits, the booking grid's
-// periods table and cell label, and the workload's working day and capacity column.
+// periods table and cell label, the workload's working day and capacity column, and the time-entries table.
 // Writing options is a document action, so nothing that changes while someone merely looks around
 // (zoom, scroll position) goes there.
 //
 // In this browser (localStorage): per table, the zoom level, the grouping, whether the critical path
 // is shown, which parents and groups are folded, the board's lane column, the workload's rows and
-// periods, and the view last switched to; and the interface language.
+// periods, and the view last switched to; the interface language; and who is timing ("I am Ann").
 
 export const SETTINGS_VERSION = 1;
 
@@ -36,6 +36,10 @@ export const WORKLOAD_DEFAULTS = Object.freeze({
   hoursPerDay: 8,           // a normal working day, in hours
   capacity: null,           // {ref, id} of the people table's capacity column (hours a week or a share), or null (guessed)
   effortUnit: 'auto',       // the Hours of work column counts 'hours' or 'days'; 'auto' reads its name
+});
+export const TIME_DEFAULTS = Object.freeze({
+  table: null,              // the time-entries table picked in Columns, or null (found by its columns)
+  cols: null,               // {task, person, date, start, end, hours, note}: its columns, or null (found by name)
 });
 export const VIEWS = ['gantt', 'timeline', 'board', 'booking', 'workload'];
 const REGION = /^(DE(-[A-Z]{2})?|AT|CH|FR|UK-EW|US)$/;
@@ -69,12 +73,16 @@ export function readOptions(options) {
   if (typeof w.hoursPerDay === 'number' && w.hoursPerDay > 0 && w.hoursPerDay <= 24) workload.hoursPerDay = w.hoursPerDay;
   if (w.capacity && typeof w.capacity === 'object' && typeof w.capacity.id === 'string') workload.capacity = { ref: w.capacity.ref, id: w.capacity.id };
   if (w.effortUnit === 'hours' || w.effortUnit === 'days' || w.effortUnit === 'auto') workload.effortUnit = w.effortUnit;
+  const tm = o.time && typeof o.time === 'object' ? o.time : {};
+  const time = { ...TIME_DEFAULTS };
+  if (typeof tm.table === 'string' && tm.table) time.table = tm.table;
+  if (tm.cols && typeof tm.cols === 'object' && typeof tm.cols.task === 'string') time.cols = Object.fromEntries(['task', 'person', 'date', 'start', 'end', 'hours', 'note'].map((k) => [k, typeof tm.cols[k] === 'string' ? tm.cols[k] : null]));
   const view = VIEWS.includes(o.view) ? o.view : 'auto';
-  return { roles: o.roles && typeof o.roles === 'object' ? o.roles : null, gantt, board, booking, workload, view };
+  return { roles: o.roles && typeof o.roles === 'object' ? o.roles : null, gantt, board, booking, workload, time, view };
 }
 
 /** What Save writes. Other keys already in the options (from a later version) are kept. */
-export function writeOptions(previous, { storedRoles, gantt, board, booking, workload, view }) {
+export function writeOptions(previous, { storedRoles, gantt, board, booking, workload, time, view }) {
   const prev = previous && typeof previous === 'object' ? previous : {};
   const out = { ...prev, v: SETTINGS_VERSION };
   if (storedRoles !== undefined) out.roles = storedRoles;
@@ -82,6 +90,7 @@ export function writeOptions(previous, { storedRoles, gantt, board, booking, wor
   if (board) out.board = { ...board, wip: { ...board.wip } };
   if (booking) out.booking = { ...booking };
   if (workload) out.workload = { ...workload };
+  if (time) out.time = { ...time };
   if (view !== undefined) out.view = view;
   return out;
 }
@@ -126,3 +135,9 @@ export function rememberView(tableId, view) { keep(viewKey(tableId), view); }
 const modeKey = (tableId, opensAs) => 'planStudio.mode.' + (tableId || 'demo') + '.' + opensAs;
 export function storedMode(tableId, opensAs) { const v = local(modeKey(tableId, opensAs), null); return VIEWS.includes(v) ? v : null; }
 export function rememberMode(tableId, opensAs, mode) { keep(modeKey(tableId, opensAs), mode); }
+
+// Who this browser's timers are for: a person's lane key, per table. Asked the first time a timer starts
+// and remembered here, because Grist does not tell a widget who is signed in.
+const meKey = (tableId) => 'planStudio.me.' + (tableId || 'demo');
+export function storedMe(tableId) { const v = local(meKey(tableId), null); return typeof v === 'string' ? v : null; }
+export function rememberMe(tableId, key) { keep(meKey(tableId), key); }

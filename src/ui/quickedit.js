@@ -60,8 +60,36 @@ function inputFor(col, cell, labels, id, disabled) {
 }
 
 /**
- * @param s  {row, roles, columns, labels, editable, canOpenCard, note, booking: true in the booking grid}
- * @param on {onSave({fields, patch}), onOpenCard(), onClose()}
+ * The task's time (M10): logged against planned in words, and the timer and Log time buttons. Null when
+ * there is nothing to say or do.
+ * @param tm {logged, planned (hours | null), running (this person's timer is on this task), canTrack, canSetup, hours(h) -> text}
+ */
+function timeSection(tm, on, close) {
+  if (!tm || (!tm.canTrack && !tm.canSetup && !tm.logged)) return null;
+  const H = tm.hours;
+  let words;
+  if (tm.logged > 0.004 && tm.planned) {
+    words = tm.logged > tm.planned + 0.004 ? t('{logged} of {planned} hours logged, {over} over the plan', { logged: H(tm.logged), planned: H(tm.planned), over: H(tm.logged - tm.planned) })
+      : t('{logged} of {planned} hours logged, {left} left', { logged: H(tm.logged), planned: H(tm.planned), left: H(tm.planned - tm.logged) });
+  } else if (tm.logged > 0.004) words = t('{logged} hours logged', { logged: H(tm.logged) });
+  else words = tm.planned ? t('Nothing logged yet of {planned} planned hours', { planned: H(tm.planned) }) : t('Nothing logged yet');
+  const over = tm.planned && tm.logged > tm.planned + 0.004;
+  return el('section', { class: 'ps-qe-time', 'aria-labelledby': 'ps-qe-time-h' }, [
+    el('h3', { id: 'ps-qe-time-h', text: t('Time') }),
+    el('p', { class: 'ps-qe-time__words' + (over ? ' is-over' : ''), text: words }),
+    tm.canTrack ? el('div', { class: 'ps-qe-time__actions' }, [
+      tm.running
+        ? el('button', { type: 'button', class: 'ps-btn', text: t('Stop timer'), onclick: () => { close(); on.onStopTimer?.(); } })
+        : el('button', { type: 'button', class: 'ps-btn', text: t('Start timer'), onclick: () => { close(); on.onStartTimer?.(); } }),
+      el('button', { type: 'button', class: 'ps-btn', text: t('Log time…'), onclick: () => { close(); on.onLogTime?.(); } }),
+    ]) : null,
+    !tm.canTrack && tm.canSetup ? el('button', { type: 'button', class: 'ps-link', text: t('Track time on tasks…'), onclick: () => { close(); on.onSetupTime?.(); } }) : null,
+  ]);
+}
+
+/**
+ * @param s  {row, roles, columns, labels, editable, canOpenCard, note, booking: true in the booking grid, time: see timeSection}
+ * @param on {onSave({fields, patch}), onOpenCard(), onClose(), onStartTimer(), onStopTimer(), onLogTime(), onSetupTime()}
  */
 export function openQuickEdit(host, s, on) {
   const inputs = [];
@@ -105,6 +133,7 @@ export function openQuickEdit(host, s, on) {
       ...fieldRows,
       el('button', { type: 'submit', hidden: true }),
     ]),
+    timeSection(s.time, on, () => close()),
     el('div', { class: 'ps-drawer__foot' }, [
       s.canOpenCard ? el('button', { type: 'button', class: 'ps-btn', text: t('Open Grist’s card'), title: t('Every column of this row, in Grist’s record card'), onclick: () => { close(); on.onOpenCard?.(); } }) : null,
       el('span', { class: 'ps-spacer' }),

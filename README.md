@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.1-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -112,13 +112,35 @@ The main actions have keys: arrows select, Alt+arrows move, Enter opens quick ed
 undoes. **?** lists the keys of the view on show. Dialogs keep the focus and give it back, a
 selection is announced to screen readers, and the booking grid has a cell cursor.
 
+## Time tracking
+
+Hours worked go in a table of their own, beside the tasks: a row per entry, with the task, the person,
+the day, a start and an end (from a timer) or just hours (logged by hand), and a note. Plan Studio
+finds such a table by its columns, or picks one in **Columns**; without one, **Columns → Time
+tracking → Add a time-entries table** makes it after asking (Task, Person, Date, Started, Stopped,
+Hours, Note, named in the interface language).
+
+- **A timer** starts from a task's quick edit (Enter on a bar or a card). It is a row with a start and
+  no end, so it lives in the document: it keeps running through a reload, a closed laptop or another
+  browser. The toolbar shows it with its task and time, and Stop. Starting another stops the first in
+  the same step; a timer stopped within a minute logs nothing. Each start and stop is one Undo.
+- **Logged against planned**: a card says "36 of 60 h logged", or how many hours over; the quick edit
+  and the Gantt bar's tooltip say how many are left.
+- **The timesheet** shows one person's week, or everyone's: a row per task, the hours of each day and
+  the totals, against the hours that person has that week. A click on a day logs time there, and
+  **Download CSV** hands the week's entries to a spreadsheet (semicolons and decimal commas where the
+  language writes them so).
+
+Grist does not tell a widget who is signed in, so Plan Studio asks whose timer it is the first time
+and remembers the answer in this browser.
+
 ## Where settings live
 
 - **In the widget's options**, saved in the document and shared by everyone, written only when
   someone presses Save in Columns: the column mapping, how dates are read, the view the widget
-  opens in, what a card shows, lane limits and the booking grid's periods.
-- **In this browser**: zoom, grouping, folded rows, the lane column and the last view, and the
-  interface language. Looking around never writes to the document.
+  opens in, what a card shows, lane limits, the booking grid's periods and the time-entries table.
+- **In this browser**: zoom, grouping, folded rows, the lane column and the last view, the
+  interface language, and who you are for timers. Looking around never writes to the document.
 
 ## Privacy
 

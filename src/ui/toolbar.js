@@ -33,9 +33,10 @@ const button = (text, title, onclick, cls = '') => el('button', { type: 'button'
  * @param {{level, mode, zoom, counts: {tasks, unscheduled, flagged, cards, bookings, clashes, outside, overloads, noHours}, demo, editable,
  *          readOnlyWhy, canAdd, groupOptions, groupBy, hasLinks, critical, laneOptions, laneBy, tlLaneOptions, tlLaneBy,
  *          rowOptions, rowsBy, periodOptions, periodsBy, filterOptions, filterBy, wlRowOptions, wlRowsBy, wlUnit, canLevel,
- *          examples, example}} s
+ *          timer: {title, since, elapsed} | null, hasTime, examples, example}} s
  * @param {{onMode, onZoom, onFit, onToday, onColumns, onNew, onUndated, onGroup, onCritical, onLanes, onTlLanes,
- *          onRows, onPeriods, onFilter, onClash, onWlRows, onWlUnit, onLevel, onOverload, onExample, onPrint, onKeys}} on
+ *          onRows, onPeriods, onFilter, onClash, onWlRows, onWlUnit, onLevel, onOverload, onStopTimer, onTimesheet, onExample,
+ *          onPrint, onKeys}} on
  */
 export function renderToolbar(host, s, on) {
   const view = s.mode;
@@ -121,6 +122,14 @@ export function renderToolbar(host, s, on) {
     ]),
     el('div', { class: 'ps-bar-right' }, [
       ...tools,
+      // A running timer, said in words: which task and for how long (the time ticks in main.js), and Stop.
+      s.timer && level !== 'bare' ? el('div', { class: 'ps-timer', role: 'status', title: t('Your timer is running on “{task}”', { task: s.timer.title }) }, [
+        el('span', { class: 'ps-timer__dot', 'aria-hidden': 'true' }),
+        el('span', { class: 'ps-timer__task', text: s.timer.title }),
+        el('span', { class: 'ps-timer__time', dataset: { since: String(s.timer.since) }, text: s.timer.elapsed }),
+        el('button', { type: 'button', class: 'ps-timer__stop', text: t('Stop'), title: t('Stop the timer and log its time'), onclick: on.onStopTimer }),
+      ]) : null,
+      s.hasTime && level === 'full' ? button(t('Timesheet'), t('Hours logged this week, per task and day'), on.onTimesheet) : null,
       level === 'full' ? button(t('Print'), t('Print or save as PDF (Ctrl+P)'), on.onPrint) : null,
       level === 'bare' ? null : el('button', { type: 'button', class: 'ps-btn ps-btn--key', text: '?', title: t('Keyboard shortcuts (?)'), 'aria-label': t('Keyboard shortcuts'), onclick: on.onKeys }),
       level === 'bare' ? null : button(t('Columns'), t('Which column is the start, the end, the status…'), on.onColumns),

@@ -55,6 +55,67 @@ export function confirmBox(host, { title, body, ok, cancel = t('Cancel'), items 
   });
 }
 
+/** One choice from a list, such as who is timing. Resolves the chosen value, or null when cancelled. */
+export function chooseBox(host, { title, body, label, options, value = null, ok = t('OK'), cancel = t('Cancel') }) {
+  return new Promise((resolve) => {
+    const done = (v) => { release(); scrim.remove(); box.remove(); resolve(v); };
+    const select = el('select', { id: 'ps-dlg-c', class: 'ps-input' }, options.map((o) => el('option', { value: o.value, text: o.label, selected: o.value === value })));
+    const scrim = el('div', { class: 'ps-scrim', onclick: () => done(null) });
+    const box = el('form', { class: 'ps-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ps-dlg-t', 'aria-describedby': 'ps-dlg-b',
+      onsubmit: (e) => { e.preventDefault(); done(select.value); } }, [
+      el('h2', { id: 'ps-dlg-t', text: title }),
+      el('p', { id: 'ps-dlg-b', text: body }),
+      el('div', { class: 'ps-field' }, [el('label', { for: 'ps-dlg-c', text: label }), select]),
+      el('div', { class: 'ps-dialog__foot' }, [
+        el('button', { type: 'button', class: 'ps-btn', text: cancel, onclick: () => done(null) }),
+        el('button', { type: 'submit', class: 'ps-btn ps-btn--primary', text: ok }),
+      ]),
+    ]);
+    host.append(scrim, box);
+    const release = trapFocus(box, () => done(null));
+    select.focus();
+  });
+}
+
+/**
+ * Time logged by hand: a day, hours (quarter hours, decimals allowed) and a note. Resolves
+ * {day, hours, note}, or null when cancelled.
+ * @param s {title, body, day (a day number), hours, isoOf(day), dayOf(iso), ok}
+ */
+export function logBox(host, { title, body, day, hours = null, isoOf, dayOf: parseDay, ok = t('Log time'), cancel = t('Cancel') }) {
+  return new Promise((resolve) => {
+    const done = (v) => { release(); scrim.remove(); box.remove(); resolve(v); };
+    const date = el('input', { type: 'date', id: 'ps-log-d', class: 'ps-input', value: isoOf(day), required: true });
+    // Any amount: a step would count from the minimum and turn down 2.25 (the arrows then step by 1).
+    const amount = el('input', { type: 'number', id: 'ps-log-h', class: 'ps-input ps-input--num', min: '0.01', max: '24', step: 'any', value: hours == null ? '' : String(hours), required: true });
+    const note = el('input', { type: 'text', id: 'ps-log-n', class: 'ps-input', maxlength: '500' });
+    const submit = () => {
+      const h = Number(String(amount.value).replace(',', '.'));
+      const d = parseDay(date.value);
+      if (!(h > 0 && h <= 24) || d == null) { (d == null ? date : amount).focus(); return; }
+      done({ day: d, hours: h, note: note.value.trim() });
+    };
+    const scrim = el('div', { class: 'ps-scrim', onclick: () => done(null) });
+    const box = el('form', { class: 'ps-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ps-dlg-t', 'aria-describedby': 'ps-dlg-b',
+      onsubmit: (e) => { e.preventDefault(); submit(); } }, [
+      el('h2', { id: 'ps-dlg-t', text: title }),
+      el('p', { id: 'ps-dlg-b', text: body }),
+      el('div', { class: 'ps-log' }, [
+        el('div', { class: 'ps-field' }, [el('label', { for: 'ps-log-d', text: t('Day') }), date]),
+        el('div', { class: 'ps-field' }, [el('label', { for: 'ps-log-h', text: t('Hours') }), amount]),
+      ]),
+      el('div', { class: 'ps-field' }, [el('label', { for: 'ps-log-n', text: t('Note (optional)') }), note]),
+      el('div', { class: 'ps-dialog__foot' }, [
+        el('button', { type: 'button', class: 'ps-btn', text: cancel, onclick: () => done(null) }),
+        el('button', { type: 'submit', class: 'ps-btn ps-btn--primary', text: ok }),
+      ]),
+    ]);
+    host.append(scrim, box);
+    const release = trapFocus(box, () => done(null));
+    amount.focus();
+  });
+}
+
 /**
  * A whole number to type, or nothing. Resolves the number, '' when the box was emptied (no value),
  * or null when cancelled.
