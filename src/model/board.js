@@ -17,6 +17,7 @@
 import { encodeInput } from './edits.js';
 import { refId, listOf, plain, num, dayOf } from './values.js';
 import { isDoneStatus } from './tasks.js';
+import { lanesOf } from './lanes.js';
 
 export const LANE_KINDS = ['Choice', 'Ref', 'Text'];
 /** Columns a card can show (attachments and lists of numbers would only show ids). */
@@ -48,11 +49,13 @@ export function laneKeyOf(cell, col) {
  * @param ctx     {laneCol, orderCol, labels, fields: [col], hideEmpty, wip: {laneKey: n}, today, cellText(row, col),
  *                 everyone (every task, when the quick filters keep only some: a lane's open count and its total then look at all of them),
  *                 sorter (a comparator over tasks, M15: the cards of a lane go in that order, not the order column's; the board then says `sorted`),
+ *                 swimCol (M23: rows of lanes, one band for each value of this Choice, Reference or Text column),
+ *                 kids (a Map task id -> {done, total}: the card of a task that has sub-tasks says how many are done),
  *                 timeOf(taskId) -> {logged, planned} | null (time tracking, M10)}
  * @returns {{lanes: Array, byId: Map}}  lane: {key, label, value, colour, cards, open, total, hidden, limit, over, none}
  */
 export function buildBoard(tasks, rows, ctx) {
-  const { laneCol, orderCol = null, labels = {}, fields = [], hideEmpty = false, wip = {}, today = null, cellText = null, timeOf = null, everyone = null, sorter = null } = ctx;
+  const { laneCol, orderCol = null, labels = {}, fields = [], hideEmpty = false, wip = {}, today = null, cellText = null, timeOf = null, everyone = null, sorter = null, swimCol = null, kids = null } = ctx;
   const rowOf = new Map(rows.map((r) => [r.id, r]));
   const lanes = new Map();
   const add = (key, label, value, colour = null) => {
@@ -85,9 +88,11 @@ export function buildBoard(tasks, rows, ctx) {
       fields: fields.map((c) => ({ id: c.id, label: c.label, text: cellText ? cellText(row, c) : String(plain(row[c.id]) ?? '') }))
         .filter((f) => f.text != null && f.text !== ''),
       time: timeOf ? timeOf(task.id) : null,
+      swim: swimCol ? laneKeyOf(row[swimCol.id], swimCol) : null,
+      sub: kids?.get(task.id) || null,
     };
     card.hash = [card.title, card.lane, card.order, card.colour, card.people.join('|'), card.done, card.progress,
-      card.due, card.span, card.late, card.time ? `${Math.round(card.time.logged * 100)}/${card.time.planned ?? ''}` : '', ...card.fields.map((f) => f.text)].join('\u0001');
+      card.due, card.span, card.late, card.time ? `${Math.round(card.time.logged * 100)}/${card.time.planned ?? ''}` : '', card.swim, card.sub ? `${card.sub.done}/${card.sub.total}` : '', ...card.fields.map((f) => f.text)].join('\u0001');
     lane.cards.push(card);
     byId.set(card.id, card);
   }
@@ -117,7 +122,16 @@ export function buildBoard(tasks, rows, ctx) {
     lane.over = lane.limit != null && lane.open > lane.limit ? lane.open - lane.limit : 0;
   }
   list = list.filter((l) => (l.none ? l.cards.length > 0 : hideEmpty ? l.total > 0 : true));
-  return { lanes: list, byId, sorted: !!rank };
+  // Bands of lanes: the same cards, grouped by the swim column's value (the empty value last). A value the column offers (a person,
+  // a choice) keeps its band without cards, as a place to drop one, unless empty lanes are hidden; the empty value only has one with cards.
+  let swims;
+  if (swimCol) {
+    const defs = lanesOf(swimCol, rows, labels);
+    const ordered = [...defs.filter((d) => !d.none), ...defs.filter((d) => d.none)];
+    swims = ordered.map((d) => ({ key: d.key, label: d.label, value: d.value, none: d.none, lanes: list.map((l) => ({ key: l.key, cards: l.cards.filter((c) => c.swim === d.key) })) }))
+      .filter((s) => s.lanes.some((l) => l.cards.length) || (!hideEmpty && !s.none && swimCol.kind !== 'Text'));
+  } else swims = [{ key: '', label: null, value: '', none: true, lanes: list.map((l) => ({ key: l.key, cards: l.cards })) }];
+  return { lanes: list, byId, sorted: !!rank, swims, swimmed: !!swimCol };
 }
 
 /** Ranked cards first (lowest rank on top), then the rest in the order the rows came. */
@@ -165,33 +179,44 @@ export function rankBetween(above, below, kind = 'Numeric', own = null) {
 /**
  * The writes for a card that lands at `index` in the lane with key `toKey`.
  * @param board    from buildBoard
- * @param move     {id, toKey, index}  index counts the cards of the target lane without the moved one
- * @param ctx      {laneCol, orderCol, rows}
+ * @param move     {id, toKey, swimKey?, index}  index counts the cards of the target lane (of the target band, with swimlanes) without the moved one
+ * @param ctx      {laneCol, orderCol, rows, swimCol?}
  * @returns {{items: Array<{id, plan: {fields, patch}}>, sameLane: boolean, ranked: boolean} | {error: string}}
  */
 export function planCardMove(board, move, ctx) {
-  const { laneCol, orderCol = null, rows } = ctx;
+  const { laneCol, orderCol = null, rows, swimCol = null } = ctx;
   const card = board.byId.get(move.id);
   const lane = board.lanes.find((l) => l.key === move.toKey);
   if (!card || !lane) return { error: 'gone' };
-  const sameLane = card.lane === lane.key;
-  if (!sameLane && laneCol.isFormula) return { error: 'laneFormula' };
+  const toSwim = swimCol ? (move.swimKey ?? card.swim) : null;
+  const swimChanged = !!swimCol && toSwim !== card.swim;
+  const sameLane = card.lane === lane.key && !swimChanged;
+  if (card.lane !== lane.key && laneCol.isFormula) return { error: 'laneFormula' };
+  if (swimChanged && swimCol.isFormula) return { error: 'swimFormula' };
   const rowOf = new Map(rows.map((r) => [r.id, r]));
-  const others = lane.cards.filter((c) => c.id !== card.id);
+  // with bands, the neighbours are the cards of the same band: the rank goes between them
+  const others = lane.cards.filter((c) => c.id !== card.id && (!swimCol || c.swim === toSwim));
   const index = Math.max(0, Math.min(others.length, move.index));
   const items = [];
   const fields = {}, patch = {};
 
-  if (!sameLane) {
+  if (card.lane !== lane.key) {
     const [v, cell] = encodeInput(laneCol, lane.value, rowOf.get(card.id)?.[laneCol.id]);
     fields[laneCol.id] = v;
     patch[laneCol.id] = cell;
+  }
+  if (swimChanged) {
+    const band = board.swims.find((s) => s.key === toSwim);
+    if (!band) return { error: 'gone' };
+    const [v, cell] = encodeInput(swimCol, band.value, rowOf.get(card.id)?.[swimCol.id]);
+    fields[swimCol.id] = v;
+    patch[swimCol.id] = cell;
   }
   // Sorted by the person (Display), the cards are not in their own order: a drop can change the lane, never the place in it.
   const canRank = orderCol && !orderCol.isFormula && !board.sorted;
   if (!canRank) {
     if (sameLane) return { error: board.sorted ? 'sorted' : orderCol ? 'orderFormula' : 'noOrder' };
-    return { items: [{ id: card.id, plan: { fields, patch } }], sameLane, ranked: false };
+    return { items: [{ id: card.id, plan: { fields, patch } }], sameLane, swimChanged, ranked: false };
   }
 
   const at = (i) => (i < 0 || i >= others.length ? undefined : others[i].order);
@@ -199,7 +224,7 @@ export function planCardMove(board, move, ctx) {
   if (rank != null) {
     if (rank !== card.order) { fields[orderCol.id] = rank; patch[orderCol.id] = rank; }
     if (Object.keys(fields).length) items.push({ id: card.id, plan: { fields, patch } });
-    return { items, sameLane, ranked: true };
+    return { items, sameLane, swimChanged, ranked: true };
   }
   // No room: number the lane 1, 2, 3 ... in its new order, writing only the ranks that change.
   const next = [...others.slice(0, index), card, ...others.slice(index)];
@@ -208,16 +233,18 @@ export function planCardMove(board, move, ctx) {
     if (c.order !== i + 1) { f[orderCol.id] = i + 1; p[orderCol.id] = i + 1; }
     if (Object.keys(f).length) items.push({ id: c.id, plan: { fields: f, patch: p } });
   });
-  return { items, sameLane, ranked: true };
+  return { items, sameLane, swimChanged, ranked: true };
 }
 
 /** The fields of a card added at the bottom of a lane: its name, the lane's value, the next rank, the link value. */
 export function newCardFields(lane, title, ctx) {
-  const { laneCol, orderCol = null, titleCol, link = null } = ctx;
+  const { laneCol, orderCol = null, titleCol, link = null, swim = null } = ctx;
   const out = { fields: {}, patch: {} };
   const put = (col, input) => { const [v, cell] = encodeInput(col, input, null); out.fields[col.id] = v; out.patch[col.id] = cell; };
   if (titleCol && !titleCol.isFormula && titleCol.kind !== 'Ref') put(titleCol, title);
   if (!lane.none && !laneCol.isFormula) put(laneCol, lane.value);
+  // a card added inside a band belongs to it
+  if (swim && !swim.none && !swim.col.isFormula) put(swim.col, swim.value);
   if (orderCol && !orderCol.isFormula) {
     const ranks = lane.cards.map((c) => c.order).filter((x) => typeof x === 'number');
     put(orderCol, ranks.length ? Math.floor(Math.max(...ranks)) + 1 : 1);

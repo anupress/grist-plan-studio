@@ -84,7 +84,7 @@ const S = {
   find: { active: false, keep: null, shown: 0, total: 0 },   // what this browser's quick filters keep (model/find.js)
   pinned: new Set(),   // rows added here while a filter is on: shown until the filter changes, so a new task does not vanish
   zoom: null, fitNext: false, selectedId: null, firstDraw: true,
-  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, ovBy0: null, ovBy1: null, find: emptyFind(), display: cleanDisplay(null) },   // this browser's view of this table
+  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, swimBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, ovBy0: null, ovBy1: null, find: emptyFind(), display: cleanDisplay(null) },   // this browser's view of this table
   calDay: null,        // a day in the month or week the calendar shows; null = today (not saved: looking around)
   example: 'plan',     // the demo's data: 'plan' (a website relaunch) or 'stores' (pop-up stores × weekends)
   pendingEdit: null,   // {id, note}: open quick edit once Grist sends this new row
@@ -185,6 +185,7 @@ function ensureBoard() {
     onMove: (m) => moveCard(m),
     onAdd: (a) => addCard(a),
     onLimit: (key) => setLimit(key),
+    onFold: (key) => foldLane(key),
     onUndo: () => undo(),
     onRedo: () => redo(),
   });
@@ -365,6 +366,15 @@ function laneCol() {
   if (status && laneable(status)) return status;
   return S.columns.find((c) => c.kind === 'Choice' && laneable(c)) || null;
 }
+/** The swimlanes' column: this browser's choice among the lane kinds, never the lane column itself; none unless chosen. */
+const swimmable = (c) => laneable(c) && c.id !== laneCol()?.id;
+function swimCol() {
+  const picked = colById(S.view.swimBy);
+  return picked && swimmable(picked) ? picked : null;
+}
+/** The lanes folded on this browser, by lane key (kept with the folded rows: they are about this browser, not saved views). */
+const foldPrefix = (lane) => 'l:' + lane.ref + '|';
+const foldedLanes = (lane) => new Set([...S.view.collapsed].filter((k) => k.startsWith(foldPrefix(lane))).map((k) => k.slice(foldPrefix(lane).length)));
 const orderCol = () => { const c = colById(S.roles.order); return c && (c.kind === 'Numeric' || c.kind === 'Int') ? c : null; };
 /** The columns a card shows besides its name, dates and people: picked in Columns, or the project. */
 function fieldCols(lane = laneCol()) {
@@ -507,7 +517,8 @@ function wlLogs(personCol) {
 const quickCols = () => quickColumns(S.quick, S.columns, S.roles, S.tableId);
 function labelRoles() {
   const lane = laneCol();
-  const extra = { ...(lane ? { _lane: lane.id } : {}), ...Object.fromEntries(fieldCols(lane).map((c, i) => ['_f' + i, c.id])), ...Object.fromEntries(quickCols().map((c, i) => ['_q' + i, c.id])) };
+  const swim = swimCol();
+  const extra = { ...(lane ? { _lane: lane.id } : {}), ...(swim ? { _swim: swim.id } : {}), ...Object.fromEntries(fieldCols(lane).map((c, i) => ['_f' + i, c.id])), ...Object.fromEntries(quickCols().map((c, i) => ['_q' + i, c.id])) };
   const tl = tlLaneCol(), res = bookResCol(), lab = bookLabelCol();
   const per = bookPeriodsBy();
   if (tl) extra._tl = tl.id;
@@ -751,6 +762,7 @@ function drawToolbar(model = null, level = 'full') {
     ovBy: S.mode === 'overview' ? ovPicks().map((c) => c?.id ?? null) : [],
     canBaseline: gantt && canEdit() && ganttReady(S.roles) && !!(S.built && S.built.tasks.length),
     laneOptions: asOptions(S.columns.filter(laneable)), laneBy: laneCol()?.id || null,
+    swimOptions: S.mode === 'board' ? asOptions(S.columns.filter(swimmable)) : [], swimBy: swimCol()?.id || null,
     tlLaneOptions: asOptions(S.columns.filter(tlLaneable)), tlLaneBy: tlLaneCol()?.id || null,
     rowOptions: asOptions(S.columns.filter(rowable)), rowsBy: res?.id || null,
     periodOptions: [
@@ -777,7 +789,8 @@ function drawToolbar(model = null, level = 'full') {
     onOverBy1: (id) => { S.view.ovBy1 = id || '-'; saveView(); S.signature = ''; recompute(); },
     onGroup: (id) => { S.view.groupBy = id || null; saveView(); S.signature = ''; recompute(); },
     onCritical: () => { S.view.critical = !S.view.critical; saveView(); S.signature = ''; recompute(); },
-    onLanes: (id) => { S.view.laneBy = id || null; saveView(); S.signature = ''; reload('labels'); },
+    onLanes: (id) => { S.view.laneBy = id || null; if (S.view.swimBy === S.view.laneBy) S.view.swimBy = null; saveView(); S.signature = ''; reload('labels'); },
+    onSwims: (id) => { S.view.swimBy = id || null; saveView(); S.signature = ''; reload('labels'); },
     onTlLanes: (id) => { S.view.tlLaneBy = id || null; saveView(); S.signature = ''; reload('labels'); },
     onRows: (id) => { S.view.bookRows = id || null; S.view.bookFilter = null; saveView(); S.signature = ''; reload('tables'); },
     onPeriods: (id) => { S.view.bookPeriods = id || null; saveView(); S.signature = ''; S.firstDraw = true; reload('tables'); },
@@ -801,7 +814,7 @@ function drawToolbar(model = null, level = 'full') {
   });
 }
 const saveView = () => rememberView(S.tableId, {
-  groupBy: S.view.groupBy, critical: S.view.critical, collapsed: [...S.view.collapsed], laneBy: S.view.laneBy,
+  groupBy: S.view.groupBy, critical: S.view.critical, collapsed: [...S.view.collapsed], laneBy: S.view.laneBy, swimBy: S.view.swimBy,
   tlLaneBy: S.view.tlLaneBy, bookRows: S.view.bookRows, bookPeriods: S.view.bookPeriods, bookFilter: S.view.bookFilter,
   wlRows: S.view.wlRows, wlUnit: S.view.wlUnit, wlMeasure: S.view.wlMeasure, agendaWho: S.view.agendaWho, calMode: S.view.calMode,
   ovBy0: S.view.ovBy0, ovBy1: S.view.ovBy1,
@@ -915,13 +928,23 @@ function buildBoardModel() {
     settings: { ...S.gantt, colourBy: stripeBy, groupBy: null },
   });
   const tasks = [...S.built.tasks, ...S.built.unscheduled].sort((a, b) => a.index - b.index);
+  const everyone = S.find.keep ? [...everyTask().tasks, ...everyTask().unscheduled] : null;
+  // sub-tasks: how many of a task's children are done (all of them, whatever the filters hide)
+  const kids = new Map();
+  for (const x of everyone || tasks) {
+    if (x.parentId == null) continue;
+    const k = kids.get(x.parentId) || { done: 0, total: 0 };
+    k.total++;
+    if (x.finished) k.done++;
+    kids.set(x.parentId, k);
+  }
   return buildBoard(tasks, S.rows, {
     laneCol: lane, orderCol: orderCol(), labels: S.labels, fields: fieldCols(lane), hideEmpty: S.board.hideEmpty,
     wip: wipFor(lane), today: todayDay(), cellText: (row, col) => cellText(row, col, S.labels, fmtShort), timeOf: (id) => timeOf(id),
     // the person's own order (Display): the cards of a lane then go by it, and a drop changes the lane only
     sorter: taskSorter(disp().sort, { columns: S.columns, rowOf: rowById, labels: S.labels }),
     // a lane's limit counts every open card, not only the ones the filters leave on show
-    everyone: S.find.keep ? [...everyTask().tasks, ...everyTask().unscheduled] : null,
+    everyone, swimCol: swimCol(), kids,
   });
 }
 
@@ -939,14 +962,18 @@ function recomputeBoard() {
   drawToolbar();
   const editable = canEdit();
   const order = orderCol();
-  const sig = ['b', lane.id, S.selectedId, editable, order?.id, S.board.hideEmpty, todayDay(),
+  const swim = swimCol();
+  const folded = foldedLanes(lane);
+  const sig = ['b', lane.id, swim?.id, [...folded].join(','), S.selectedId, editable, order?.id, S.board.hideEmpty, todayDay(),
+    ...(swim ? b.swims.map((s) => `${s.key}|${s.label}`) : []),
     ...b.lanes.map((l) => `${l.key}|${l.label}|${l.colour}|${l.limit}|${l.over}|` + l.cards.map((c) => c.id + '\u0002' + c.hash).join('\u0003'))].join('\n');
   const v = ensureBoard();
   showTip();
   if (sig === S.signature) return;
   S.signature = sig;
   v.update({
-    lanes: b.lanes, editable, laneLocked: lane.isFormula, canAdd: editable && !!colById(S.roles.title) && !colById(S.roles.title).isFormula,
+    lanes: b.lanes, swims: b.swims, swimmed: b.swimmed, swimLabel: swim?.label, swimLocked: !!swim?.isFormula, folded,
+    editable, laneLocked: lane.isFormula, canAdd: editable && !!colById(S.roles.title) && !colById(S.roles.title).isFormula,
     canLimit: editable || S.demo, selectedId: S.selectedId, laneLabel: lane.label, today: todayDay(), fmtDay: fmtShort, fmtRange: fmtShortRange, fmtHours,
   });
 }
@@ -1696,12 +1723,23 @@ async function removeLink({ from, to }) {
 const laneName = (lane) => (lane.none ? t('No {col}', { col: laneCol()?.label || '' }) : String(lane.label));
 let orderHintShown = false;
 
-/** A card dropped at `index` in the lane `toKey` (or moved there with Alt + arrows). */
-function moveCard({ id, toKey, index }) {
+const bandName = (band) => (band.none ? t('No {col}', { col: swimCol()?.label || '' }) : String(band.label));
+
+/** Fold a lane to a narrow strip, or open it again. */
+function foldLane(laneKey) {
+  const col = laneCol();
+  if (!col) return;
+  toggleFold(foldPrefix(col) + laneKey);
+}
+
+/** A card dropped at `index` in the lane `toKey` (of the band `swimKey`, with swimlanes), or moved there with Alt + arrows. */
+function moveCard({ id, toKey, swimKey, index }) {
   const b = S.boardModel;
   const lane = laneCol();
   if (!b || !lane || !canEdit()) { S.signature = ''; recompute(); return; }
-  const plan = planCardMove(b, { id, toKey, index }, { laneCol: lane, orderCol: orderCol(), rows: S.rows });
+  const swim = swimCol();
+  const was = b.byId.get(id);
+  const plan = planCardMove(b, { id, toKey, swimKey, index }, { laneCol: lane, orderCol: orderCol(), rows: S.rows, swimCol: swim });
   if (plan.error) {
     S.signature = '';
     recompute();
@@ -1711,25 +1749,32 @@ function moveCard({ id, toKey, index }) {
     } else if (plan.error === 'sorted') toast(t('The cards are sorted in Display, so they can’t be moved up or down by hand.'), { label: t('Display'), run: () => toggleDisplay() });
     else if (plan.error === 'orderFormula') toast(t('The order column is a formula, so cards can’t be moved up or down here.'));
     else if (plan.error === 'laneFormula') toast(t('“{col}” is a formula, so cards can’t change lanes here.', { col: lane.label }));
+    else if (plan.error === 'swimFormula') toast(t('“{col}” is a formula, so cards can’t change swimlanes here.', { col: swim?.label || '' }));
     return;
   }
   if (!plan.items.length) return;
   if (id !== S.selectedId) { S.selectedId = id; if (S.live) moveCursor(id).catch(() => {}); }
   const name = taskById(id)?.title || t('(no name)');
   const to = b.lanes.find((l) => l.key === toKey);
+  const band = plan.swimChanged ? b.swims.find((s) => s.key === swimKey) : null;
   const message = plan.sameLane ? t('Moved “{name}” within {lane}.', { name, lane: laneName(to) })
+    : band && was?.lane === toKey ? t('Moved “{name}” to {band}.', { name, band: bandName(band) })
+    : band ? t('Moved “{name}” to {lane}, {band}.', { name, lane: laneName(to), band: bandName(band) })
     : t('Moved “{name}” to {lane}.', { name, lane: laneName(to) })
       + (plan.items.length > 1 ? ' ' + tn(plan.items.length - 1, 'The lane’s order was renumbered ({n} card).', 'The lane’s order was renumbered ({n} cards).') : '');
   writeMany(plan.items, message);
 }
 
 /** A card typed into the box at the bottom of a lane. */
-async function addCard({ laneKey, title }) {
+async function addCard({ laneKey, swimKey, title }) {
   const b = S.boardModel;
   const lane = b?.lanes.find((l) => l.key === laneKey);
   if (!lane || !canEdit()) return;
+  const swim = swimCol();
+  const band = swim && swimKey != null ? b.swims.find((s) => s.key === swimKey) : null;
   const link = await linkForNewTask();
-  const plan = newCardFields(lane, title, { laneCol: laneCol(), orderCol: orderCol(), titleCol: colById(S.roles.title), link: link && !link.unknown ? link : null });
+  const plan = newCardFields(lane, title, { laneCol: laneCol(), orderCol: orderCol(), titleCol: colById(S.roles.title), link: link && !link.unknown ? link : null,
+    swim: band ? { col: swim, value: band.value, none: band.none } : null });
   if (link?.unknown) toast(t('This task will show here once its {col} matches the row selected in the linked widget.', { col: link.unknown.label }));
   if (S.demo) {
     const id = Math.max(0, ...S.rows.map((r) => r.id)) + 1;

@@ -113,7 +113,7 @@ export const MAX_VIEWS = 30;
 const text = (v) => typeof v === 'string' && v.length > 0 && v.length < 200;
 const oneOf = (...list) => (v) => list.includes(v);
 const SNAPSHOT = {
-  groupBy: text, critical: (v) => v === true, laneBy: text, tlLaneBy: text, bookRows: text, bookPeriods: text, bookFilter: text,
+  groupBy: text, critical: (v) => v === true, laneBy: text, swimBy: text, tlLaneBy: text, bookRows: text, bookPeriods: text, bookFilter: text,
   wlRows: text, wlUnit: oneOf('day', 'week', 'month'), wlMeasure: oneOf('planned', 'logged', 'remaining'),
   agendaWho: oneOf('mine', 'all'), calMode: oneOf('month', 'week'),
   ovBy0: text, ovBy1: text,   // the overview's two breakdowns (M19): a column id; the second may be '-' for none
@@ -176,7 +176,7 @@ const keep = (key, value) => { try { localStorage.setItem(key, JSON.stringify(va
 const viewKey = (tableId) => 'planStudio.view.' + (tableId || 'demo');
 
 /**
- * {groupBy, critical, collapsed, laneBy (board), tlLaneBy (timeline), bookRows, bookPeriods ('day' | 'week' |
+ * {groupBy, critical, collapsed (folded rows, and folded board lanes as 'l:<column ref>|<lane key>'), laneBy (board), swimBy (the board's swimlanes), tlLaneBy (timeline), bookRows, bookPeriods ('day' | 'week' |
  *  'month' | 'col:<colId>' | 'table:<tableId>'), bookFilter ('<colId>=<value>'), wlRows, wlUnit ('day' | 'week' | 'month'),
  *  find (the quick filters, model/find.js), display (row height, order, colours, labels: model/display.js)};
  *  the column ids are null when not chosen
@@ -188,6 +188,7 @@ export function storedView(tableId) {
     critical: v.critical === true,
     collapsed: Array.isArray(v.collapsed) ? v.collapsed.filter((x) => typeof x === 'string').slice(0, 2000) : [],
     laneBy: typeof v.laneBy === 'string' ? v.laneBy : null,
+    swimBy: typeof v.swimBy === 'string' ? v.swimBy : null,
     tlLaneBy: typeof v.tlLaneBy === 'string' ? v.tlLaneBy : null,
     bookRows: typeof v.bookRows === 'string' ? v.bookRows : null,
     bookPeriods: typeof v.bookPeriods === 'string' ? v.bookPeriods : null,

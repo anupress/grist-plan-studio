@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.14.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.15.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -32,7 +32,7 @@ Opened in a plain browser tab, the widget runs on sample data and saves nothing:
 |---|---|---|
 | **Gantt chart** | tasks, with parents and dependencies | drag bars and their ends, link tasks, fold parents, show the critical path |
 | **Timeline** | a band per person, room or project | drag a bar to another band to reassign it, or along it to move its dates |
-| **Board** | cards in a lane per status, person or any other column | drag cards between and within lanes, add cards, set lane limits |
+| **Board** | cards in a lane per status, person or any other column, optionally in rows (swimlanes) | drag cards between and within lanes and rows, add cards, set lane limits, fold a lane |
 | **Calendar** | a month or a week, a bar for each task on its days | drag a bar to another day; the task keeps its length |
 | **Booking grid** | resources × days, weeks, months or your own periods | see free cells counted per period, click one to book it, spot double bookings |
 | **Workload** | people × days, weeks or months, hours against capacity | see who is over and when, list the tasks behind a cell, **Level** the plan |
@@ -312,6 +312,19 @@ These are this browser's choices, per table; a saved view keeps them; nothing is
 **Back to the defaults** undoes them all.
 
 ![Display: compact rows, Status and Owner beside the names, and the panel](docs/images/display.png)
+
+## The board: swimlanes, folding, sub-tasks
+
+- **Swimlanes** (the picker beside **Lanes**) split every lane into rows, one for each value of a second column: the person,
+  the project, a priority. A card dropped in another row takes that row's value as well as the lane's, in one step you can
+  undo; a card dropped on an empty row (a person with no task yet) assigns it. The lanes' titles stay on top while you scroll,
+  each row says how many cards it holds, and **Add card** in any cell creates the task with both values already filled in.
+  The choice is kept in this browser and by saved views; nothing is written to the document.
+- **Fold a lane** with the arrow in its title: it shrinks to a strip with its count and its name standing up, which is still a
+  place to drop a card (it goes to the end of the lane). Folded lanes are remembered in this browser.
+- **Sub-tasks**: a card whose task has sub-tasks says how many are done, in words ("2 of 5 sub-tasks done") with a short bar.
+- **Keys**: **Alt + Shift + ↑ ↓** moves the selected card to the next row; the other arrows work across rows as they did across lanes.
+- A formula column cannot be written, so a lane or row column that is one only lets cards move where its value stays the same.
 
 ## Getting around
 

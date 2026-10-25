@@ -20,7 +20,8 @@ eq('…and nothing else: no folded rows, no stray keys', Object.keys(snap.view).
 eq('a choice not made is null', [snap.view.tlLaneBy, snap.view.wlMeasure, snap.view.bookRows], [null, null, null]);
 eq('a view that does not exist falls back to the Gantt chart, a bad zoom to none', [S.snapshotView({ mode: 'nope', zoom: 'hours', view: {} }).mode, S.snapshotView({ mode: 'nope', zoom: 'hours', view: {} }).zoom], ['gantt', null]);
 eq('the calendar is a view', S.snapshotView({ mode: 'calendar', zoom: null, view: { calMode: 'month' } }).mode, 'calendar');
-eq('a bad value for a choice becomes null', S.snapshotView({ mode: 'board', zoom: 'week', view: { wlUnit: 'fortnight', critical: 'yes', groupBy: '' } }).view, { groupBy: null, critical: null, laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, ovBy0: null, ovBy1: null, find: null, display: null });
+eq('the board’s swimlane column is kept in a saved view', S.snapshotView({ mode: 'board', zoom: 'week', view: { swimBy: 'Owner' } }).view.swimBy, 'Owner');
+eq('a bad value for a choice becomes null', S.snapshotView({ mode: 'board', zoom: 'week', view: { wlUnit: 'fortnight', critical: 'yes', groupBy: '' } }).view, { groupBy: null, critical: null, laneBy: null, swimBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, ovBy0: null, ovBy1: null, find: null, display: null });
 
 // the quick filters travel with a view
 const withFind = S.snapshotView({ mode: 'gantt', zoom: null, view: { find: { q: ' logo ', sel: { Status: ['Doing', 'Doing', 7], Owner: [] }, cols: ['Priority'], junk: 1 } } });

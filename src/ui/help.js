@@ -25,6 +25,8 @@ export function helpFor(view) {
         t('Drag a card to another lane to change its value, or up and down to put it in order.'),
         t('The number in a lane’s title counts its open cards; click it to set a limit.'),
         t('Add card, at the foot of a lane, adds a task there.'),
+        t('Swimlanes split the lanes into rows, one for each value of another column such as the person: a card dropped in another row takes that value too.'),
+        t('The arrow in a lane’s title folds it to a strip with its count; cards can still be dropped on the strip.'),
       ],
     };
     case 'calendar': return {

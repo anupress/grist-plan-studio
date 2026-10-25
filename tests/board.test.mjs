@@ -165,5 +165,54 @@ const ctx = { laneCol: col('Status'), orderCol: col('Rank'), rows };
   eq('unsorted, the same drop writes the rank as it always did', [own.ranked, own.items.length], [true, 1]);
 }
 
+// ---- swimlanes and the sub-task line (M23)
+{
+  const swim = (over = {}) => board({ swimCol: col('Owner'), ...over });
+  const ctxS0 = () => ({ laneCol: col('Status'), orderCol: col('Rank'), rows, swimCol: col('Owner') });
+  const flat = (b) => b.swims.map((x) => [x.label ?? '∅', x.lanes.map((l) => l.cards.map((c) => c.id))]);
+  const b = swim();
+  eq('no swim column: one band with every lane, as before', [board().swims.length, board().swimmed, board().swims[0].lanes.map((l) => l.cards.length)], [1, false, board().lanes.map((l) => l.cards.length)]);
+  eq('bands: the referenced table’s order, the empty one last', b.swims.map((x) => x.label ?? '∅'), ['Ben', 'Ann', 'Chloé', '∅']);
+  eq('each band holds its cards in each lane (lanes: ∅, To do, Doing, Done, Parked)', flat(b), [
+    ['Ben', [[], [], [2], [], []]], ['Ann', [[], [], [1], [4], []]], ['Chloé', [[5], [], [], [], []]], ['∅', [[], [], [6], [], [3]]],
+  ]);
+  eq('swimmed says so', b.swimmed, true);
+  eq('every card is in exactly one band', b.swims.flatMap((x) => x.lanes.flatMap((l) => l.cards.map((c) => c.id))).sort(), [1, 2, 3, 4, 5, 6]);
+  eq('a text column makes bands from the values the cards have', swim({ swimCol: col('Area') }).swims.map((x) => x.label ?? '∅'), ['Brand', 'Web', '∅']);
+  const dan = { Owner: new Map([[2, 'Ben'], [1, 'Ann'], [3, 'Chloé'], [4, 'Dan']]) };
+  eq('a person with no card keeps a band to drop one on', swim({ labels: dan }).swims.map((x) => [x.label ?? '∅', x.lanes.every((l) => !l.cards.length)]), [['Ben', false], ['Ann', false], ['Chloé', false], ['Dan', true], ['∅', false]]);
+  eq('…unless empty lanes are hidden', swim({ labels: dan, hideEmpty: true }).swims.map((x) => x.label ?? '∅'), ['Ben', 'Ann', 'Chloé', '∅']);
+  eq('…and dropping on it writes that person', B.planCardMove(swim({ labels: dan }), { id: 1, toKey: 'v:Doing', swimKey: 'r:4', index: 0 }, { ...ctxS0() }).items[0].plan.fields.Owner, 4);
+  eq('the card knows its band', [b.byId.get(1).swim, b.byId.get(3).swim], ['r:1', '']);
+  // sub-tasks
+  const kids = new Map([[1, { done: 2, total: 5 }]]);
+  const withKids = board({ kids });
+  eq('a card with sub-tasks says how many are done', [withKids.byId.get(1).sub, withKids.byId.get(2).sub], [{ done: 2, total: 5 }, null]);
+  eq('…and redraws when that changes', withKids.byId.get(1).hash !== board({ kids: new Map([[1, { done: 3, total: 5 }]]) }).byId.get(1).hash, true);
+  // moves
+  const ctxS = { laneCol: col('Status'), orderCol: col('Rank'), rows, swimCol: col('Owner') };
+  const bandOf = (label) => b.swims.find((x) => (x.label ?? '∅') === label);
+  const toBen = B.planCardMove(b, { id: 1, toKey: 'v:Doing', swimKey: 'r:2', index: 0 }, ctxS);
+  eq('dragged into another band in the same lane: the band’s column is written, the lane’s is not', [toBen.items.map((i) => Object.keys(i.plan.fields).sort()), toBen.swimChanged, toBen.sameLane], [[['Owner', 'Rank']], true, false]);
+  eq('…the person written is the band’s: Ben is row 2', toBen.items[0].plan.fields.Owner, 2);
+  const across = B.planCardMove(b, { id: 1, toKey: 'v:Done', swimKey: 'r:2', index: 0 }, ctxS);
+  eq('into another lane and another band: both columns', Object.keys(across.items[0].plan.fields).filter((k) => k !== 'Rank').sort(), ['Owner', 'Status']);
+  eq('into the empty band the swim column is emptied', B.planCardMove(b, { id: 1, toKey: 'v:Doing', swimKey: '', index: 0 }, ctxS).items[0].plan.fields.Owner, 0);
+  // Area as the swim column: the Web band holds cards 1 and 6 in Doing (ranks 2 and 3)
+  const ctxA = { ...ctxS, swimCol: col('Area') };
+  const web = swim({ swimCol: col('Area') });
+  const within = B.planCardMove(web, { id: 6, toKey: 'v:Doing', swimKey: 'v:Web', index: 0 }, ctxA);
+  eq('within its own band it only ranks, as before', [within.items.map((i) => Object.keys(i.plan.fields)), within.swimChanged, within.sameLane], [[['Rank']], false, true]);
+  eq('…above the card that was first', within.items[0].plan.fields.Rank < 2, true);
+  eq('the rank goes between the neighbours in the band: Ann’s Doing cell holds card 1 only, so moving 1 to Ben’s cell at index 0 ranks above Ben’s card 2 (rank 1)', toBen.items[0].plan.fields.Rank < 1, true);
+  eq('a swim column that is a formula cannot be written', B.planCardMove(b, { id: 1, toKey: 'v:Doing', swimKey: 'r:2', index: 0 }, { ...ctxS, swimCol: { ...col('Owner'), isFormula: true } }), { error: 'swimFormula' });
+  eq('sorted: a drop into another band still writes the band, never the place', (() => { const sb = swim({ sorter: (a, c) => String(a.title).localeCompare(String(c.title)) }); const p = B.planCardMove(sb, { id: 1, toKey: 'v:Doing', swimKey: 'r:2', index: 0 }, ctxS); return [Object.keys(p.items[0].plan.fields), p.ranked]; })(), [['Owner'], false]);
+  // a card added in a band
+  const lane = b.lanes.find((l) => l.key === 'v:Doing');
+  const added = B.newCardFields(lane, 'New', { laneCol: col('Status'), orderCol: col('Rank'), titleCol: col('Task'), swim: { col: col('Owner'), value: 2, none: false } });
+  eq('a card added inside a band takes the band’s value', [added.fields.Status, added.fields.Owner, added.fields.Task], ['Doing', 2, 'New']);
+  eq('…none for the empty band', 'Owner' in B.newCardFields(lane, 'New', { laneCol: col('Status'), titleCol: col('Task'), swim: { col: col('Owner'), value: 0, none: true } }).fields, false);
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

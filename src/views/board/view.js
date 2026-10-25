@@ -2,11 +2,14 @@
 // gesture writes is decided in model/board.js and main.js.
 //
 //   drag a card              to another lane (writes the lane column) or up and down (writes the rank)
+//   swimlanes                rows of lanes, one band for each value of a second column; a drop into another band writes that column too
+//   fold a lane              the lane shrinks to a strip with its count; it still takes drops, at the end
 //   click / arrow keys       select (Grist's cursor follows)
 //   Enter                    quick edit           double-click     Grist's record card
 //   Alt + arrows             move the selected card one lane across, or one place up or down
+//   Alt + Shift + up / down  with swimlanes, move the selected card to the next band
 //   the count in a lane      set the lane's limit of open cards
-//   Add card                 a new row in that lane; Enter adds and keeps the box open for the next
+//   Add card                 a new row in that lane (and band); Enter adds and keeps the box open for the next
 //
 // Drag uses Sortable.js (vendor/, MIT), in its fallback mode so the card under the pointer is the
 // card itself rather than the browser's translucent drag image.
@@ -15,20 +18,24 @@ import { el, clear } from '../../core/util.js';
 import { initials } from '../../model/board.js';
 import { t, tn } from '../../i18n/index.js';
 
-const CAP = 150;   // cards drawn per lane before a "Show all" button
+const CAP = 150;   // cards drawn per cell before a "Show all" button
+const SEP = '\u0001';
+const AT_END = 1e9;   // a drop on a folded lane has no place among cards that are not drawn: it goes last
 
 /**
- * @param on {onSelect(id), onOpen(id), onQuickEdit(id), onMove({id, toKey, index}), onAdd({laneKey, title}),
- *            onLimit(laneKey), onUndo(), onRedo()}
+ * @param on {onSelect(id), onOpen(id), onQuickEdit(id), onMove({id, toKey, swimKey?, index}), onAdd({laneKey, swimKey?, title}),
+ *            onLimit(laneKey), onFold(laneKey), onUndo(), onRedo()}
  */
 export function createBoard(host, on) {
-  // model: {lanes, editable, rankable, canAdd, canLimit, selectedId, laneLabel, fmtDay(d), fmtRange(a, b), today, fmtHours(h)}
+  // model: {lanes, swims: [{key, label, none, lanes: [{key, cards}]}] (one band without swimlanes), swimmed, swimLabel, folded: Set of lane keys,
+  //         editable, laneLocked, swimLocked, canAdd, canLimit, selectedId, laneLabel, fmtDay(d), fmtRange(a, b), today, fmtHours(h)}
   let model = null;
   let pending = null;                // a model that arrived mid-drag, drawn when the drag ends
   let dragging = false;
   let sortables = [];
-  let adding = null;                 // {laneKey, value}: the open "Add card" box survives a redraw
-  const expanded = new Set();        // lanes showing all their cards
+  let adding = null;                 // {laneKey, swimKey, value}: the open "Add card" box survives a redraw
+  let revealAfter = null;            // a card in a folded lane: the lane opens, then the card is scrolled to
+  const expanded = new Set();        // cells showing all their cards
   const nodes = new Map();           // card id -> element
 
   const root = el('div', { class: 'ps-board', tabindex: '0', role: 'region', 'aria-label': t('Board') });
@@ -37,6 +44,11 @@ export function createBoard(host, on) {
   clear(host).append(root);
 
   const Sortable = typeof window !== 'undefined' ? window.Sortable : null;
+
+  const folded = (lane) => !!model.folded?.has(lane.key);
+  const cellKey = (laneKey, swimKey) => laneKey + SEP + (swimKey ?? '');
+  const laneName = (lane) => (lane.none ? t('No {col}', { col: model.laneLabel }) : String(lane.label ?? ''));
+  const bandName = (band) => (band.none ? t('No {col}', { col: model.swimLabel }) : String(band.label ?? ''));
 
   // ---- drawing ---------------------------------------------------------------------------------------
   function personChip(name) {
@@ -71,6 +83,16 @@ export function createBoard(host, on) {
     ]);
   }
 
+  /** A task with sub-tasks says how many are done, in words with a short bar beside them. */
+  function subLine(card) {
+    const s = card.sub;
+    if (!s || !s.total) return null;
+    return el('p', { class: 'ps-card__sub' + (s.done >= s.total ? ' is-all' : '') }, [
+      el('span', { class: 'ps-card__subbar', 'aria-hidden': 'true' }, [el('span', { style: { width: Math.round((100 * s.done) / s.total) + '%' } })]),
+      el('span', { text: s.total === 1 ? t('{done} of 1 sub-task done', { done: s.done }) : t('{done} of {total} sub-tasks done', { done: s.done, total: s.total }) }),
+    ]);
+  }
+
   function cardNode(card) {
     const people = card.people.slice(0, 3);
     const more = card.people.length - people.length;
@@ -88,6 +110,7 @@ export function createBoard(host, on) {
         el('dt', { text: f.label }), el('dd', { text: f.text }),
       ]))) : null,
       timeLine(card),
+      subLine(card),
       (() => {
         const when = whenText(card);
         if (!when && !people.length) return null;
@@ -106,50 +129,116 @@ export function createBoard(host, on) {
     return node;
   }
 
-  function laneNode(lane) {
-    const name = lane.none ? t('No {col}', { col: model.laneLabel }) : String(lane.label ?? '');
+  /** The chevron that folds a lane. */
+  function foldButton(lane) {
+    const f = folded(lane);
+    const label = f ? t('Unfold {name}', { name: laneName(lane) }) : t('Fold {name}', { name: laneName(lane) });
+    return el('button', {
+      type: 'button', class: 'ps-caret ps-lane__fold', 'aria-expanded': f ? 'false' : 'true', 'aria-label': label, title: label,
+      onclick: () => on.onFold?.(lane.key),
+    }, [el('span', { class: 'ps-caret__chevron' + (f ? ' is-folded' : ''), 'aria-hidden': 'true' })]);
+  }
+
+  function laneHead(lane) {
+    const name = laneName(lane);
+    const f = folded(lane);
     const count = lane.limit != null ? `${lane.open}/${lane.limit}` : lane.hidden ? t('{n} of {total}', { n: lane.cards.length, total: lane.total }) : String(lane.cards.length);
     const countTitle = (lane.limit != null
       ? t('{open} open cards, limit {limit}.', { open: lane.open, limit: lane.limit })
       : tn(lane.cards.length, '{n} card.', '{n} cards.'))
       + (lane.hidden ? ' ' + tn(lane.hidden, '{n} card is hidden by the filters.', '{n} cards are hidden by the filters.') : '');
-    const countNode = model.canLimit && !lane.none
+    const countNode = model.canLimit && !lane.none && !f
       ? el('button', { type: 'button', class: 'ps-lane__count', text: count, title: countTitle + ' ' + t('Click to set a limit of open cards.'), onclick: () => on.onLimit?.(lane.key) })
       : el('span', { class: 'ps-lane__count', text: count, title: countTitle });
-
-    const shown = expanded.has(lane.key) ? lane.cards : lane.cards.slice(0, CAP);
-    const list = el('div', { class: 'ps-lane__list', dataset: { lane: lane.key }, role: 'list', 'aria-label': name },
-      shown.map((c) => { const n = cardNode(c); n.setAttribute('role', 'listitem'); return n; }));
-    if (!lane.cards.length) list.append(el('p', { class: 'ps-lane__empty', text: lane.hidden ? tn(lane.hidden, '{n} card is hidden by the filters.', '{n} cards are hidden by the filters.') : t('No cards') }));
-    if (shown.length < lane.cards.length) {
-      list.append(el('button', { type: 'button', class: 'ps-lane__more', text: t('Show all {n}', { n: lane.cards.length }),
-        onclick: () => { expanded.add(lane.key); draw(); } }));
-    }
-
-    const head = el('header', { class: 'ps-lane__head', style: lane.colour ? { '--lane': lane.colour } : {} }, [
+    return el('header', { class: 'ps-lane__head' + (f ? ' is-folded' : ''), style: lane.colour ? { '--lane': lane.colour } : {} }, [
+      foldButton(lane),
       el('h3', { class: 'ps-lane__name', text: name, title: name }),
       countNode,
     ]);
-    return el('section', { class: 'ps-lane' + (lane.over ? ' is-over' : '') + (lane.none ? ' is-none' : ''), dataset: { lane: lane.key } }, [
-      head,
-      lane.over ? el('p', { class: 'ps-lane__over', text: tn(lane.over, '{n} over the limit', '{n} over the limit') }) : null,
-      list,
-      model.canAdd ? addBox(lane) : null,
+  }
+
+  const overNote = (lane) => (lane.over && !folded(lane) ? el('p', { class: 'ps-lane__over', text: tn(lane.over, '{n} over the limit', '{n} over the limit') }) : null);
+
+  /** The cards of one lane in one band (the only band without swimlanes). */
+  function listNode(lane, band, cards) {
+    const swimKey = model.swimmed ? band.key : null;
+    const f = folded(lane);
+    const label = model.swimmed ? `${bandName(band)}, ${laneName(lane)}` : laneName(lane);
+    const dataset = { lane: lane.key };
+    if (swimKey != null) dataset.swim = swimKey;
+    if (f) dataset.folded = '1';
+    const list = el('div', { class: 'ps-lane__list' + (model.swimmed ? ' ps-cell__list' : ''), dataset, role: 'list', 'aria-label': label });
+    if (f) {
+      // the cards are not drawn, but the strip is still a place to drop one; with bands it says how many are in it
+      if (model.swimmed && cards.length) list.append(el('span', { class: 'ps-cell__n', text: String(cards.length), title: tn(cards.length, '{n} card.', '{n} cards.') }));
+      return list;
+    }
+    const key = cellKey(lane.key, swimKey);
+    const shown = expanded.has(key) ? cards : cards.slice(0, CAP);
+    list.append(...shown.map((c) => { const n = cardNode(c); n.setAttribute('role', 'listitem'); return n; }));
+    if (!cards.length && !model.swimmed) {
+      list.append(el('p', { class: 'ps-lane__empty', text: lane.hidden ? tn(lane.hidden, '{n} card is hidden by the filters.', '{n} cards are hidden by the filters.') : t('No cards') }));
+    }
+    if (shown.length < cards.length) {
+      list.append(el('button', { type: 'button', class: 'ps-lane__more', text: t('Show all {n}', { n: cards.length }),
+        onclick: () => { expanded.add(key); draw(); } }));
+    }
+    return list;
+  }
+
+  /** Without swimlanes: a lane is a column of its own. */
+  function laneNode(lane) {
+    const f = folded(lane);
+    const band = model.swims[0];
+    const cards = band.lanes.find((l) => l.key === lane.key)?.cards || lane.cards;
+    return el('section', { class: 'ps-lane' + (lane.over ? ' is-over' : '') + (lane.none ? ' is-none' : '') + (f ? ' is-folded' : ''), dataset: { lane: lane.key } }, [
+      laneHead(lane),
+      overNote(lane),
+      listNode(lane, band, cards),
+      model.canAdd && !f ? addBox(lane, band) : null,
     ]);
   }
 
-  function addBox(lane) {
-    const foot = el('div', { class: 'ps-lane__foot' });
+  /** With swimlanes: the lanes' heads in a row that stays on top, then each band's name and its cells. */
+  function gridNodes() {
+    lanesBox.style.gridTemplateColumns = model.lanes.map((l) => (folded(l) ? '44px' : 'minmax(256px, var(--ps-colmax, 340px))')).join(' ');
+    const out = model.lanes.map((lane) => el('div', { class: 'ps-colhead' + (lane.over ? ' is-over' : '') + (lane.none ? ' is-none' : '') + (folded(lane) ? ' is-folded' : ''), dataset: { lane: lane.key } }, [
+      laneHead(lane), overNote(lane),
+    ]));
+    for (const band of model.swims) {
+      const n = band.lanes.reduce((a, l) => a + l.cards.length, 0);
+      out.push(el('div', { class: 'ps-band' + (band.none ? ' is-none' : ''), dataset: { swim: band.key } }, [
+        el('div', { class: 'ps-band__head' }, [
+          el('h3', { class: 'ps-band__name', text: bandName(band), title: bandName(band) }),
+          el('span', { class: 'ps-band__count', text: n ? tn(n, '{n} card', '{n} cards') : t('No cards') }),
+        ]),
+      ]));
+      model.lanes.forEach((lane, i) => {
+        const f = folded(lane);
+        out.push(el('div', { class: 'ps-cell' + (f ? ' is-folded' : ''), dataset: { lane: lane.key, swim: band.key } }, [
+          listNode(lane, band, band.lanes[i].cards),
+          model.canAdd && !f ? addBox(lane, band) : null,
+        ]));
+      });
+    }
+    return out;
+  }
+
+  function addBox(lane, band) {
+    const swimKey = model.swimmed ? band.key : null;
+    const where = model.swimmed ? `${bandName(band)}, ${laneName(lane)}` : laneName(lane);
+    const mine = () => adding?.laneKey === lane.key && (adding.swimKey ?? null) === swimKey;
+    const foot = el('div', { class: 'ps-lane__foot' + (model.swimmed ? ' ps-lane__foot--cell' : '') });
     const openBox = (value = '') => {
-      adding = { laneKey: lane.key, value };
-      const input = el('textarea', { class: 'ps-lane__input', rows: '2', placeholder: t('Card name'), 'aria-label': t('New card in {lane}', { lane: lane.label ?? t('No {col}', { col: model.laneLabel }) }) });
+      adding = { laneKey: lane.key, swimKey, value };
+      const input = el('textarea', { class: 'ps-lane__input', rows: '2', placeholder: t('Card name'), 'aria-label': t('New card in {lane}', { lane: where }) });
       input.value = value;
       const submit = () => {
         const title = input.value.trim();
         if (!title) return;
         input.value = '';
-        adding = { laneKey: lane.key, value: '' };
-        on.onAdd?.({ laneKey: lane.key, title });
+        adding = { laneKey: lane.key, swimKey, value: '' };
+        on.onAdd?.({ laneKey: lane.key, ...(swimKey != null ? { swimKey } : {}), title });
       };
       input.addEventListener('input', () => { if (adding) adding.value = input.value; });
       input.addEventListener('keydown', (e) => {
@@ -162,12 +251,12 @@ export function createBoard(host, on) {
       ]));
       return input;
     };
-    if (adding?.laneKey === lane.key) {
+    if (mine()) {
       const input = openBox(adding.value);
       requestAnimationFrame(() => { input.focus(); input.setSelectionRange(input.value.length, input.value.length); });
     } else {
-      foot.append(el('button', { type: 'button', class: 'ps-lane__add', onclick: () => { const i = openBox(); i.focus(); } }, [
-        el('span', { class: 'ps-lane__plus', 'aria-hidden': 'true' }), el('span', { text: t('Add card') }),
+      foot.append(el('button', { type: 'button', class: 'ps-lane__add', 'aria-label': model.swimmed ? t('Add card to {lane}', { lane: where }) : null, onclick: () => { const i = openBox(); i.focus(); } }, [
+        el('span', { class: 'ps-lane__plus', 'aria-hidden': 'true' }), el('span', { class: 'ps-lane__addtext', text: t('Add card') }),
       ]));
     }
     return foot;
@@ -175,27 +264,37 @@ export function createBoard(host, on) {
 
   function draw() {
     if (!model) return;
-    const scrollX = root.scrollLeft;
-    const scrollY = new Map([...lanesBox.querySelectorAll('.ps-lane__list')].map((l) => [l.dataset.lane, l.scrollTop]));
+    const scrollX = root.scrollLeft, scrollTop = root.scrollTop;
+    const scrollY = new Map([...root.querySelectorAll('.ps-lane__list')].map((l) => [cellKey(l.dataset.lane, l.dataset.swim), l.scrollTop]));
     const hadFocus = root.contains(document.activeElement) && document.activeElement !== root;
     for (const s of sortables) s.destroy();
     sortables = [];
     nodes.clear();
-    clear(lanesBox).append(...model.lanes.map(laneNode));
+    clear(lanesBox);
+    lanesBox.className = model.swimmed ? 'ps-board__grid' : 'ps-board__lanes';
+    lanesBox.style.gridTemplateColumns = '';
+    lanesBox.append(...(model.swimmed ? gridNodes() : model.lanes.map(laneNode)));
     root.classList.toggle('is-editable', !!model.editable);
+    root.classList.toggle('has-swims', !!model.swimmed);
     root.scrollLeft = scrollX;
-    for (const l of lanesBox.querySelectorAll('.ps-lane__list')) if (scrollY.has(l.dataset.lane)) l.scrollTop = scrollY.get(l.dataset.lane);
+    root.scrollTop = scrollTop;
+    for (const l of root.querySelectorAll('.ps-lane__list')) {
+      const k = cellKey(l.dataset.lane, l.dataset.swim);
+      if (scrollY.has(k)) l.scrollTop = scrollY.get(k);
+    }
     if (hadFocus && !adding && model.selectedId != null) nodes.get(model.selectedId)?.focus({ preventScroll: true });
     if (model.editable && Sortable) attachDrag();
+    if (revealAfter != null && nodes.has(revealAfter)) { nodes.get(revealAfter).scrollIntoView({ block: 'nearest', inline: 'nearest' }); revealAfter = null; }
   }
 
   function attachDrag() {
-    for (const list of lanesBox.querySelectorAll('.ps-lane__list')) {
+    for (const list of root.querySelectorAll('.ps-lane__list')) {
+      // A lane or swim column that is a formula can't be written: cards may then only move where its value stays the same.
+      const group = (model.laneLocked ? 'L' + list.dataset.lane : '') + (model.swimLocked ? 'S' + list.dataset.swim : '');
       sortables.push(Sortable.create(list, {
-        // A lane column that is a formula can't be written: cards may then only move up and down.
-        group: model.laneLocked ? 'ps-lane-' + list.dataset.lane : 'ps-board',
+        group: group ? 'ps-' + group : 'ps-board',
         draggable: '.ps-card',
-        filter: '.ps-lane__more, .ps-lane__empty',
+        filter: '.ps-lane__more, .ps-lane__empty, .ps-cell__n',
         preventOnFilter: false,
         // no sliding cards for someone who asked the system for less motion
         animation: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 140,
@@ -218,13 +317,15 @@ export function createBoard(host, on) {
           root.classList.remove('is-dragging');
           const id = Number(evt.item.dataset.id);
           const toKey = evt.to.dataset.lane;
+          const swimKey = evt.to.dataset.swim;   // undefined without swimlanes
+          const index = evt.to.dataset.folded ? AT_END : evt.newDraggableIndex;
           const moved = evt.from !== evt.to || evt.oldDraggableIndex !== evt.newDraggableIndex;
           // Sortable has moved the element; the drawing goes back to the model's order until the write lands.
           const next = pending || model;
           pending = null;
           model = next;
           draw();
-          if (moved) on.onMove?.({ id, toKey, index: evt.newDraggableIndex });
+          if (moved) on.onMove?.({ id, toKey, ...(swimKey != null ? { swimKey } : {}), index });
         },
       }));
     }
@@ -241,13 +342,15 @@ export function createBoard(host, on) {
     if (n) on.onOpen?.(Number(n.dataset.id));
   });
 
-  /** Where the selected card is: [lane index, card index]. */
+  /** Where the selected card is: [band index, lane index, card index]. */
   function position() {
     const id = model?.selectedId;
     if (id == null) return null;
-    for (let i = 0; i < model.lanes.length; i++) {
-      const j = model.lanes[i].cards.findIndex((c) => c.id === id);
-      if (j >= 0) return [i, j];
+    for (let s = 0; s < model.swims.length; s++) {
+      for (let l = 0; l < model.swims[s].lanes.length; l++) {
+        const j = model.swims[s].lanes[l].cards.findIndex((c) => c.id === id);
+        if (j >= 0) return [s, l, j];
+      }
     }
     return null;
   }
@@ -259,45 +362,61 @@ export function createBoard(host, on) {
     if (mod && key === 'z') { e.preventDefault(); (e.shiftKey ? on.onRedo : on.onUndo)?.(); return; }
     if (mod && key === 'y') { e.preventDefault(); on.onRedo?.(); return; }
     if (mod) return;
-    const lanes = model.lanes;
+    const lanes = model.lanes, bands = model.swims;
     const pos = position();
     const arrows = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+    const bandPart = (b) => (model.swimmed ? { swimKey: b.key } : {});
     if (e.altKey && pos && arrows.includes(e.key)) {
       e.preventDefault();
       if (!model.editable) return;
-      const [li, ci] = pos;
-      const card = lanes[li].cards[ci];
+      const [si, li, ci] = pos;
+      const card = bands[si].lanes[li].cards[ci];
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        const to = ci + (e.key === 'ArrowUp' ? -1 : 1);
-        if (to >= 0 && to < lanes[li].cards.length) on.onMove?.({ id: card.id, toKey: lanes[li].key, index: to });
+        if (e.shiftKey) {
+          // to the next band, at the end of the same lane
+          const sj = si + (e.key === 'ArrowUp' ? -1 : 1);
+          if (model.swimmed && !model.swimLocked && sj >= 0 && sj < bands.length) on.onMove?.({ id: card.id, toKey: lanes[li].key, ...bandPart(bands[sj]), index: bands[sj].lanes[li].cards.length });
+        } else {
+          const to = ci + (e.key === 'ArrowUp' ? -1 : 1);
+          if (to >= 0 && to < bands[si].lanes[li].cards.length) on.onMove?.({ id: card.id, toKey: lanes[li].key, ...bandPart(bands[si]), index: to });
+        }
       } else {
         const lj = li + (e.key === 'ArrowLeft' ? -1 : 1);
-        if (lj >= 0 && lj < lanes.length && !model.laneLocked) on.onMove?.({ id: card.id, toKey: lanes[lj].key, index: lanes[lj].cards.length });
+        if (lj >= 0 && lj < lanes.length && !model.laneLocked) on.onMove?.({ id: card.id, toKey: lanes[lj].key, ...bandPart(bands[si]), index: bands[si].lanes[lj].cards.length });
       }
       return;
     }
     if (e.altKey) return;
-    const pick = (li, ci) => {
-      const lane = lanes[li];
-      if (!lane?.cards.length) return false;
+    // a cell with cards that are drawn (a folded lane's are not)
+    const usable = (si, li) => !!bands[si]?.lanes[li]?.cards.length && !folded(lanes[li]);
+    const pick = (si, li, ci) => {
+      if (!usable(si, li)) return false;
+      const cards = bands[si].lanes[li].cards;
       e.preventDefault();
-      on.onSelect?.(lane.cards[Math.max(0, Math.min(lane.cards.length - 1, ci))].id);
+      on.onSelect?.(cards[Math.max(0, Math.min(cards.length - 1, ci))].id);
       return true;
     };
     if (!pos) {
-      if (arrows.includes(e.key) || e.key === 'Home') { const li = lanes.findIndex((l) => l.cards.length); if (li >= 0) pick(li, 0); }
+      if (arrows.includes(e.key) || e.key === 'Home') {
+        for (let si = 0; si < bands.length; si++) for (let li = 0; li < lanes.length; li++) if (pick(si, li, 0)) return;
+      }
       return;
     }
-    const [li, ci] = pos;
-    if (e.key === 'ArrowDown') pick(li, ci + 1);
-    else if (e.key === 'ArrowUp') pick(li, ci - 1);
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    const [si, li, ci] = pos;
+    const size = bands[si].lanes[li].cards.length;
+    if (e.key === 'ArrowDown') {
+      if (ci + 1 < size) pick(si, li, ci + 1);
+      else for (let sj = si + 1; sj < bands.length; sj++) if (pick(sj, li, 0)) break;   // on into the band below
+    } else if (e.key === 'ArrowUp') {
+      if (ci > 0) pick(si, li, ci - 1);
+      else for (let sj = si - 1; sj >= 0; sj--) if (pick(sj, li, AT_END)) break;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       // the nearest lane that has cards, at the same height where it can
       const step = e.key === 'ArrowLeft' ? -1 : 1;
-      for (let lj = li + step; lj >= 0 && lj < lanes.length; lj += step) if (pick(lj, ci)) break;
-    } else if (e.key === 'Home') pick(li, 0);
-    else if (e.key === 'End') pick(li, lanes[li].cards.length - 1);
-    else if (e.key === 'Enter') { e.preventDefault(); on.onQuickEdit?.(lanes[li].cards[ci].id); }
+      for (let lj = li + step; lj >= 0 && lj < lanes.length; lj += step) if (pick(si, lj, ci)) break;
+    } else if (e.key === 'Home') pick(si, li, 0);
+    else if (e.key === 'End') pick(si, li, size - 1);
+    else if (e.key === 'Enter') { e.preventDefault(); on.onQuickEdit?.(bands[si].lanes[li].cards[ci].id); }
   });
 
   // ---- API -----------------------------------------------------------------------------------------------
@@ -309,10 +428,15 @@ export function createBoard(host, on) {
   function reveal(id) {
     const n = nodes.get(id);
     if (!n) {
-      // past the cap of its lane: open the lane up
       const lane = model?.lanes.find((l) => l.cards.some((c) => c.id === id));
-      if (!lane || expanded.has(lane.key)) return;
-      expanded.add(lane.key);
+      if (!lane) return;
+      // in a folded lane: open it, and scroll to the card when it is drawn
+      if (folded(lane)) { revealAfter = id; on.onFold?.(lane.key); return; }
+      // past the cap of its cell: open the cell up
+      const card = lane.cards.find((c) => c.id === id);
+      const key = cellKey(lane.key, model.swimmed ? card.swim : null);
+      if (expanded.has(key)) return;
+      expanded.add(key);
       draw();
       return reveal(id);
     }

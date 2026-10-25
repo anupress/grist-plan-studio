@@ -123,3 +123,53 @@ button.ps-lane__count:hover { background: var(--ps-hover); color: var(--ps-ink);
   .ps-board__lanes { padding: 8px 10px 0; gap: 10px; }
 }
 .ps-checks--tall { max-height: 280px; }
+
+/* Folded lanes (M23): a strip with the name standing up and the count, still a place to drop a card. */
+.ps-lane__fold { align-self: center; margin-left: -2px; }
+.ps-lane.is-folded { width: 44px; flex: none; max-width: 44px; }
+.ps-lane__head.is-folded { flex-direction: column; align-items: center; gap: 8px; margin: 0; padding: 9px 0 10px; }
+.ps-lane__head.is-folded .ps-lane__fold { margin-left: 0; }
+.ps-lane__head.is-folded .ps-lane__name { writing-mode: vertical-rl; max-height: 140px; }
+.ps-lane__head.is-folded .ps-lane__count { margin-left: 0; order: -1; padding: 0; }
+.ps-lane.is-folded .ps-lane__list { border-radius: 6px; padding: 0; }
+.ps-board.is-dragging .ps-lane.is-folded .ps-lane__list { box-shadow: inset 0 0 0 1px var(--ps-line-strong); }
+.ps-board.is-dragging .ps-lane.is-folded .ps-lane__list:hover { box-shadow: inset 0 0 0 1px var(--ps-focus); background: var(--ps-hover); }
+
+/* What a card says about its sub-tasks: words, with a short bar beside them. */
+.ps-card__sub { margin: 6px 0 0; display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 1.45; color: var(--ps-muted); font-variant-numeric: tabular-nums; }
+.ps-card__subbar { flex: none; width: 28px; height: 3px; border-radius: 2px; background: var(--ps-line); overflow: hidden; }
+.ps-card__subbar > span { display: block; height: 100%; background: var(--ps-muted); }
+.ps-card__sub.is-all .ps-card__subbar > span { background: var(--ps-ok); }
+
+/* Swimlanes (M23): the lanes' heads stay on top, each band has its name on a hairline, and every cell is a place to drop. */
+.ps-board.has-swims { overflow: auto; scroll-snap-type: none; }
+.ps-board__grid { display: grid; align-content: start; width: max-content; min-width: 100%; box-sizing: border-box; padding: 0 8px 14px; }
+.ps-colhead { position: sticky; top: 0; z-index: 3; background: var(--ps-ground); padding: 10px 6px 0; min-width: 0; }
+.ps-colhead .ps-lane__head { margin: 0; }
+.ps-colhead.is-over .ps-lane__head { border-top-color: var(--ps-crit); }
+.ps-colhead.is-over .ps-lane__count { color: var(--ps-crit); font-weight: 700; }
+.ps-colhead.is-none .ps-lane__name { font-weight: 500; font-style: italic; color: var(--ps-muted); }
+.ps-colhead.is-folded { padding-left: 0; padding-right: 0; }
+.ps-band { grid-column: 1 / -1; margin-top: 6px; border-top: 1px solid var(--ps-line); }
+.ps-band__head { position: sticky; left: 14px; display: inline-flex; align-items: baseline; gap: 10px; max-width: 70vw; padding: 10px 0 6px; }
+.ps-band__name { margin: 0; min-width: 0; font-size: 13px; font-weight: 600; letter-spacing: -0.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-band.is-none .ps-band__name { font-weight: 500; font-style: italic; color: var(--ps-muted); }
+.ps-band__count { flex: none; font-size: 12px; color: var(--ps-muted); font-variant-numeric: tabular-nums; }
+.ps-cell { display: flex; flex-direction: column; min-width: 0; padding: 0 6px 4px; }
+.ps-cell.is-folded { padding-left: 0; padding-right: 0; align-items: stretch; }
+.ps-cell__list { flex: 1; min-height: 44px; overflow: visible; border-radius: 6px; }
+.ps-cell__n { align-self: center; padding-top: 6px; font-size: 12px; color: var(--ps-muted); font-variant-numeric: tabular-nums; }
+.ps-board.is-dragging .ps-cell__list { box-shadow: inset 0 0 0 1px var(--ps-line); }
+.ps-board.is-dragging .ps-cell__list:hover { box-shadow: inset 0 0 0 1px var(--ps-focus); background: var(--ps-hover); }
+/* adding a card in a cell: just a plus until the cell is pointed at, so a grid of cells is not a grid of buttons */
+.ps-lane__foot--cell { padding: 0 2px 2px; }
+.ps-lane__foot--cell .ps-lane__add { padding: 4px 8px; }
+.ps-lane__foot--cell .ps-lane__addtext { display: none; }
+.ps-cell:hover .ps-lane__addtext, .ps-cell:focus-within .ps-lane__addtext, .ps-lane__foot--cell .ps-lane__add:focus-visible .ps-lane__addtext { display: inline; }
+@media (hover: none) { .ps-lane__foot--cell .ps-lane__addtext { display: inline; } }
+@media (max-width: 560px) {
+  .ps-board__grid { padding: 0 4px 10px; --ps-colmax: 256px; }
+  .ps-band__head { left: 10px; }
+}
+.ps-colhead.is-folded .ps-lane__head.is-folded { gap: 6px; padding-bottom: 8px; }
+.ps-colhead.is-folded .ps-lane__name { max-height: 96px; }

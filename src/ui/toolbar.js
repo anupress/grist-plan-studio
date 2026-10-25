@@ -31,11 +31,11 @@ const button = (text, title, onclick, cls = '') => el('button', { type: 'button'
  *   level: 'full' (default); 'switch' when the view shows a message instead (only the view switch and Columns);
  *   'bare' before the widget can work at all (the brand and the mode only)
  * @param {{level, mode, zoom, counts: {tasks, unscheduled, flagged, cards, bookings, clashes, outside, overloads, noHours, logged (text, Logged only)}, demo, editable,
- *          readOnlyWhy, canAdd, groupOptions, groupBy, hasLinks, critical, laneOptions, laneBy, tlLaneOptions, tlLaneBy,
+ *          readOnlyWhy, canAdd, groupOptions, groupBy, hasLinks, critical, laneOptions, laneBy, swimOptions, swimBy, tlLaneOptions, tlLaneBy,
  *          rowOptions, rowsBy, periodOptions, periodsBy, filterOptions, filterBy, wlRowOptions, wlRowsBy, wlUnit, wlMeasure (null without time entries), canLevel,
  *          agendaWho ('mine' | 'all' | null without people), agendaDoable, canCalendar, narrow (a phone: no calendar),
  *          timer: {title, since, elapsed} | null, hasTime, display: {available, changed, open}, examples, example}} s
- * @param {{onMode, onZoom, onFit, onToday, onColumns, onNew, onUndated, onGroup, onCritical, onLanes, onTlLanes,
+ * @param {{onMode, onZoom, onFit, onToday, onColumns, onNew, onUndated, onGroup, onCritical, onLanes, onSwims, onTlLanes,
  *          onRows, onPeriods, onFilter, onClash, onWlRows, onWlUnit, onWlMeasure, onAgendaWho, onCalendar, onReminders, onViews, onDisplay, onLevel, onOverload, onStopTimer, onTimesheet, onExample,
  *          onPrint, onHelp}} on
  */
@@ -100,7 +100,10 @@ export function renderToolbar(host, s, on) {
     } else if (view === 'timeline') {
       tools = [s.tlLaneOptions?.length ? picker(t('Lanes'), t('Make a lane for each value of'), s.tlLaneOptions, s.tlLaneBy, on.onTlLanes) : null, ...zoomTools()];
     } else if (view === 'board') {
-      tools = [s.laneOptions?.length ? picker(t('Lanes'), t('Make a lane for each value of'), s.laneOptions, s.laneBy, on.onLanes) : null];
+      tools = [
+        s.laneOptions?.length ? picker(t('Lanes'), t('Make a lane for each value of'), s.laneOptions, s.laneBy, on.onLanes) : null,
+        s.swimOptions?.length ? picker(t('Swimlanes'), t('Make a row of lanes for each value of'), s.swimOptions, s.swimBy, on.onSwims, t('No swimlanes')) : null,
+      ];
     } else if (view === 'booking') {
       tools = [
         s.rowOptions?.length ? picker(t('Rows'), t('A row for each'), s.rowOptions, s.rowsBy, on.onRows) : null,

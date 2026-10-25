@@ -30,6 +30,7 @@ const BY_VIEW = {
     ['← →', 'Go to the next lane'],
     ['Alt+← →', 'Move the card to the next lane'],
     ['Alt+↑ ↓', 'Move the card up or down'],
+    ['Alt+Shift+↑ ↓', 'Move the card to the next swimlane'],
   ],
   booking: [
     ['← → ↑ ↓', 'Move from cell to cell'],

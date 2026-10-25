@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.15.0
+
+The board gets swimlanes. Tested in Grist 1.7.20 (band counts compared with the table, every drop read back, one Undo each).
+
+- **Swimlanes**: rows of lanes, one for each value of a second Choice, Reference or Text column. A drop into another row writes
+  that column too (and the lane's, when it differs) in one undoable step; empty rows for known values (a person with no task yet)
+  are places to drop one; **Add card** in a cell fills in both values; **Alt + Shift + ↑ ↓** moves the selected card to the next row.
+  The lanes' titles stay on top while the rows scroll.
+- **Fold a lane** to a strip with its count; it still takes drops. Remembered per browser, left out of saved views.
+- **Sub-tasks on cards**: "2 of 5 sub-tasks done", with a short bar.
+- German and French for every new word; help and the keys list say it too.
+
 ## 1.14.0
 
 Only mine, and more fields. Tested in Grist 1.7.20 (the counts compared with the table, the cells read back after each save).
