@@ -20,7 +20,7 @@ import { linksOf, isLate, pushPlan, criticalPath, wouldLoop } from './model/sche
 import { makeCalendar, holidaysBetween } from './model/calendar.js';
 import { todayDay, dateFromDay, plain, dayOf, num, isoFromDay, dayFromISO, progressScale } from './model/values.js';
 import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink } from './model/edits.js';
-import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, storedMe, rememberMe, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, TIME_DEFAULTS, VIEWS, snapshotView, withView, MAX_VIEWS } from './model/settings.js';
+import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, storedMe, rememberMe, storedTab, rememberTab, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, TIME_DEFAULTS, VIEWS, snapshotView, withView, MAX_VIEWS } from './model/settings.js';
 import { buildBoard, planCardMove, newCardFields, cellText, LANE_KINDS, FIELD_KINDS } from './model/board.js';
 import { LANE_KINDS as TL_KINDS, planLaneChange, lanesOf } from './model/lanes.js';
 import { buildTimeline } from './model/timeline.js';
@@ -232,7 +232,7 @@ function ensureAgenda() {
 }
 
 /** A message in place of the view; `actions` are [label, run] buttons, the first one the main one. */
-function emptyState(title, body, actions = [[t('Choose columns'), openColumns]]) {
+function emptyState(title, body, actions = [[t('Choose columns'), () => openColumns('columns')]]) {
   dropOthers(null);
   clear(stage).appendChild(el('div', { class: 'ps-empty' }, [
     el('h2', { text: title }),
@@ -621,10 +621,10 @@ function recompute() {
     const hasDates = S.columns.some((c) => c.kind === 'Date' || c.kind === 'DateTime');
     const toBoard = boardPossible() ? [[t('Show the board'), () => setMode('board')]] : [];
     emptyState(t('Which columns hold the dates?'), hasDates
-      ? t('Plan Studio draws each task from a name and a date. Pick the columns in Columns.')
+      ? t('Plan Studio draws each task from a name and a date. Pick the columns in Settings.')
       : t('This table has no Date column yet. Add one (a start date, an end or a due date), or show another table in this widget.')
         + (toBoard.length ? ' ' + t('The board needs no dates.') : ''),
-    hasDates ? [[t('Choose columns'), openColumns], ...toBoard] : toBoard);
+    hasDates ? [[t('Choose columns'), () => openColumns('columns')], ...toBoard] : toBoard);
     return;
   }
   const m = buildModel();
@@ -687,7 +687,7 @@ function recomputeBoard() {
     S.built = null;
     drawToolbar(null, 'switch');
     emptyState(t('Which column makes the lanes?'),
-      t('The board puts each row in a lane by the value of a Choice, Reference or Text column, such as Status. Pick it in Columns, or add a Status column to the table.'));
+      t('The board puts each row in a lane by the value of a Choice, Reference or Text column, such as Status. Pick it in Settings, or add a Status column to the table.'));
     return;
   }
   const b = buildBoardModel();
@@ -712,8 +712,8 @@ function recomputeTimeline() {
   if (!ganttReady(S.roles) || !lane) {
     S.built = null;
     drawToolbar(null, 'switch');
-    if (!lane) emptyState(t('Which column makes the lanes?'), t('The timeline draws a band for each person, room or project: a Reference, Choice or Text column. Pick it in Columns.'));
-    else emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Pick the columns in Columns.'));
+    if (!lane) emptyState(t('Which column makes the lanes?'), t('The timeline draws a band for each person, room or project: a Reference, Choice or Text column. Pick it in Settings.'));
+    else emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Pick the columns in Settings.'));
     return;
   }
   const cal = calendar();
@@ -791,8 +791,8 @@ function recomputeBooking() {
     S.built = null;
     drawToolbar(null, 'switch');
     emptyState(!res ? t('Which column holds the resource?') : t('Which column says when?'), !res
-      ? t('The booking grid has a row for each room, store, flat or person: a Reference, Choice or Text column such as Room. Pick it in Columns.')
-      : t('Each booking needs dates, or a column naming its period (a Weekend column with Weekend 1, 2, 3). Pick them in Columns.'));
+      ? t('The booking grid has a row for each room, store, flat or person: a Reference, Choice or Text column such as Room. Pick it in Settings.')
+      : t('Each booking needs dates, or a column naming its period (a Weekend column with Weekend 1, 2, 3). Pick them in Settings.'));
     return;
   }
   const all = [...S.built.tasks, ...S.built.unscheduled];
@@ -889,8 +889,8 @@ function recomputeWorkload() {
   if (!ganttReady(S.roles) || !person) {
     S.built = null;
     drawToolbar(null, 'switch');
-    if (!person) emptyState(t('Whose work is it?'), t('The workload has a row for each person: the column that says who a task is assigned to, such as Owner. Pick it as “Assigned to” in Columns.'));
-    else emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Pick the columns in Columns.'));
+    if (!person) emptyState(t('Whose work is it?'), t('The workload has a row for each person: the column that says who a task is assigned to, such as Owner. Pick it as “Assigned to” in Settings.'));
+    else emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Pick the columns in Settings.'));
     return;
   }
   const cal = calendar();
@@ -975,7 +975,7 @@ function recomputeCalendar() {
   if (!ganttReady(S.roles)) {
     S.built = null;
     drawToolbar(null, 'switch');
-    emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Pick the columns in Columns.'));
+    emptyState(t('Which columns hold the dates?'), t('Plan Studio draws each task from a name and a date. Pick the columns in Settings.'));
     return;
   }
   const cal = calendar();
@@ -1047,7 +1047,7 @@ function recomputeAgenda() {
   if (!S.roles.title) {
     S.built = null;
     drawToolbar(null, 'switch');
-    emptyState(t('Which column holds the task names?'), t('The agenda lists each task by name and date. Pick the columns in Columns.'));
+    emptyState(t('Which column holds the task names?'), t('The agenda lists each task by name and date. Pick the columns in Settings.'));
     return;
   }
   const cal = calendar();
@@ -1419,7 +1419,7 @@ function moveCard({ id, toKey, index }) {
     S.signature = '';
     recompute();
     if (plan.error === 'noOrder') {
-      if (!orderHintShown) toast(t('Cards keep the table’s order. To sort them by hand, choose a number column as “Order in a lane” in Columns.'), { label: t('Columns'), run: openColumns });
+      if (!orderHintShown) toast(t('Cards keep the table’s order. To sort them by hand, choose a number column as “Order in a lane” in Settings.'), { label: t('Settings'), run: () => openColumns('columns') });
       orderHintShown = true;
     } else if (plan.error === 'orderFormula') toast(t('The order column is a formula, so cards can’t be moved up or down here.'));
     else if (plan.error === 'laneFormula') toast(t('“{col}” is a formula, so cards can’t change lanes here.', { col: lane.label }));
@@ -1800,7 +1800,7 @@ function starterState() {
     el('div', { class: 'ps-starter__list' }, list.map((tpl) => el('button', { type: 'button', class: 'ps-starter__item', onclick: () => applyTemplate(tpl) }, [
       el('span', { class: 'ps-starter__name', text: tpl.label }), el('span', { class: 'ps-starter__hint', text: hints[tpl.id] }),
     ]))),
-    el('p', { class: 'ps-starter__or' }, [el('button', { type: 'button', class: 'ps-link', text: t('Or choose the columns yourself'), onclick: openColumns })]),
+    el('p', { class: 'ps-starter__or' }, [el('button', { type: 'button', class: 'ps-link', text: t('Or choose the columns yourself'), onclick: () => openColumns('columns') })]),
   ]));
 }
 
@@ -2186,7 +2186,8 @@ function openPending() {
 
 // ---- Columns panel --------------------------------------------------------------------------------------
 let mappingOpen = null;
-async function openColumns() {
+/** The settings panel, on a tab: the one asked for, else the one last used in this browser. */
+async function openColumns(tab) {
   if (mappingOpen) return;
   mappingOpen = true;
   const datedTables = S.live ? await listDatedTables().catch(() => []) : [];
@@ -2201,7 +2202,9 @@ async function openColumns() {
     time: S.time, timeTables, timeFound: S.time.table ? null : S.timeTableId, canSetupTime: S.live && canEdit() && !hasTime(),
     canAddColumns: S.live && canEdit(),
     datedTables: datedTables.filter((x) => x !== S.tableId),
+    mode: S.mode, tab: typeof tab === 'string' ? tab : storedTab(),
   }, {
+    onTab: (id) => rememberTab(id),
     onClose: () => { mappingOpen = null; },
     onAddColumn: (role) => addColumnFor(role),
     onSetupTime: () => setupTime(),

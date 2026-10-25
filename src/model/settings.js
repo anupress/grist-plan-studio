@@ -194,6 +194,11 @@ const modeKey = (tableId, opensAs) => 'planStudio.mode.' + (tableId || 'demo') +
 export function storedMode(tableId, opensAs) { const v = local(modeKey(tableId, opensAs), null); return VIEWS.includes(v) ? v : null; }
 export function rememberMode(tableId, opensAs, mode) { keep(modeKey(tableId, opensAs), mode); }
 
+// The tab of the settings panel last used, so it opens where the person left off. A new browser starts on Columns.
+const tabKey = 'planStudio.settingsTab';
+export function storedTab() { const v = local(tabKey, null); return v === 'view' || v === 'more' ? v : 'columns'; }
+export function rememberTab(tab) { keep(tabKey, tab); }
+
 // Who this browser's timers are for: a person's lane key, per table. Asked the first time a timer starts
 // and remembered here, because Grist does not tell a widget who is signed in.
 const meKey = (tableId) => 'planStudio.me.' + (tableId || 'demo');

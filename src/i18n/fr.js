@@ -68,7 +68,7 @@ export const FR = {
   // empty states
   'Choose columns': 'Choisir les colonnes',
   'Which columns hold the dates?': `Quelles colonnes contiennent les dates${NN}?`,
-  'Plan Studio draws each task from a name and a date. Pick the columns in Columns.': `Plan Studio dessine chaque tâche à partir d’un nom et d’une date. Choisissez les colonnes dans ${q('Colonnes')}.`,
+  'Plan Studio draws each task from a name and a date. Pick the columns in Settings.': `Plan Studio dessine chaque tâche à partir d’un nom et d’une date. Choisissez les colonnes dans ${q('Réglages')}.`,
   'This table has no Date column yet. Add one (a start date, an end or a due date), or show another table in this widget.':
     'Cette table n’a pas encore de colonne Date. Ajoutez-en une (début, fin ou échéance), ou affichez une autre table dans ce widget.',
   'No tasks to show': 'Aucune tâche à afficher',
@@ -79,16 +79,16 @@ export const FR = {
   'Show the board': 'Afficher le tableau',
   'The board needs no dates.': 'Le tableau n’a pas besoin de dates.',
   'Which column makes the lanes?': `Quelle colonne forme les couloirs${NN}?`,
-  'The board puts each row in a lane by the value of a Choice, Reference or Text column, such as Status. Pick it in Columns, or add a Status column to the table.':
-    `Le tableau range chaque ligne dans un couloir selon la valeur d’une colonne Choix, Référence ou Texte, comme Statut. Choisissez-la dans ${q('Colonnes')}, ou ajoutez une colonne Statut à la table.`,
-  'The timeline draws a band for each person, room or project: a Reference, Choice or Text column. Pick it in Columns.':
-    `La chronologie trace une bande par personne, salle ou projet${NB}: une colonne Référence, Choix ou Texte. Choisissez-la dans ${q('Colonnes')}.`,
+  'The board puts each row in a lane by the value of a Choice, Reference or Text column, such as Status. Pick it in Settings, or add a Status column to the table.':
+    `Le tableau range chaque ligne dans un couloir selon la valeur d’une colonne Choix, Référence ou Texte, comme Statut. Choisissez-la dans ${q('Réglages')}, ou ajoutez une colonne Statut à la table.`,
+  'The timeline draws a band for each person, room or project: a Reference, Choice or Text column. Pick it in Settings.':
+    `La chronologie trace une bande par personne, salle ou projet${NB}: une colonne Référence, Choix ou Texte. Choisissez-la dans ${q('Réglages')}.`,
   'Which column holds the resource?': `Quelle colonne indique la ressource${NN}?`,
-  'The booking grid has a row for each room, store, flat or person: a Reference, Choice or Text column such as Room. Pick it in Columns.':
-    `Le planning de réservation a une ligne par salle, boutique, logement ou personne${NB}: une colonne Référence, Choix ou Texte comme Salle. Choisissez-la dans ${q('Colonnes')}.`,
+  'The booking grid has a row for each room, store, flat or person: a Reference, Choice or Text column such as Room. Pick it in Settings.':
+    `Le planning de réservation a une ligne par salle, boutique, logement ou personne${NB}: une colonne Référence, Choix ou Texte comme Salle. Choisissez-la dans ${q('Réglages')}.`,
   'Which column says when?': `Quelle colonne indique quand${NN}?`,
-  'Each booking needs dates, or a column naming its period (a Weekend column with Weekend 1, 2, 3). Pick them in Columns.':
-    `Chaque réservation a besoin de dates, ou d’une colonne qui nomme sa période (une colonne Week-end avec Week-end 1, 2, 3). Choisissez-les dans ${q('Colonnes')}.`,
+  'Each booking needs dates, or a column naming its period (a Weekend column with Weekend 1, 2, 3). Pick them in Settings.':
+    `Chaque réservation a besoin de dates, ou d’une colonne qui nomme sa période (une colonne Week-end avec Week-end 1, 2, 3). Choisissez-les dans ${q('Réglages')}.`,
 
   // who may write
   'Not connected to Grist.': 'Pas connecté à Grist.',
@@ -312,8 +312,8 @@ export const FR = {
   'Moved “{name}” within {lane}.': `${q('{name}')} déplacée dans {lane}.`,
   'The lane’s order was renumbered ({n} card).': 'L’ordre du couloir a été renuméroté ({n} carte).',
   'The lane’s order was renumbered ({n} cards).': 'L’ordre du couloir a été renuméroté ({n} cartes).',
-  'Cards keep the table’s order. To sort them by hand, choose a number column as “Order in a lane” in Columns.':
-    `Les cartes suivent l’ordre de la table. Pour les trier à la main, choisissez une colonne numérique comme ${q('Ordre dans le couloir')} dans ${q('Colonnes')}.`,
+  'Cards keep the table’s order. To sort them by hand, choose a number column as “Order in a lane” in Settings.':
+    `Les cartes suivent l’ordre de la table. Pour les trier à la main, choisissez une colonne numérique comme ${q('Ordre dans le couloir')} dans ${q('Réglages')}.`,
   'The order column is a formula, so cards can’t be moved up or down here.': 'La colonne d’ordre est une formule, les cartes ne peuvent donc pas monter ou descendre ici.',
   '“{col}” is a formula, so cards can’t change lanes here.': `${q('{col}')} est une formule, les cartes ne peuvent donc pas changer de couloir ici.`,
 
@@ -490,7 +490,7 @@ export const FR = {
   'Tasks whose Hours of work cell is empty count for nothing here.': 'Les tâches dont la case Heures de travail est vide ne comptent pas ici.',
   'The work a task needs: hours, or person-days when the column’s name says days. The workload spreads it over the task’s working days.':
     `Le travail dont une tâche a besoin${NB}: des heures, ou des jours-personne quand le nom de la colonne parle de jours. La charge le répartit sur les jours ouvrés de la tâche.`,
-  'The workload has a row for each person: the column that says who a task is assigned to, such as Owner. Pick it as “Assigned to” in Columns.':
+  'The workload has a row for each person: the column that says who a task is assigned to, such as Owner. Pick it as “Assigned to” in Settings.':
     `La charge a une ligne par personne${NB}: la colonne qui dit à qui une tâche est attribuée, comme Responsable. Choisissez-la comme «${NB}Assigné à${NB}» dans Colonnes.`,
   'When “Assigned to” is a Reference to a people table, a column there can give each person’s hours a week. Without one, everyone has a full day.':
     `Quand «${NB}Assigné à${NB}» est une référence à une table de personnes, une colonne de cette table peut donner les heures par semaine de chacun. Sans elle, chacun a une journée entière.`,
@@ -668,7 +668,7 @@ export const FR = {
   'Starts {date}': 'Commence le {date}',
   'Tasks that are not done show up here, under the day they need someone.': 'Les tâches non terminées apparaissent ici, sous le jour où elles demandent quelqu’un.',
   'The agenda does not print. Switch to the Gantt chart, the board or the workload to print.': 'L’agenda ne s’imprime pas. Passez au diagramme de Gantt, au tableau ou à la charge pour imprimer.',
-  'The agenda lists each task by name and date. Pick the columns in Columns.': `L’agenda liste chaque tâche par nom et par date. Choisissez les colonnes dans ${q('Colonnes')}.`,
+  'The agenda lists each task by name and date. Pick the columns in Settings.': `L’agenda liste chaque tâche par nom et par date. Choisissez les colonnes dans ${q('Réglages')}.`,
   'The key opens every document you can open in Grist: keep that Google project to yourself. A free Google account can send 100 emails a day, a Workspace account 1,500.': `La clé ouvre tous les documents que vous pouvez ouvrir dans Grist${NB}: gardez ce projet Google pour vous. Un compte Google gratuit peut envoyer 100 e-mails par jour, un compte Workspace 1${NN}500.`,
   'The script': 'Le script',
   'There is no dated task to add.': 'Aucune tâche datée à ajouter.',
@@ -732,4 +732,27 @@ export const FR = {
   'Save as PNG draws the same layout as a picture, for a slide or a message.': `${q('Enregistrer en PNG')} dessine la même mise en page sous forme d’image, pour une diapositive ou un message.`,
   'This is too large for a picture. Use Print, then Save as PDF.': 'C’est trop grand pour une image. Choisissez Imprimer, puis enregistrez en PDF.',
   'Your browser would not draw the picture. Use Print, then Save as PDF.': 'Votre navigateur n’a pas voulu dessiner l’image. Choisissez Imprimer, puis enregistrez en PDF.',
+  '1 column set': '1 colonne définie',
+  '{n} columns set': '{n} colonnes définies',
+  'More columns this view reads': 'Autres colonnes lues par cette vue',
+  'Columns other views use ({n})': 'Colonnes des autres vues ({n})',
+  'Columns, how dates are read, and what each view shows': 'Colonnes, lecture des dates et contenu de chaque vue',
+  'Find a setting': 'Trouver un réglage',
+  'Kept in this browser, not in the document.': 'Conservé dans ce navigateur, pas dans le document.',
+  'More': 'Plus',
+  'No setting matches “{q}”.': `Aucun réglage ne correspond à ${q('{q}')}.`,
+  'Other ways to give a date': 'Autres façons d’indiquer une date',
+  'Saved for everyone who opens this page. The language stays in this browser.': 'Enregistré pour tous ceux qui ouvrent cette page. La langue reste dans ce navigateur.',
+  'Settings': 'Réglages',
+  'This view': 'Cette vue',
+  'This widget': 'Ce widget',
+  'Used by: {views}.': `Utilisé par${NB}: {views}.`,
+  'Pick the column that names each task.': 'Choisissez la colonne qui nomme chaque tâche.',
+  'Each task is named by “{name}” and drawn from “{start}” to “{end}”.': `Chaque tâche est nommée d’après ${q('{name}')} et dessinée de ${q('{start}')} à ${q('{end}')}.`,
+  'Each task is named by “{name}” and drawn from “{start}” for as many days as “{duration}” says.': `Chaque tâche est nommée d’après ${q('{name}')} et dessinée à partir de ${q('{start}')}, sur autant de jours que l’indique ${q('{duration}')}.`,
+  'Each task is named by “{name}” and drawn on the day in “{start}”.': `Chaque tâche est nommée d’après ${q('{name}')} et dessinée le jour indiqué par ${q('{start}')}.`,
+  'Each task is named by “{name}” and shown on the day in “{date}”: a milestone, or a bar ending there.': `Chaque tâche est nommée d’après ${q('{name}')} et affichée le jour indiqué par ${q('{date}')}${NB}: un jalon, ou une barre qui s’y termine.`,
+  'Each task is named by “{name}”. With no start or due date it can’t be drawn on a timeline: the board and the agenda still list it.': `Chaque tâche est nommée d’après ${q('{name}')}. Sans date de début ni d’échéance, elle ne peut pas être dessinée sur une chronologie${NB}: le tableau et l’agenda la listent quand même.`,
+  'Colours follow “{col}”.': `Les couleurs suivent ${q('{col}')}.`,
+  'People come from “{col}”.': `Les personnes viennent de ${q('{col}')}.`,
 };

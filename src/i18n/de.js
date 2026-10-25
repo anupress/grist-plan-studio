@@ -33,7 +33,7 @@ export const DE = {
 
   // empty states
   'Which columns hold the dates?': 'In welchen Spalten stehen die Daten?',
-  'Plan Studio draws each task from a name and a date. Pick the columns in Columns.': 'Plan Studio zeichnet jede Aufgabe aus einem Namen und einem Datum. Wählen Sie die Spalten unter „Spalten“.',
+  'Plan Studio draws each task from a name and a date. Pick the columns in Settings.': 'Plan Studio zeichnet jede Aufgabe aus einem Namen und einem Datum. Wählen Sie die Spalten unter „Einstellungen“.',
   'This table has no Date column yet. Add one (a start date, an end or a due date), or show another table in this widget.': 'Diese Tabelle hat noch keine Datumsspalte. Legen Sie eine an (Beginn, Ende oder Fälligkeit) oder zeigen Sie in diesem Widget eine andere Tabelle.',
   'Choose columns': 'Spalten wählen',
   'The task here has no date yet.': 'Die Aufgabe hier hat noch kein Datum.',
@@ -241,14 +241,14 @@ export const DE = {
   'Moved “{name}” within {lane}.': '„{name}“ innerhalb von {lane} verschoben.',
   'The lane’s order was renumbered ({n} card).': 'Die Reihenfolge der Bahn wurde neu nummeriert ({n} Karte).',
   'The lane’s order was renumbered ({n} cards).': 'Die Reihenfolge der Bahn wurde neu nummeriert ({n} Karten).',
-  'Cards keep the table’s order. To sort them by hand, choose a number column as “Order in a lane” in Columns.':
-    'Karten folgen der Reihenfolge der Tabelle. Um sie von Hand zu sortieren, wählen Sie unter „Spalten“ eine Zahlenspalte als „Reihenfolge in der Bahn“.',
+  'Cards keep the table’s order. To sort them by hand, choose a number column as “Order in a lane” in Settings.':
+    'Karten folgen der Reihenfolge der Tabelle. Um sie von Hand zu sortieren, wählen Sie unter „Einstellungen“ eine Zahlenspalte als „Reihenfolge in der Bahn“.',
   'The order column is a formula, so cards can’t be moved up or down here.':
     'Die Spalte für die Reihenfolge ist eine Formel. Karten lassen sich hier deshalb nicht nach oben oder unten verschieben.',
   '“{col}” is a formula, so cards can’t change lanes here.': '„{col}“ ist eine Formel. Karten können hier deshalb nicht die Bahn wechseln.',
   'Which column makes the lanes?': 'Welche Spalte bildet die Bahnen?',
-  'The board puts each row in a lane by the value of a Choice, Reference or Text column, such as Status. Pick it in Columns, or add a Status column to the table.':
-    'Das Board ordnet jede Zeile nach dem Wert einer Auswahl-, Referenz- oder Textspalte (etwa Status) einer Bahn zu. Wählen Sie diese Spalte unter „Spalten“ oder fügen Sie der Tabelle eine Status-Spalte hinzu.',
+  'The board puts each row in a lane by the value of a Choice, Reference or Text column, such as Status. Pick it in Settings, or add a Status column to the table.':
+    'Das Board ordnet jede Zeile nach dem Wert einer Auswahl-, Referenz- oder Textspalte (etwa Status) einer Bahn zu. Wählen Sie diese Spalte unter „Einstellungen“ oder fügen Sie der Tabelle eine Status-Spalte hinzu.',
   'Show the board': 'Board anzeigen',
   'The board needs no dates.': 'Das Board kommt ohne Datumsangaben aus.',
   'Order in a lane': 'Reihenfolge in der Bahn',
@@ -304,13 +304,13 @@ export const DE = {
   '“{col}” is a formula, so tasks can’t change lanes here.': '„{col}“ ist eine Formel. Aufgaben können hier deshalb nicht die Bahn wechseln.',
   'That column is a formula, so the booking can’t be moved there.': 'Diese Spalte ist eine Formel. Die Buchung lässt sich deshalb nicht dorthin verschieben.',
   'Which column holds the resource?': 'Welche Spalte nennt die Ressource?',
-  'The booking grid has a row for each room, store, flat or person: a Reference, Choice or Text column such as Room. Pick it in Columns.':
-    'Der Belegungsplan hat eine Zeile für jeden Raum, jeden Stand, jede Wohnung oder Person: eine Referenz-, Auswahl- oder Textspalte wie Raum. Wählen Sie sie unter „Spalten“.',
+  'The booking grid has a row for each room, store, flat or person: a Reference, Choice or Text column such as Room. Pick it in Settings.':
+    'Der Belegungsplan hat eine Zeile für jeden Raum, jeden Stand, jede Wohnung oder Person: eine Referenz-, Auswahl- oder Textspalte wie Raum. Wählen Sie sie unter „Einstellungen“.',
   'Which column says when?': 'Welche Spalte sagt, wann?',
-  'Each booking needs dates, or a column naming its period (a Weekend column with Weekend 1, 2, 3). Pick them in Columns.':
-    'Jede Buchung braucht Datumsangaben oder eine Spalte, die ihren Zeitraum nennt (etwa eine Spalte Wochenende mit Wochenende 1, 2, 3). Wählen Sie sie unter „Spalten“.',
-  'The timeline draws a band for each person, room or project: a Reference, Choice or Text column. Pick it in Columns.':
-    'Die Zeitleiste zeichnet ein Band je Person, Raum oder Projekt: eine Referenz-, Auswahl- oder Textspalte. Wählen Sie sie unter „Spalten“.',
+  'Each booking needs dates, or a column naming its period (a Weekend column with Weekend 1, 2, 3). Pick them in Settings.':
+    'Jede Buchung braucht Datumsangaben oder eine Spalte, die ihren Zeitraum nennt (etwa eine Spalte Wochenende mit Wochenende 1, 2, 3). Wählen Sie sie unter „Einstellungen“.',
+  'The timeline draws a band for each person, room or project: a Reference, Choice or Text column. Pick it in Settings.':
+    'Die Zeitleiste zeichnet ein Band je Person, Raum oder Projekt: eine Referenz-, Auswahl- oder Textspalte. Wählen Sie sie unter „Einstellungen“.',
   'Resource': 'Ressource',
   'A room, store, flat or vehicle: the booking grid has a row for each.': 'Ein Raum, ein Stand, eine Wohnung oder ein Fahrzeug: Der Belegungsplan hat für jedes davon eine Zeile.',
   'Period': 'Zeitraum',
@@ -475,7 +475,7 @@ export const DE = {
   'Tasks whose Hours of work cell is empty count for nothing here.': 'Aufgaben mit leerer Zelle in „Arbeitsstunden“ zählen hier nicht.',
   'The work a task needs: hours, or person-days when the column’s name says days. The workload spreads it over the task’s working days.':
     'Die Arbeit, die eine Aufgabe braucht: Stunden, oder Personentage, wenn der Spaltenname Tage nennt. Die Auslastung verteilt sie auf die Arbeitstage der Aufgabe.',
-  'The workload has a row for each person: the column that says who a task is assigned to, such as Owner. Pick it as “Assigned to” in Columns.':
+  'The workload has a row for each person: the column that says who a task is assigned to, such as Owner. Pick it as “Assigned to” in Settings.':
     'Die Auslastung hat eine Zeile je Person: die Spalte, die sagt, wer für eine Aufgabe zuständig ist, etwa Verantwortlich. Wählen Sie sie unter Spalten als „Zuständig“.',
   'When “Assigned to” is a Reference to a people table, a column there can give each person’s hours a week. Without one, everyone has a full day.':
     'Wenn „Zuständig“ eine Referenz auf eine Personentabelle ist, kann eine Spalte dort die Wochenstunden jeder Person angeben. Ohne sie hat jede Person einen vollen Tag.',
@@ -653,7 +653,7 @@ export const DE = {
   'Starts {date}': 'Beginnt {date}',
   'Tasks that are not done show up here, under the day they need someone.': 'Offene Aufgaben erscheinen hier unter dem Tag, an dem sie jemanden brauchen.',
   'The agenda does not print. Switch to the Gantt chart, the board or the workload to print.': 'Die Agenda lässt sich nicht drucken. Wechseln Sie zum Gantt-Diagramm, zum Board oder zur Auslastung, um zu drucken.',
-  'The agenda lists each task by name and date. Pick the columns in Columns.': 'Die Agenda listet jede Aufgabe mit Name und Datum auf. Wählen Sie die Spalten unter „Spalten“.',
+  'The agenda lists each task by name and date. Pick the columns in Settings.': 'Die Agenda listet jede Aufgabe mit Name und Datum auf. Wählen Sie die Spalten unter „Einstellungen“.',
   'The key opens every document you can open in Grist: keep that Google project to yourself. A free Google account can send 100 emails a day, a Workspace account 1,500.': 'Der Schlüssel öffnet jedes Dokument, das Sie in Grist öffnen können: Behalten Sie dieses Google-Projekt für sich. Ein kostenloses Google-Konto kann 100 E-Mails pro Tag senden, ein Workspace-Konto 1.500.',
   'The script': 'Das Skript',
   'There is no dated task to add.': 'Es gibt keine Aufgabe mit Datum zum Hinzufügen.',
@@ -717,4 +717,27 @@ export const DE = {
   'Save as PNG draws the same layout as a picture, for a slide or a message.': '„Als PNG speichern“ zeichnet dasselbe Layout als Bild, für eine Folie oder eine Nachricht.',
   'This is too large for a picture. Use Print, then Save as PDF.': 'Das ist zu groß für ein Bild. Wählen Sie Drucken und speichern Sie dann als PDF.',
   'Your browser would not draw the picture. Use Print, then Save as PDF.': 'Ihr Browser wollte das Bild nicht zeichnen. Wählen Sie Drucken und speichern Sie dann als PDF.',
+  '1 column set': '1 Spalte gesetzt',
+  '{n} columns set': '{n} Spalten gesetzt',
+  'More columns this view reads': 'Weitere Spalten, die diese Ansicht liest',
+  'Columns other views use ({n})': 'Spalten anderer Ansichten ({n})',
+  'Columns, how dates are read, and what each view shows': 'Spalten, Datumsangaben und was jede Ansicht zeigt',
+  'Find a setting': 'Einstellung suchen',
+  'Kept in this browser, not in the document.': 'Wird in diesem Browser gespeichert, nicht im Dokument.',
+  'More': 'Mehr',
+  'No setting matches “{q}”.': 'Keine Einstellung passt zu „{q}“.',
+  'Other ways to give a date': 'Andere Möglichkeiten, ein Datum anzugeben',
+  'Saved for everyone who opens this page. The language stays in this browser.': 'Gespeichert für alle, die diese Seite öffnen. Die Sprache bleibt in diesem Browser.',
+  'Settings': 'Einstellungen',
+  'This view': 'Diese Ansicht',
+  'This widget': 'Dieses Widget',
+  'Used by: {views}.': 'Verwendet von: {views}.',
+  'Pick the column that names each task.': 'Wählen Sie die Spalte, die jede Aufgabe benennt.',
+  'Each task is named by “{name}” and drawn from “{start}” to “{end}”.': 'Jede Aufgabe wird nach „{name}“ benannt und von „{start}“ bis „{end}“ gezeichnet.',
+  'Each task is named by “{name}” and drawn from “{start}” for as many days as “{duration}” says.': 'Jede Aufgabe wird nach „{name}“ benannt und ab „{start}“ so viele Tage lang gezeichnet, wie „{duration}“ angibt.',
+  'Each task is named by “{name}” and drawn on the day in “{start}”.': 'Jede Aufgabe wird nach „{name}“ benannt und an dem Tag aus „{start}“ gezeichnet.',
+  'Each task is named by “{name}” and shown on the day in “{date}”: a milestone, or a bar ending there.': 'Jede Aufgabe wird nach „{name}“ benannt und an dem Tag aus „{date}“ gezeigt: als Meilenstein oder als Balken, der dort endet.',
+  'Each task is named by “{name}”. With no start or due date it can’t be drawn on a timeline: the board and the agenda still list it.': 'Jede Aufgabe wird nach „{name}“ benannt. Ohne Start- oder Fälligkeitsdatum lässt sie sich nicht auf einer Zeitachse zeichnen: Board und Agenda führen sie trotzdem auf.',
+  'Colours follow “{col}”.': 'Die Farben folgen „{col}“.',
+  'People come from “{col}”.': 'Die Personen stammen aus „{col}“.',
 };

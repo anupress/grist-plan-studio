@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.4.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.5.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -56,7 +56,7 @@ Each person gets a row, and each cell the hours asked of them against the hours 
 from an **Hours of work** column (or person-days, when its name says days), spread over the task's
 working days and split between its people; without one, each task takes a full working day of each of
 its people, and the view says it assumes so. Capacity is 8 hours on every working day (set in
-**Columns**), scaled by a column of the people table: hours a week (40, 24) or a share (0.5, 50 %).
+**Settings**), scaled by a column of the people table: hours a week (40, 24) or a share (0.5, 50 %).
 Weekends, public holidays and a holidays table count as days off; a row of that table that names a
 person is that person's day off.
 
@@ -83,7 +83,7 @@ assigned to, a holidays table, the periods of a booking grid), reads column type
 a formula, and writes your changes back. It shows the table you chose when adding the widget.
 
 **Your columns, not ours.** Plan Studio never asks for a schema. It works out which column is the
-start, the end, the due date, the assignee, the status and so on, and the **Columns** button shows
+start, the end, the due date, the assignee, the status and so on, and the **Settings** button shows
 what it found and lets you change it:
 
 - Grist's Project Management, Lab Project Management, Rental Management and Content Calendar
@@ -92,6 +92,27 @@ what it found and lets you change it:
   offers **Add a column for it**.
 - An empty table (Grist's new Table1) offers three starter templates: a project plan, an event
   booking plan and a room booking. Each asks first, and Grist's Undo takes it back.
+
+### Settings
+
+![The Settings panel: a sentence saying what the columns will do, then the name and the dates](docs/images/settings.png)
+
+One panel, three tabs, so a beginner sees three questions and an expert still finds every option:
+
+- **Columns** starts with a plain sentence about what your choices will do (“Each task is named by
+  “Task” and drawn from “Start” to “End””), with how many columns are set and **Detect again**. Below it
+  are the name and the dates; the other ways to give a date (a due date, a duration) sit in a fold that is
+  open when you use them. The columns only other views read are one fold further down, each one saying
+  which views use it.
+- **This view** holds the options of the view on show: the Gantt chart's colours, how dates are read and
+  which days count; the board's cards and lanes; the workload's day and capacity. It opens first the next
+  time you come back to it, because the panel remembers its tab in your browser.
+- **More** lists the options of the other views, in folds, and the interface language.
+- **Find a setting** at the top searches all three at once, in the language you use, by the setting's
+  name and its explanation; the results say which tab each one lives on.
+
+Saving writes the column mapping and the options into the document for everyone who opens the page
+(the panel says so); the language stays in your browser.
 
 **Every change is one Grist action.** A drag writes one row, or one bundle when dependants move
 with it, so one Ctrl+Z, in Grist or in the widget, takes the whole change back. Formula columns are
@@ -120,7 +141,7 @@ Tested in Chrome: a browser that will not draw it says so too. The agenda has no
 
 ## Languages and keys
 
-English, German and French, following Grist's language (or chosen in Columns). Dates, week
+English, German and French, following Grist's language (or chosen in Settings). Dates, week
 numbers and key names follow the language.
 
 The main actions have keys: arrows select, Alt+arrows move, Enter opens quick edit, Ctrl+Z
@@ -131,7 +152,7 @@ selection is announced to screen readers, and the booking grid has a cell cursor
 
 Hours worked go in a table of their own, beside the tasks: a row per entry, with the task, the person,
 the day, a start and an end (from a timer) or just hours (logged by hand), and a note. Plan Studio
-finds such a table by its columns, or picks one in **Columns**; without one, **Columns → Time
+finds such a table by its columns, or picks one in **Settings**; without one, **Settings → More → Time
 tracking → Add a time-entries table** makes it after asking (Task, Person, Date, Started, Stopped,
 Hours, Note, named in the interface language).
 
@@ -168,7 +189,7 @@ folds into one menu and the controls a thumb can hit.
   Each event keeps the same id, so importing the file again updates it instead of adding a copy.
   Whether a calendar app keeps an imported reminder is the app's choice; if yours does not, set its
   own notification.
-- **Email reminders** (**Columns → Reminders**, or the Agenda's button) write a short Google Apps
+- **Email reminders** (**Settings → This view** on the Agenda, or the Agenda's button) write a short Google Apps
   Script for your document. Grist's own email action is for paid plans and cannot run on a date, so
   this one runs in your Google account instead, free: every morning it emails each person the tasks
   that are late or due in the next few days, at the address in the Email column of their row in the
@@ -208,7 +229,7 @@ finished, its `Project_Id` reads as the project's name, and its hours (`Estimate
 ## Where settings live
 
 - **In the widget's options**, saved in the document and shared by everyone, written only when
-  someone presses Save in Columns: the column mapping, how dates are read, the view the widget
+  someone presses Save in Settings: the column mapping, how dates are read, the view the widget
   opens in, what a card shows, lane limits, the booking grid's periods, the time-entries table and the
   saved views (when someone presses Save in Views).
 - **In this browser**: zoom, grouping, folded rows, the lane column and the last view, the
@@ -260,7 +281,7 @@ src/data/       the document's tables, columns and references
 src/model/      roles, tasks, edits, scheduling, lanes, board, booking, workload, templates (pure, tested)
 src/views/      gantt/, timeline/, board/, booking/, workload/
 src/print/      page layout and the printed views
-src/ui/         toolbar, Columns panel, quick edit, dialogs, keys
+src/ui/         toolbar, Settings panel, quick edit, dialogs, keys
 src/i18n/       English keys, German and French tables
 src/styles/     the stylesheets
 src/demo/       the sample plans used outside Grist

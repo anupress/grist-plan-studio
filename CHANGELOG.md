@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.5.0
+
+A settings panel that fits the person: three questions for a beginner, every option still there for an expert.
+Tested in Grist 1.7.20 (a table nobody had set up on docs.getgrist.com, and the Project Management template).
+
+- **Settings** replaces the Columns button and opens on three tabs. **Columns** says in a plain sentence what
+  your choices will do (“Each task is named by “Task” and drawn from “Start” to “End”. Colours follow “Status”.”),
+  with how many columns are set and **Detect again**, then the name and the dates; a due date or a duration
+  sits in a fold that is open when you use one. The columns only other views read are one fold below, each saying
+  which views use it. **This view** holds the options of the view on show (the Gantt chart's colours, how dates
+  are read, the days that count; the board's cards and lanes; the workload's day and capacity). **More** holds the
+  options of the other views, in folds, and the interface language. The panel reopens on the tab you last used.
+- **Find a setting** searches every option by its name and its explanation, in the interface language, accents
+  and capitals ignored; each result says which tab it lives on.
+- The panel says where a setting is kept: the mapping and the options for everyone who opens the page, the
+  language in this browser only.
+- On a table with no dates the first message offers **Choose columns**, which opens the panel on the sentence:
+  Choose columns, Start, End and Save: four steps to a drawn plan.
+- Fixed: the dialog's heading and the Name field shared one id, so a screen reader named the field “Columns”.
+- German and French for every new word, the eight sentences included; tap targets of 24 px for the panel's links.
+
 ## 1.4.0
 
 A calendar, saved views, a way over from TaskFlow and Gestion de Projet, and PNG pictures.

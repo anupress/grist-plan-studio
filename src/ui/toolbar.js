@@ -1,7 +1,7 @@
 // The strip above the views: which view, what is shown, and that view's own controls (zoom, Fit,
 // Today and New task for the Gantt chart; lanes and zoom for the timeline; the lane column for the
 // board; rows, periods and a filter for the booking grid; rows, periods and Level for the workload), plus
-// the Columns panel.
+// the settings panel.
 
 import { el, clear } from '../core/util.js';
 import { ZOOM_ORDER } from '../views/gantt/layout.js';
@@ -152,7 +152,7 @@ export function renderToolbar(host, s, on) {
       level === 'full' ? button(t('Views'), t('Saved views: a view as you set it up, under a name'), on.onViews) : null,
       level === 'full' && view !== 'agenda' ? button(t('Print'), t('Print or save as PDF (Ctrl+P)'), on.onPrint, ' ps-hide-narrow') : null,
       level === 'bare' ? null : el('button', { type: 'button', class: 'ps-btn ps-btn--key ps-hide-narrow', text: '?', title: t('Keyboard shortcuts (?)'), 'aria-label': t('Keyboard shortcuts'), onclick: on.onKeys }),
-      level === 'bare' ? null : button(t('Columns'), t('Which column is the start, the end, the status…'), on.onColumns, ' ps-columns-btn'),
+      level === 'bare' ? null : button(t('Settings'), t('Columns, how dates are read, and what each view shows'), on.onColumns, ' ps-columns-btn'),
     ]),
   );
 }
