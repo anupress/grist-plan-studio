@@ -7,12 +7,17 @@ import { refId, listOf, plain, num, dayOf } from './values.js';
 
 /** Row and bar heights in px: a compact plan fits a third more rows on the same screen. */
 export const DENSITIES = { comfortable: { rowH: 32, barH: 20 }, compact: { rowH: 24, barH: 16 } };
+/** The grids: a person's row in the workload, a booking's track in the booking grid. */
+export const GRID_HEIGHTS = { comfortable: { wlRowH: 58, trackH: 30 }, compact: { wlRowH: 44, trackH: 24 } };
+/** How the timeline orders its lanes: by name, the busiest first (most tasks), or whoever starts first. */
+export const LANE_SORTS = ['name', 'busiest', 'start'];
 export const LABEL_MODES = ['auto', 'beside', 'off'];
 export const MAX_LIST_COLS = 3;
 
 export const DISPLAY_DEFAULTS = Object.freeze({
   density: 'comfortable',   // 'comfortable' | 'compact'
-  sort: null,               // null (the table's order) | 'start' | 'end' | 'name' | 'col:<column id>'
+  sort: null,               // null (the table's order) | 'start' | 'end' | 'name' | 'col:<column id>'; the Gantt's rows, the board's cards
+  laneSort: null,           // null (the lanes' own order) | 'name' | 'busiest' | 'start'; the timeline's lanes
   colourBy: null,           // a column id, or null (what Settings says)
   labels: 'auto',           // where a bar's name goes: in it when it fits (else beside), beside always, or nowhere
   weekNumbers: true, weekends: true, today: true,
@@ -27,6 +32,7 @@ export function cleanDisplay(v) {
   if (!v || typeof v !== 'object') return d;
   if (v.density in DENSITIES) d.density = v.density;
   if (v.sort === 'start' || v.sort === 'end' || v.sort === 'name' || (typeof v.sort === 'string' && v.sort.startsWith('col:') && id(v.sort.slice(4)))) d.sort = v.sort;
+  if (LANE_SORTS.includes(v.laneSort)) d.laneSort = v.laneSort;
   if (id(v.colourBy)) d.colourBy = v.colourBy;
   if (LABEL_MODES.includes(v.labels)) d.labels = v.labels;
   for (const k of ['weekNumbers', 'weekends', 'today']) if (typeof v[k] === 'boolean') d[k] = v[k];
@@ -38,6 +44,7 @@ export function cleanDisplay(v) {
 export const isDefaultDisplay = (d) => JSON.stringify(cleanDisplay(d)) === JSON.stringify(cleanDisplay(null));
 
 export const heights = (d) => DENSITIES[cleanDisplay(d).density];
+export const gridHeights = (d) => GRID_HEIGHTS[cleanDisplay(d).density];
 
 // ---- sorting the rows ----------------------------------------------------------------------------------------
 const byText = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });

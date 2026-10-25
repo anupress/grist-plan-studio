@@ -151,5 +151,19 @@ const ctx = { laneCol: col('Status'), orderCol: col('Rank'), rows };
   eq('with no list of everyone, the counts are the cards', [board().lanes.find((l) => l.key === 'v:Doing').total, board().lanes.find((l) => l.key === 'v:Doing').hidden], [3, 0]);
 }
 
+// ---- cards in the person's own order (1.9) -----------------------------------------------------------------
+{
+  const byName = (a, b) => String(a.title).localeCompare(String(b.title));
+  const sortedBoard = board({ sorter: byName });
+  eq('no sorter: ranked cards first, as before', [board().sorted, view(board())[2]], [false, 'Doing:2,1,6']);
+  eq('a sorter orders the cards of every lane, whatever their rank', view(sortedBoard), ['∅:5', 'To do:', 'Doing:2,6,1', 'Done:4', 'Parked:3']);
+  eq('the board says it is sorted', sortedBoard.sorted, true);
+  eq('dropping a card elsewhere in its own lane writes nothing: the order is not the person’s to set', B.planCardMove(sortedBoard, { id: 1, toKey: 'v:Doing', index: 0 }, { laneCol: col('Status'), orderCol: col('Rank'), rows }), { error: 'sorted' });
+  const across = B.planCardMove(sortedBoard, { id: 1, toKey: 'v:Done', index: 0 }, { laneCol: col('Status'), orderCol: col('Rank'), rows });
+  eq('to another lane it changes the lane only, no rank', [across.items.map((i) => [i.id, Object.keys(i.plan.fields)]), across.ranked, across.sameLane], [[[1, ['Status']]], false, false]);
+  const own = B.planCardMove(board(), { id: 1, toKey: 'v:Doing', index: 0 }, { laneCol: col('Status'), orderCol: col('Rank'), rows });
+  eq('unsorted, the same drop writes the rank as it always did', [own.ranked, own.items.length], [true, 1]);
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

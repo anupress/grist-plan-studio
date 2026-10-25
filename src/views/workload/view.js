@@ -58,6 +58,7 @@ export function createWorkload(host, on = {}) {
   let raf = 0;
   let cursor = null;   // {ri, pi}
   let pop = null;      // the open list of a cell's tasks: {el, ri, pi, release}
+  let RH = ROW_H;      // this person's row height (model/display.js: comfortable or compact)
 
   const name = (p) => (p.none ? model.noneLabel : String(p.label ?? ''));
   const hours = (h) => hoursText(h, model.locale);
@@ -71,7 +72,7 @@ export function createWorkload(host, on = {}) {
     canvas.style.setProperty('--res-w', resW + 'px');
     canvas.style.setProperty('--grid-w', n * colW + 'px');
     canvas.style.setProperty('--head-h', HEAD_H + 'px');
-    canvas.style.setProperty('--body-h', Math.max(ROW_H, model.people.length * ROW_H) + 'px');
+    canvas.style.setProperty('--body-h', Math.max(RH, model.people.length * RH) + 'px');
     canvas.style.setProperty('--col-w', colW + 'px');
   }
 
@@ -120,7 +121,7 @@ export function createWorkload(host, on = {}) {
       const p = model.people[ri];
       side.appendChild(el('div', {
         class: 'ps-book__res ps-wl__person' + (p.none ? ' is-none' : ''), role: 'listitem',
-        style: { top: ri * ROW_H + 'px', height: ROW_H + 'px', '--lane': p.colour || 'transparent' },
+        style: { top: ri * RH + 'px', height: RH + 'px', '--lane': p.colour || 'transparent' },
       }, [
         el('span', { class: 'ps-book__resname', text: name(p), title: name(p) }),
         p.none ? el('span', { class: 'ps-wl__cap', text: t('no one to measure against') })
@@ -132,8 +133,8 @@ export function createWorkload(host, on = {}) {
   function cell(p, ri, i) {
     const x = p.totals[i];
     const over = x.cap != null && x.load > x.cap + EPS;
-    const left = i * colW, top = ri * ROW_H;
-    const base = { dataset: { ri: String(ri), pi: String(i) }, style: { left: left + 'px', top: top + 'px', width: colW + 'px', height: ROW_H + 'px' } };
+    const left = i * colW, top = ri * RH;
+    const base = { dataset: { ri: String(ri), pi: String(i) }, style: { left: left + 'px', top: top + 'px', width: colW + 'px', height: RH + 'px' } };
     if (x.load <= EPS) {
       // Weekends and public holidays are off for everyone and the header says which day it is; the word marks
       // only a working day this person is away (a row of the holidays table naming them).
@@ -170,17 +171,17 @@ export function createWorkload(host, on = {}) {
     if (today >= 0) body.appendChild(el('div', { class: 'ps-book__todaycol', style: { left: today * colW + 'px', width: colW + 'px' } }));
     for (let ri = r0; ri <= r1; ri++) {
       const p = model.people[ri];
-      body.appendChild(el('div', { class: 'ps-book__row' + (ri % 2 ? ' is-alt' : ''), style: { top: ri * ROW_H + 'px', height: ROW_H + 'px' } }));
+      body.appendChild(el('div', { class: 'ps-book__row' + (ri % 2 ? ' is-alt' : ''), style: { top: ri * RH + 'px', height: RH + 'px' } }));
       for (let i = c0; i <= c1; i++) { const c = cell(p, ri, i); if (c) body.appendChild(c); }
     }
     if (cursor && cursor.ri >= r0 && cursor.ri <= r1 && cursor.pi >= c0 && cursor.pi <= c1) {
-      body.appendChild(el('div', { class: 'ps-book__cursor', 'aria-hidden': 'true', style: { left: cursor.pi * colW + 'px', top: cursor.ri * ROW_H + 'px', width: colW + 'px', height: ROW_H + 'px' } }));
+      body.appendChild(el('div', { class: 'ps-book__cursor', 'aria-hidden': 'true', style: { left: cursor.pi * colW + 'px', top: cursor.ri * RH + 'px', width: colW + 'px', height: RH + 'px' } }));
     }
   }
 
   function windowOf() {
-    const r0 = Math.max(0, Math.floor(scroll.scrollTop / ROW_H) - 3);
-    const r1 = Math.min(model.people.length - 1, Math.ceil((scroll.scrollTop + scroll.clientHeight) / ROW_H) + 3);
+    const r0 = Math.max(0, Math.floor(scroll.scrollTop / RH) - 3);
+    const r1 = Math.min(model.people.length - 1, Math.ceil((scroll.scrollTop + scroll.clientHeight) / RH) + 3);
     const c0 = Math.max(0, Math.floor(scroll.scrollLeft / colW) - 1);
     const c1 = Math.min(model.periods.length - 1, Math.ceil((scroll.scrollLeft + viewW()) / colW) + 3);
     return { r0, r1, c0, c1 };
@@ -236,9 +237,9 @@ export function createWorkload(host, on = {}) {
     // next to the cell, inside the widget
     const r = root.getBoundingClientRect(), s = scroll.getBoundingClientRect();
     const x0 = s.left - r.left + resW + pi * colW - scroll.scrollLeft;
-    const y0 = s.top - r.top + HEAD_H + (ri + 1) * ROW_H - scroll.scrollTop;
+    const y0 = s.top - r.top + HEAD_H + (ri + 1) * RH - scroll.scrollTop;
     box.style.left = Math.max(8, Math.min(r.width - box.offsetWidth - 8, x0)) + 'px';
-    box.style.top = (y0 + box.offsetHeight > r.height - 8 ? Math.max(8, y0 - ROW_H - box.offsetHeight - 4) : y0 + 2) + 'px';
+    box.style.top = (y0 + box.offsetHeight > r.height - 8 ? Math.max(8, y0 - RH - box.offsetHeight - 4) : y0 + 2) + 'px';
     const onKey = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePop(); return; }
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -310,8 +311,8 @@ export function createWorkload(host, on = {}) {
     else if (e.key === 'Enter') { e.preventDefault(); openPop(cursor.ri, cursor.pi, { focus: true }); }
   });
   function revealCell(c) {
-    const top = c.ri * ROW_H, viewH = scroll.clientHeight - HEAD_H;
-    if (top < scroll.scrollTop) scroll.scrollTop = top; else if (top + ROW_H > scroll.scrollTop + viewH) scroll.scrollTop = top + ROW_H - viewH;
+    const top = c.ri * RH, viewH = scroll.clientHeight - HEAD_H;
+    if (top < scroll.scrollTop) scroll.scrollTop = top; else if (top + RH > scroll.scrollTop + viewH) scroll.scrollTop = top + RH - viewH;
     const x = c.pi * colW;
     if (x < scroll.scrollLeft) scroll.scrollLeft = x; else if (x + colW > scroll.scrollLeft + viewW()) scroll.scrollLeft = x + colW - viewW();
   }
@@ -330,6 +331,7 @@ export function createWorkload(host, on = {}) {
     const reopen = pop && next.people[pop.ri] ? { ri: pop.ri, pi: pop.pi } : null;
     closePop(false);
     model = next;
+    RH = next.rowH || ROW_H;
     F = formatters(next.locale);
     corner.textContent = next.rowLabel || '';
     size();

@@ -77,5 +77,21 @@ eq('lists put a row in every lane they name', [L.laneKeysOf(rows[0].Team, col('T
   eq('a task of two people is in both lanes', team.lanes.filter((l) => l.bars.some((b) => b.task.id === 1)).map((l) => l.label), ['Ben', 'Ann']);
 }
 
+// ---- the order of the lanes (1.9) ----------------------------------------------------------------------------
+{
+  const T = (id, s, e) => ({ id, index: id, title: 'T' + id, start: day(s), end: day(e) });
+  const tasks = [T(1, '2026-11-02', '2026-11-06'), T(2, '2026-11-04', '2026-11-05'), T(3, '2026-11-02', '2026-11-03'), T(4, '2026-11-09', '2026-11-10')];
+  const lanes = (laneSort, over = tasks) => TL.buildTimeline(over, rows, { laneCol: col('Owner'), labels, laneSort }).lanes.map((l) => l.key);
+  eq('no order asked: the referenced table’s own (Ben, Ann, Chloé)', lanes(null), ['', 'r:2', 'r:1', 'r:3']);
+  eq('by name: Ann, Ben, Chloé; the empty lane stays first', lanes('name'), ['', 'r:1', 'r:2', 'r:3']);
+  eq('busiest first: Ann has two bars, Ben one, Chloé none', lanes('busiest'), ['', 'r:1', 'r:2', 'r:3']);
+  const late = [T(1, '2026-11-20', '2026-11-25'), T(2, '2026-11-21', '2026-11-22'), T(3, '2026-11-02', '2026-11-03'), T(4, '2026-11-02', '2026-11-03')];
+  eq('earliest start first: Ben starts on the 2nd, Ann on the 20th, Chloé has nothing and goes last', lanes('start', late), ['', 'r:2', 'r:1', 'r:3']);
+  eq('ties keep the lanes’ own order (no task without a person here, so no empty lane)', TL.buildTimeline([T(1, '2026-11-02', '2026-11-03'), T(4, '2026-11-02', '2026-11-03')], rows, { laneCol: col('Owner'), labels, laneSort: 'start' }).lanes.map((l) => l.key), ['r:2', 'r:1', 'r:3']);
+  const sorted = TL.buildTimeline(tasks, rows, { laneCol: col('Owner'), labels, laneSort: 'name' });
+  eq('offsets follow the new order', sorted.lanes.map((l) => [l.key, l.offset]), [['', 0], ['r:1', 1], ['r:2', 3], ['r:3', 4]]);
+  eq('hiding empty lanes still works with an order', TL.buildTimeline(tasks, rows, { laneCol: col('Owner'), labels, laneSort: 'name', hideEmpty: true }).lanes.map((l) => l.key), ['', 'r:1', 'r:2']);
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.9.0
+
+The small things left over from 1.5 to 1.8. Tested in Grist 1.7.20 (a table of 12 tasks and one of 2,000).
+
+- **Display in every view.** Row height is now also the agenda's rows, the workload's people (44 px instead of 58), the booking grid's
+  tracks and the calendar's bars. The board gets **Sort cards by**, the timeline **Sort lanes by** (name, the busiest first,
+  whoever starts first).
+- **Sorted cards.** While the board is sorted a card can change lanes but not its place in a lane (nothing would write the rank
+  that the sort ignores); the board says so, with a button to Display.
+- **Keys:** **/** goes to the search, **D** opens and closes Display. Both are in the help.
+- **+ New task in the agenda** (the phone's first view). In Mine the new task is yours, so it does not vanish from your list.
+- **Type:** half-pixel font sizes and the weights 650 and 550 are gone from the screen styles (12.5 and 11.5 px became
+  12, 13 and 11; 650 became 600).
+- German and French for every new word.
+
 ## 1.8.0
 
 Help for first use. Tested in Grist 1.7.20 (a table with columns nobody could have guessed, and the Project Management template).

@@ -16,7 +16,7 @@ const eq = (n, got, want) => { if (JSON.stringify(got) === JSON.stringify(want))
 eq('nothing stored is the default', D.cleanDisplay(null), { ...D.DISPLAY_DEFAULTS, cols: [] });
 eq('junk is the default', D.cleanDisplay('compact'), D.cleanDisplay(null));
 eq('a valid choice of each kind is kept', D.cleanDisplay({ density: 'compact', sort: 'col:Status', colourBy: 'Owner', labels: 'beside', weekNumbers: false, weekends: false, today: false, cols: ['Status', 'Owner'] }),
-  { density: 'compact', sort: 'col:Status', colourBy: 'Owner', labels: 'beside', weekNumbers: false, weekends: false, today: false, cols: ['Status', 'Owner'] });
+  { density: 'compact', sort: 'col:Status', laneSort: null, colourBy: 'Owner', labels: 'beside', weekNumbers: false, weekends: false, today: false, cols: ['Status', 'Owner'] });
 eq('an unknown density, label mode or sort falls back', [D.cleanDisplay({ density: 'huge' }).density, D.cleanDisplay({ labels: 'inside' }).labels, D.cleanDisplay({ sort: 'random' }).sort, D.cleanDisplay({ sort: 'col:' }).sort], ['comfortable', 'auto', null, null]);
 eq('a toggle must be a yes or no', D.cleanDisplay({ weekends: 'no', today: 0 }), D.cleanDisplay(null));
 eq('list columns: strings only, once each, at most three', D.cleanDisplay({ cols: ['a', 'a', 7, 'b', 'c', 'd'] }).cols, ['a', 'b', 'c']);
@@ -78,6 +78,13 @@ eq('sorted by name', names({ sort: D.taskSorter('name', { columns, rowOf: () => 
 // list columns
 const cand = D.listColumns(columns, { title: 'Title', parent: 'Parent' }, 'Tasks').map((c) => c.id);
 eq('the list may show or sort by any column but the name and the links', cand, ['Status', 'Owner', 'Hours', 'Notes']);
+
+// ---- the grids and the lanes (1.9) ---------------------------------------------------------------------------
+eq('grid heights: the workload row and the booking track, comfortable and compact', [D.gridHeights(null), D.gridHeights({ density: 'compact' })], [{ wlRowH: 58, trackH: 30 }, { wlRowH: 44, trackH: 24 }]);
+eq('the heights the grids used until now are the comfortable ones', D.GRID_HEIGHTS.comfortable, { wlRowH: 58, trackH: 30 });
+eq('a lane order is kept when it is one of the three', ['name', 'busiest', 'start'].map((k) => D.cleanDisplay({ laneSort: k }).laneSort), ['name', 'busiest', 'start']);
+eq('another lane order falls back to the lanes’ own', [D.cleanDisplay({ laneSort: 'random' }).laneSort, D.cleanDisplay({ laneSort: 3 }).laneSort, D.cleanDisplay(null).laneSort], [null, null, null]);
+eq('a lane order counts as a change from the defaults', [D.isDefaultDisplay({ laneSort: 'name' }), D.isDefaultDisplay(null)], [false, true]);
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

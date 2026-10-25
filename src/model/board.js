@@ -47,11 +47,12 @@ export function laneKeyOf(cell, col) {
  * @param rows    the same rows, encoded
  * @param ctx     {laneCol, orderCol, labels, fields: [col], hideEmpty, wip: {laneKey: n}, today, cellText(row, col),
  *                 everyone (every task, when the quick filters keep only some: a lane's open count and its total then look at all of them),
+ *                 sorter (a comparator over tasks, M15: the cards of a lane go in that order, not the order column's; the board then says `sorted`),
  *                 timeOf(taskId) -> {logged, planned} | null (time tracking, M10)}
  * @returns {{lanes: Array, byId: Map}}  lane: {key, label, value, colour, cards, open, total, hidden, limit, over, none}
  */
 export function buildBoard(tasks, rows, ctx) {
-  const { laneCol, orderCol = null, labels = {}, fields = [], hideEmpty = false, wip = {}, today = null, cellText = null, timeOf = null, everyone = null } = ctx;
+  const { laneCol, orderCol = null, labels = {}, fields = [], hideEmpty = false, wip = {}, today = null, cellText = null, timeOf = null, everyone = null, sorter = null } = ctx;
   const rowOf = new Map(rows.map((r) => [r.id, r]));
   const lanes = new Map();
   const add = (key, label, value, colour = null) => {
@@ -106,8 +107,9 @@ export function buildBoard(tasks, rows, ctx) {
   // Alphabetical lanes for Text, with the choice list or the referenced table deciding otherwise.
   let list = [...lanes.values()];
   if (laneCol.kind === 'Text') list = [list[0], ...list.slice(1).sort((a, b) => String(a.label).localeCompare(String(b.label)))];
+  const rank = sorter ? new Map([...tasks].sort(sorter).map((x, i) => [x.id, i])) : null;
   for (const lane of list) {
-    lane.cards.sort(byRank);
+    lane.cards.sort(rank ? (a, b) => rank.get(a.id) - rank.get(b.id) : byRank);
     lane.open = everyone ? openOf.get(lane.key) || 0 : lane.cards.filter((c) => !c.done).length;
     lane.total = everyone ? Math.max(totalOf.get(lane.key) || 0, lane.cards.length) : lane.cards.length;
     lane.hidden = lane.total - lane.cards.length;
@@ -115,7 +117,7 @@ export function buildBoard(tasks, rows, ctx) {
     lane.over = lane.limit != null && lane.open > lane.limit ? lane.open - lane.limit : 0;
   }
   list = list.filter((l) => (l.none ? l.cards.length > 0 : hideEmpty ? l.total > 0 : true));
-  return { lanes: list, byId };
+  return { lanes: list, byId, sorted: !!rank };
 }
 
 /** Ranked cards first (lowest rank on top), then the rest in the order the rows came. */
@@ -185,9 +187,10 @@ export function planCardMove(board, move, ctx) {
     fields[laneCol.id] = v;
     patch[laneCol.id] = cell;
   }
-  const canRank = orderCol && !orderCol.isFormula;
+  // Sorted by the person (Display), the cards are not in their own order: a drop can change the lane, never the place in it.
+  const canRank = orderCol && !orderCol.isFormula && !board.sorted;
   if (!canRank) {
-    if (sameLane) return { error: orderCol ? 'orderFormula' : 'noOrder' };
+    if (sameLane) return { error: board.sorted ? 'sorted' : orderCol ? 'orderFormula' : 'noOrder' };
     return { items: [{ id: card.id, plan: { fields, patch } }], sameLane, ranked: false };
   }
 

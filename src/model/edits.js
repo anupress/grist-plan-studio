@@ -198,13 +198,15 @@ export function linkValue(rows, col) {
 }
 
 /** The fields of a new task dated `day`: its name, the first date column that can be written, the link value. */
-export function newTaskFields(ctx, { day, title, link = null }) {
+export function newTaskFields(ctx, { day, title, link = null, assign = null }) {
   const out = { fields: {}, patch: {} };
   const titleCol = writableCol(ctx, 'title');
   if (titleCol && titleCol.kind !== 'Ref') put(out, titleCol, title);
   const dateCol = writableCol(ctx, 'start') || writableCol(ctx, 'due') || writableCol(ctx, 'end');
   if (dateCol) putDay(out, dateCol, dateCol === colFor(ctx, 'end') ? storedEnd(ctx, day) : day, null);
   if (link && !link.col.isFormula) put(out, link.col, link.value, link.cell);
+  // a task added in someone's own list belongs to them, or it would vanish from the list the moment it is made
+  if (assign && !assign.col.isFormula && (!link || link.col.id !== assign.col.id)) { const [v, cell] = encodeInput(assign.col, assign.value, null); put(out, assign.col, v, cell); }
   return out;
 }
 

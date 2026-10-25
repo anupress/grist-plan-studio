@@ -161,6 +161,13 @@ const plan = (row, ctx, mode, a, b) => { const t = taskOf(row, ctx); return E.pl
   const link = E.linkValue(rows, ctx.columns[2]);
   eq('a new task: name, start, and the link value', E.newTaskFields(ctx, { day: day('2026-11-02'), title: 'New task', link }).fields, { T: 'New task', S: secs('2026-11-02'), Project: 2 });
   const dueCtx = setup([{ id: 'T', type: 'Text' }, { id: 'Due', type: 'Date' }], { title: 'T', due: 'Due' });
+  const whoCtx = setup([{ id: 'T', type: 'Text' }, { id: 'Due', type: 'Date' }, { id: 'Who', type: 'Ref:People' }, { id: 'Team', type: 'RefList:People' }, { id: 'Owner', type: 'Text' }], { title: 'T', due: 'Due', assignee: 'Who' });
+  const col2 = (id) => whoCtx.columns.find((c) => c.id === id);
+  eq('assigned to me: a Reference gets my row', E.newTaskFields(whoCtx, { day: day('2026-11-02'), title: 'x', assign: { col: col2('Who'), value: 3 } }).fields, { T: 'x', Due: secs('2026-11-02'), Who: 3 });
+  eq('a list gets me as its one item', E.newTaskFields(whoCtx, { day: day('2026-11-02'), title: 'x', assign: { col: col2('Team'), value: [3] } }).fields.Team, ['L', 3]);
+  eq('a text column gets my name', E.newTaskFields(whoCtx, { day: day('2026-11-02'), title: 'x', assign: { col: col2('Owner'), value: 'Ann' } }).fields.Owner, 'Ann');
+  eq('the select-by link wins over the same column', E.newTaskFields(whoCtx, { day: day('2026-11-02'), title: 'x', link: { col: col2('Who'), value: 5, cell: ['R', 'People', 5] }, assign: { col: col2('Who'), value: 3 } }).fields.Who, 5);
+  eq('nobody asked for: nothing about a person', 'Who' in E.newTaskFields(whoCtx, { day: day('2026-11-02'), title: 'x' }).fields, false);
   eq('a due-only table gets a due date', E.newTaskFields(dueCtx, { day: day('2026-11-02'), title: 'x' }).fields, { T: 'x', Due: secs('2026-11-02') });
 }
 

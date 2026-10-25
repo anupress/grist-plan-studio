@@ -41,6 +41,7 @@ export function createBooking(host, on = {}) {
 
   // {resources, periods, free, unit, mode, today, editable, canBook, selectedId, resourceLabel, noneLabel, locale, labelOf(task)}
   let model = null;
+  let TH = TRACK_H;   // this person's track height (model/display.js: comfortable or compact)
   let F = null;
   let colW = 104, resW = 180;
   let tops = [];      // resource i -> its top in the body
@@ -51,7 +52,7 @@ export function createBooking(host, on = {}) {
   let swallowUntil = 0;
   let cursor = null;   // {ri, pi}: the keyboard's cell, ringed; Enter books it or edits what is there
 
-  const rowH = (r) => Math.max(1, r.tracks) * TRACK_H + ROW_PAD;
+  const rowH = (r) => Math.max(1, r.tracks) * TH + ROW_PAD;
   const resName = (r) => (r.none ? model.noneLabel : String(r.label ?? ''));
   const items = () => model.resources.flatMap((r, ri) => r.items.map((it) => ({ r, ri, it }))).sort((a, b) => a.ri - b.ri || a.it.first - b.it.first || a.it.track - b.it.track);
   const findItem = (id, resKey = null) => items().find((x) => x.it.task.id === id && (resKey == null || x.r.key === resKey)) || null;
@@ -70,7 +71,7 @@ export function createBooking(host, on = {}) {
     canvas.style.setProperty('--res-w', resW + 'px');
     canvas.style.setProperty('--grid-w', Math.max(1, model.periods.length) * colW + 'px');
     canvas.style.setProperty('--head-h', HEAD_H + 'px');
-    canvas.style.setProperty('--body-h', Math.max(TRACK_H, y) + 'px');
+    canvas.style.setProperty('--body-h', Math.max(TH, y) + 'px');
     canvas.style.setProperty('--col-w', colW + 'px');
   }
 
@@ -158,7 +159,7 @@ export function createBooking(host, on = {}) {
         body.appendChild(el('div', {
           class: 'ps-blk' + (task.id === model.selectedId ? ' is-selected' : '') + (it.clash ? ' is-clash' : '') + (task.colour ? ' has-stripe' : '') + (model.editable ? ' can-move' : ''),
           dataset: { id: String(task.id), res: String(ri) },
-          style: { left: x + 'px', top: tops[ri] + ROW_PAD / 2 + it.track * TRACK_H + 'px', width: w + 'px', height: TRACK_H - 4 + 'px', '--stripe': task.colour || 'transparent', paddingLeft: inset ? inset + 11 + 'px' : null },
+          style: { left: x + 'px', top: tops[ri] + ROW_PAD / 2 + it.track * TH + 'px', width: w + 'px', height: TH - 4 + 'px', '--stripe': task.colour || 'transparent', paddingLeft: inset ? inset + 11 + 'px' : null },
           role: 'img', 'aria-label': [label, resName(r), dates, it.clash ? t('double booked') : null].filter(Boolean).join(', '),
         }, [
           el('span', { class: 'ps-blk__label', text: label }),
@@ -358,6 +359,7 @@ export function createBooking(host, on = {}) {
     if (drag) finish(true);
     if (cursor && (cursor.ri >= next.resources.length || cursor.pi >= next.periods.length)) cursor = null;
     model = next;
+    TH = next.trackH || TRACK_H;
     F = formatters(next.locale);
     corner.textContent = next.resourceLabel || '';
     root.classList.toggle('is-editable', !!next.editable);

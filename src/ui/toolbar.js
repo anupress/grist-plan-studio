@@ -107,6 +107,7 @@ export function renderToolbar(host, s, on) {
       ];
     } else if (view === 'agenda') {
       tools = [
+        s.canAdd ? button(t('+ New task'), t('A task for today'), on.onNew, ' ps-btn--primary') : null,
         s.agendaWho ? seg(t('Show'), [['mine', t('Mine')], ['all', t('Everyone')]], s.agendaWho, on.onAgendaWho) : null,
         s.canCalendar ? button(t('Add to calendar'), t('A calendar file with the dates below and a reminder'), on.onCalendar) : null,
         button(t('Email reminders'), t('Email the tasks that are late or due soon, every morning'), on.onReminders, ' ps-hide-narrow'),

@@ -50,7 +50,7 @@ import { renderToolbar } from './ui/toolbar.js';
 import { openMapping } from './ui/mapping.js';
 import { createFilterBar } from './ui/filterbar.js';
 import { openDisplay, SECTIONS as DISPLAY_SECTIONS } from './ui/display.js';
-import { cleanDisplay, isDefaultDisplay, heights, taskSorter, listColumns, MAX_LIST_COLS } from './model/display.js';
+import { cleanDisplay, isDefaultDisplay, heights, gridHeights, taskSorter, listColumns, MAX_LIST_COLS } from './model/display.js';
 import { applyFind, rowsKept, cleanFind, emptyFind, choicesOf, facetRows, FIND_KINDS, NONE } from './model/find.js';
 import { openQuickEdit } from './ui/quickedit.js';
 import { confirmBox, numberBox, chooseBox, logBox } from './ui/dialog.js';
@@ -862,6 +862,8 @@ function buildBoardModel() {
   return buildBoard(tasks, S.rows, {
     laneCol: lane, orderCol: orderCol(), labels: S.labels, fields: fieldCols(lane), hideEmpty: S.board.hideEmpty,
     wip: wipFor(lane), today: todayDay(), cellText: (row, col) => cellText(row, col, S.labels, fmtShort), timeOf: (id) => timeOf(id),
+    // the person's own order (Display): the cards of a lane then go by it, and a drop changes the lane only
+    sorter: taskSorter(disp().sort, { columns: S.columns, rowOf: rowById, labels: S.labels }),
     // a lane's limit counts every open card, not only the ones the filters leave on show
     everyone: S.find.keep ? [...everyTask().tasks, ...everyTask().unscheduled] : null,
   });
@@ -906,7 +908,7 @@ function recomputeTimeline() {
   const cal = calendar();
   S.built = buildTasks(viewRows(), { roles: S.roles, columns: S.columns, labels: S.labels, calendar: cal, settings: { ...S.gantt, colourBy: colourByCol()?.id || null } });
   // A room or a desk cannot be in two places at once; a person can be on two tasks.
-  const tl = buildTimeline(S.built.tasks, S.rows, { laneCol: lane, labels: S.labels, clashes: lane.id === S.roles.resource });
+  const tl = buildTimeline(S.built.tasks, S.rows, { laneCol: lane, labels: S.labels, clashes: lane.id === S.roles.resource, laneSort: disp().laneSort });
   S.tlModel = tl;
   const span = spanOf(S.built.tasks);
   const v = ensureTimeline();
@@ -1002,6 +1004,7 @@ function recomputeBooking() {
     resources: g.resources, periods, free: g.free, unit, mode: periodCol ? 'column' : 'dates', today: todayDay(),
     editable: editable && !res.isFormula, canBook: editable && !res.isFormula && (periodCol ? !periodCol.isFormula : true),
     selectedId: S.selectedId, resourceLabel: res.label, noneLabel: t('No {col}', { col: res.label }), locale: dateLocale(gristCulture()), labelOf,
+    trackH: gridHeights(disp()).trackH,
   }, { first: S.firstDraw, startAt: startPeriod(g, periods) });
   S.firstDraw = false;
 }
@@ -1124,6 +1127,7 @@ function recomputeWorkload() {
   const team = teamTotals(wl.people.filter((p) => !p.none), periods, wl.from);
   v.update({
     people, periods, unit, team, today, measure, gone, selectedId: S.selectedId, rowLabel: person.label, noneLabel: t('Not assigned'), locale: dateLocale(gristCulture()),
+    rowH: gridHeights(disp()).wlRowH,
     workdays: unit === 'day' ? periods.map((p) => cal.isWork(p.start)) : null,
     tasksAt: (ri, pi) => tasksIn(people[ri].src, periods[pi]),
     locate: (id) => {
@@ -1619,7 +1623,8 @@ function moveCard({ id, toKey, index }) {
     if (plan.error === 'noOrder') {
       if (!orderHintShown) toast(t('Cards keep the table’s order. To sort them by hand, choose a number column as “Order in a lane” in Settings.'), { label: t('Settings'), run: () => openColumns('columns') });
       orderHintShown = true;
-    } else if (plan.error === 'orderFormula') toast(t('The order column is a formula, so cards can’t be moved up or down here.'));
+    } else if (plan.error === 'sorted') toast(t('The cards are sorted in Display, so they can’t be moved up or down by hand.'), { label: t('Display'), run: () => toggleDisplay() });
+    else if (plan.error === 'orderFormula') toast(t('The order column is a formula, so cards can’t be moved up or down here.'));
     else if (plan.error === 'laneFormula') toast(t('“{col}” is a formula, so cards can’t change lanes here.', { col: lane.label }));
     return;
   }
@@ -2320,9 +2325,21 @@ function printNow(o) {
 // ? lists the keys, from anywhere but a text box.
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startPrint(); return; }
-  if (e.key === '?' && !e.ctrlKey && !e.metaKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '') && !shell.querySelector('.ps-dialog, .ps-drawer')) {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '') || e.target?.isContentEditable;
+  if (e.key === '?' && !e.ctrlKey && !e.metaKey && !typing && !shell.querySelector('.ps-dialog, .ps-drawer')) {
     e.preventDefault();
     openHelpPanel();
+    return;
+  }
+  // / goes to the search, D opens or closes Display: from anywhere but a text box or a dialog
+  if (!e.ctrlKey && !e.metaKey && !e.altKey && !typing && !shell.querySelector('.ps-dialog, .ps-drawer')) {
+    if (e.key === '/') {
+      const box = document.querySelector('.ps-find__input');
+      if (box && !box.closest('[hidden]')) { e.preventDefault(); box.focus(); box.select?.(); }
+    } else if ((e.key === 'd' || e.key === 'D') && DISPLAY_SECTIONS[S.mode]) {
+      e.preventDefault();
+      toggleDisplay();
+    }
   }
 });
 
@@ -2407,12 +2424,20 @@ async function linkForNewTask() {
   return linkValue(S.rows, col) || { unknown: col };
 }
 
+/** In the agenda's Mine list a new task is mine, so it stays on the list: the assignee column and the value that is me, or null. */
+function assignToMe() {
+  if (S.mode !== 'agenda' || agendaWho() !== 'mine') return null;
+  const col = colById(S.roles.assignee);
+  const lane = col && lanesOf(col, S.rows, S.labels).find((l) => l.key === S.me);
+  if (!lane) return null;
+  return { col, value: col.kind === 'RefList' || col.kind === 'ChoiceList' ? [lane.value] : lane.value };
+}
 async function newTask(onDay) {
   if (!canEdit()) return;
   // a click handler passes its event: only a day number is a day
   const day = typeof onDay === 'number' ? onDay : todayDay();
   const link = await linkForNewTask();
-  const plan = newTaskFields(ctx(), { day, title: t('New task'), link: link && !link.unknown ? link : null });
+  const plan = newTaskFields(ctx(), { day, title: t('New task'), link: link && !link.unknown ? link : null, assign: assignToMe() });
   const note = link?.unknown ? t('This task will show here once its {col} matches the row selected in the linked widget.', { col: link.unknown.label }) : null;
   if (S.demo) {
     const id = Math.max(0, ...S.rows.map((r) => r.id)) + 1;

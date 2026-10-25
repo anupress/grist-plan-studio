@@ -32,10 +32,10 @@ eq('a list read from the document cleans the filter too', S.cleanViews([{ id: 'f
 
 // how the rows and bars look travels with a view too
 const withDisplay = S.snapshotView({ mode: 'gantt', zoom: null, view: { display: { density: 'compact', sort: 'start', labels: 'off', weekNumbers: false, cols: ['Status', 'Status', 'Owner'], junk: 1 } } });
-eq('a view keeps the display choices, cleaned', withDisplay.view.display, { density: 'compact', sort: 'start', colourBy: null, labels: 'off', weekNumbers: false, weekends: true, today: true, cols: ['Status', 'Owner'] });
+eq('a view keeps the display choices, cleaned', withDisplay.view.display, { density: 'compact', sort: 'start', laneSort: null, colourBy: null, labels: 'off', weekNumbers: false, weekends: true, today: true, cols: ['Status', 'Owner'] });
 eq('the default display is kept as null, so an old view and a new one with nothing chosen are the same', [S.snapshotView({ mode: 'gantt', zoom: null, view: {} }).view.display, S.snapshotView({ mode: 'gantt', zoom: null, view: { display: { density: 'comfortable', labels: 'auto' } } }).view.display], [null, null]);
 eq('a junk display becomes null', S.snapshotView({ mode: 'gantt', zoom: null, view: { display: 'wide' } }).view.display, null);
-eq('a list read from the document cleans the display too', S.cleanViews([{ id: 'd1', name: 'Dense', mode: 'gantt', zoom: null, view: { display: { density: 'compact', labels: 'inside' } } }])[0].view.display, { density: 'compact', sort: null, colourBy: null, labels: 'auto', weekNumbers: true, weekends: true, today: true, cols: [] });
+eq('a list read from the document cleans the display too', S.cleanViews([{ id: 'd1', name: 'Dense', mode: 'gantt', zoom: null, view: { display: { density: 'compact', labels: 'inside' } } }])[0].view.display, { density: 'compact', sort: null, laneSort: null, colourBy: null, labels: 'auto', weekNumbers: true, weekends: true, today: true, cols: [] });
 eq('this browser’s memory of a table gives a clean display when nothing is stored', (() => { globalThis.localStorage = { getItem: () => null, setItem: () => {} }; return S.storedView('t').display.density; })(), 'comfortable');
 
 const good = (id, name, extra = {}) => ({ id, name, mode: 'board', zoom: 'week', view: { laneBy: 'Status' }, ...extra });

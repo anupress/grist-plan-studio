@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.8.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.9.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -157,7 +157,7 @@ English, German and French, following Grist's language (or chosen in Settings). 
 numbers and key names follow the language.
 
 The main actions have keys: arrows select, Alt+arrows move, Enter opens quick edit, Ctrl+Z
-undoes. **?** opens the help: what the view is for, what to try, and the keys of the view on show. Dialogs keep the focus and give it back, a
+undoes. **/** goes to the search, **D** opens or closes Display, **?** opens the help: what the view is for, what to try, and the keys of the view on show. Dialogs keep the focus and give it back, a
 selection is announced to screen readers, and the booking grid has a cell cursor.
 
 ## Time tracking
@@ -246,12 +246,16 @@ are left of stays in the list at 0.
 
 ## Display
 
-**Display** in the toolbar (Gantt chart, timeline, board, calendar) opens a panel under it that leaves the view in
+**Display** in the toolbar (every view; **D** is its key) opens a panel under it that leaves the view in
 sight, so each choice shows at once. The same table can be a dense list for one person and a roomy plan for another:
 
-- **Row height**: comfortable or compact (rows 24 px instead of 32, bars 16 px instead of 20; board cards sit closer).
+- **Row height**: comfortable or compact (rows 24 px instead of 32, bars 16 px instead of 20; board cards, calendar bars, the
+  agenda's rows, the workload's people (44 px instead of 58) and the booking grid's tracks sit closer too).
 - **Sort rows by** (Gantt chart): start date, end date, name or any column; siblings are sorted among themselves,
   so a task stays under its parent; empty values go last, and a Choice goes by its own list (To do, Doing, Done).
+- **Sort cards by** (board): the same choices, inside each lane. While it is on, a card can still go to another lane, but
+  not up or down by hand, and the board says so; turn it off to put the cards in your own order again.
+- **Sort lanes by** (timeline): by name, the busiest first, or whoever starts first; the lane of tasks with no value stays on top.
 - **Colour by**: any Choice, Reference, list, text or yes/no column, in place of what Settings says.
 - **Names on bars**: in the bar when they fit (else beside), always beside, or none.
 - **Show**: week numbers, weekends and the today line, each on or off.
@@ -259,6 +263,7 @@ sight, so each choice shows at once. The same table can be a dense list for one 
 - In the calendar a day has its own **+** (shown where the pointer or the focus is, and faintly on a touch screen), and a
   double click on a day's empty part does the same: a task dated that day, with its quick edit open. **+ New task**
   in the toolbar makes one for today.
+- The agenda has **+ New task** too (a task for today, with its quick edit open): in **Mine** it is yours, so it stays on your list.
 
 These are this browser's choices, per table; a saved view keeps them; nothing is written to the document.
 **Back to the defaults** undoes them all.

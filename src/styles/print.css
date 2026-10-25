@@ -23,7 +23,7 @@
 .pp-title { text-align: left; padding: 0 0 3mm; font-weight: 400; }
 .pp-board .pp-title { display: block; }
 .pp-title__main { font-size: 14px; font-weight: 700; margin-right: 10px; }
-.pp-title__sub { color: var(--pp-muted); font-size: 10.5px; }
+.pp-title__sub { color: var(--pp-muted); font-size: 10px; }
 
 .pp-name {
   text-align: left; vertical-align: middle; padding: 0 6px; border-bottom: 1px solid var(--pp-line); border-right: 1px solid var(--pp-line-strong);
@@ -33,7 +33,7 @@
 .pp-name__label { display: block; overflow: hidden; text-overflow: ellipsis; }
 .pp-name__sub { display: block; color: var(--pp-muted); font-size: 9px; }
 .pp-name__clash { display: block; color: var(--pp-crit); font-size: 9px; font-weight: 600; }
-.pp-row--group .pp-name, .pp-row--lane .pp-name { font-weight: 650; }
+.pp-row--group .pp-name, .pp-row--lane .pp-name { font-weight: 600; }
 .pp-row--group { background: var(--pp-ground); }
 
 .pp-scale { position: relative; padding: 0; border-bottom: 1px solid var(--pp-line-strong); vertical-align: bottom; }
@@ -43,7 +43,7 @@
   position: absolute; top: 0; height: 100%; box-sizing: border-box; border-left: 1px solid var(--pp-line);
   padding: 2px 3px 0; font-size: 9px; font-weight: 500; color: var(--pp-muted); white-space: nowrap; overflow: hidden;
 }
-.pp-scale__row:first-child:not(:last-child) .pp-scale__cell { color: var(--pp-ink); font-weight: 650; }
+.pp-scale__row:first-child:not(:last-child) .pp-scale__cell { color: var(--pp-ink); font-weight: 600; }
 
 .pp-chart { padding: 0; border-bottom: 1px solid var(--pp-line); }
 .pp-strip { position: relative; overflow: hidden; }
@@ -70,7 +70,7 @@
 .pp-board th.pp-lane__head { text-align: left; }
 .pp-board .pp-lane__head { margin-right: 2mm; }
 .pp-lane__head {
-  border-top: 2.5px solid; padding: 3px 1px 4px; font-weight: 650; font-size: 11px; border-right: 2mm solid #fff;
+  border-top: 2.5px solid; padding: 3px 1px 4px; font-weight: 600; font-size: 11px; border-right: 2mm solid #fff;
 }
 .pp-lane__head.is-over { color: var(--pp-crit); }
 .pp-lane__count { float: right; color: var(--pp-muted); font-weight: 500; font-variant-numeric: tabular-nums; }
@@ -79,7 +79,7 @@
   padding: 4px 6px; margin-top: 2mm; break-inside: avoid;
 }
 .pp-card.is-done { color: var(--pp-muted); }
-.pp-card__title { font-weight: 550; }
+.pp-card__title { font-weight: 500; }
 .pp-card__fields, .pp-card__meta { color: var(--pp-muted); font-size: 9px; margin-top: 2px; }
 .pp-card__meta { display: flex; justify-content: space-between; gap: 6px; }
 .pp-card__meta .is-late { color: var(--pp-crit); font-weight: 600; }
@@ -88,12 +88,12 @@
 .pp-grid td, .pp-grid th { border: 1px solid var(--pp-line); }
 .pp-grid .pp-titlerow th { border: 0; }
 .pp-period { text-align: left; vertical-align: bottom; padding: 3px 5px; font-weight: 400; border-bottom: 1px solid var(--pp-line-strong) !important; }
-.pp-period__label { display: block; font-weight: 650; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-period__label { display: block; font-weight: 600; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pp-period__sub { display: block; color: var(--pp-muted); font-size: 9px; }
-.pp-period__free { display: block; color: var(--pp-ok); font-size: 9px; font-weight: 650; }
+.pp-period__free { display: block; color: var(--pp-ok); font-size: 9px; font-weight: 600; }
 .pp-period__free.is-full { color: var(--pp-muted); font-weight: 500; }
 .pp-grid .pp-row td { height: 6mm; }
-.pp-booked { padding: 0 5px; font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-booked { padding: 0 5px; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pp-booked.is-clash { color: var(--pp-crit); background: #fbecec; font-weight: 600; }
 .pp-free { background: var(--pp-free); }
 .pp-flag { font-weight: 600; }
@@ -125,6 +125,6 @@
 .pp-cal__chip.is-to-right { margin-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .pp-cal__chip.is-done { color: var(--pp-muted); }
 .pp-cal__chip.is-done span { text-decoration: line-through; }
-.pp-cal__more { align-self: start; padding: 0 1.6mm; font-size: 8.5px; color: var(--pp-muted); }
+.pp-cal__more { align-self: start; padding: 0 1.6mm; font-size: 9px; color: var(--pp-muted); }
 .pp-png .pp-cal { break-inside: auto; }
 .pp-png .pp-sheet + .pp-sheet { margin-top: 12mm; }

@@ -9,9 +9,12 @@ import { t } from '../i18n/index.js';
 /** The sections each view has. */
 export const SECTIONS = {
   gantt: ['density', 'sort', 'colour', 'labels', 'show', 'cols'],
-  timeline: ['density', 'colour', 'labels', 'show'],
-  board: ['density', 'colour'],
-  calendar: ['colour'],
+  timeline: ['density', 'lanes', 'colour', 'labels', 'show'],
+  board: ['density', 'sort', 'colour'],
+  calendar: ['density', 'colour'],
+  booking: ['density'],
+  workload: ['density'],
+  agenda: ['density'],
 };
 
 /**
@@ -63,10 +66,13 @@ export function openDisplay(host, state, on) {
     clear(panel);
     const body = [];
     if (sections.includes('density')) body.push(seg(t('Row height'), [['comfortable', t('Comfortable')], ['compact', t('Compact')]], d.density, 'density'));
-    if (sections.includes('sort')) body.push(select(t('Sort rows by'), 'sort', [
+    if (sections.includes('sort')) body.push(select(s.mode === 'board' ? t('Sort cards by') : t('Sort rows by'), 'sort', [
       { id: 'start', label: t('Start date') }, { id: 'end', label: t('End date') }, { id: 'name', label: t('Name') },
       ...s.sortOptions.map((o) => ({ id: 'col:' + o.id, label: o.label })),
     ], d.sort, t('The table’s order')));
+    if (sections.includes('lanes')) body.push(select(t('Sort lanes by'), 'laneSort', [
+      { id: 'name', label: t('Name') }, { id: 'busiest', label: t('Most tasks first') }, { id: 'start', label: t('Earliest start first') },
+    ], d.laneSort, t('The lanes’ own order')));
     if (sections.includes('colour')) body.push(select(t('Colour by'), 'colourBy', s.colourOptions, d.colourBy, t('As set in Settings')));
     if (sections.includes('labels')) body.push(seg(t('Names on bars'), [['auto', t('In the bar')], ['beside', t('Beside')], ['off', t('None')]], d.labels, 'labels'));
     if (sections.includes('show')) {
