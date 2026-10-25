@@ -98,6 +98,7 @@ const general = () => [
   t('Search and the chips under the toolbar leave tasks out of the view; they never change your table.'),
   t('Display sets how rows and bars look in this browser. Settings says which column means what.'),
   t('Each change you make is one step in Grist’s Undo (Ctrl+Z).'),
+  t('A task’s edit window can duplicate it, with its sub-tasks, or delete it. Both are one step in Undo.'),
 ];
 
 /**

@@ -10,7 +10,7 @@
   --ps-surface: #ffffff;
   --ps-surface-2: #f3f6f9;
   --ps-ink: #14202b;
-  --ps-muted: #5b6b7e;
+  --ps-muted: #566679;
   --ps-line: #dde4ec;
   --ps-line-strong: #c3cedb;
   --ps-hover: rgba(20, 32, 43, 0.04);
@@ -209,6 +209,8 @@ button, input, select { font: inherit; color: inherit; }
 .ps-drawer__head h2 { font-size: 15px; margin: 0; }
 .ps-drawer__body { flex: 1; overflow: auto; padding: 4px 16px 16px; }
 .ps-drawer__body h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ps-muted); margin: 18px 0 6px; }
+.ps-drawer__tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--ps-line); }
+.ps-btn--danger { color: var(--ps-crit); }
 .ps-drawer__foot { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--ps-line); }
 .ps-spacer { flex: 1; }
 .ps-source { color: var(--ps-muted); margin: 10px 0 0; }
@@ -256,6 +258,7 @@ button, input, select { font: inherit; color: inherit; }
 .ps-drawer--narrow { width: min(380px, 100%); }
 .ps-field--check { display: flex; align-items: center; gap: 8px; flex-direction: row-reverse; justify-content: flex-end; }
 .ps-field--check > label { margin: 0; }
+.ps-field--check input[type="checkbox"] { width: 24px; height: 24px; flex: none; }
 .ps-checks { display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow: auto; padding: 4px 0; }
 .ps-check { display: inline-flex; align-items: center; gap: 8px; }
 

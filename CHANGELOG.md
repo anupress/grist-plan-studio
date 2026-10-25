@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.12.0
+
+Delete and duplicate. Tested in Grist 1.7.20 (a table of 12 tasks with sub-tasks and links; the rows read back and Grist's Undo clicked after each step).
+
+- **Delete** a task from its edit window, or with the **Del** key (it asks first). With sub-tasks it asks whether they move up one
+  level or go too; whatever waited for a deleted task is let go in the same step. One Undo brings it all back.
+- **Duplicate** a task, or a task with its sub-tasks: every column that is not a formula, the name marked “(copy)”, links
+  between the copies pointing at the copies. One Undo removes the copies. The copy opens in the edit window.
+- The edit window's buttons sit in a row of their own, so the five of them fit.
+- German and French for every new word.
+
 ## 1.11.0
 
 An eighth view: the overview. Tested in Grist 1.7.20 (a table of 12 tasks, the counts compared with the table's own).

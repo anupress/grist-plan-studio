@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.11.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.12.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -242,6 +242,19 @@ to begin with; any Choice, Reference or yes/no column, and a Text column that is
 - **Needs attention** lists the late tasks, the longest first, and **Next milestones** the ones coming up; click a task to edit it.
 - **Print** (or Save as PNG) makes the one-page report. The columns chosen are kept in this browser and by a saved view.
   A task with several people counts under each of them, and the page says so.
+
+## Delete and duplicate
+
+A task's edit window (double-click a bar, a card or a row, or select it and press Enter) has **Duplicate** and **Delete**,
+and the **Del** key deletes the selected task. Both are one step in Grist's Undo, in every view.
+
+- **Delete** asks first. A task with sub-tasks asks what happens to them: **keep them, one level up** (they take the
+  deleted task's own parent) or **delete them too**. Anything that waited for a deleted task stops waiting for it, in the
+  same step, so one Undo puts back the rows and the links together.
+- **Duplicate** copies every column that is not a formula, with the name marked “(copy)”, and opens the copy so it can be
+  renamed. A task with sub-tasks asks whether to copy them too: each copy sits under the copy of its parent, links between
+  the copies point at the copies, and links to anything else stay as they were.
+- Neither is offered to someone who cannot edit the document.
 
 ## Search and filters
 

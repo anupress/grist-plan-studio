@@ -7,6 +7,7 @@ const COMMON = [
   ['Enter', 'Edit the selected item'],
   ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
   ['Ctrl+P', 'Print or save as PDF'],
+  ['Del', 'Delete the selected task (it asks first)'],
   ['/', 'Search by name'],
   ['D', 'Open or close Display'],
   ['?', 'Help and these shortcuts'],

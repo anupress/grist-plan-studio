@@ -22,6 +22,7 @@ import { makeCalendar, holidaysBetween } from './model/calendar.js';
 import { todayDay, dateFromDay, plain, dayOf, num, isoFromDay, dayFromISO, progressScale } from './model/values.js';
 import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink, baselineFields, doneOnFields, canMoveDoneOn } from './model/edits.js';
 import { baselineSummary, baselineTargets, drifted } from './model/plan.js';
+import { planDelete, planDuplicate, descendantsOf } from './model/rowops.js';
 import { slipText, slipShortText } from './ui/planwords.js';
 import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, storedMe, rememberMe, storedTab, rememberTab, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, TIME_DEFAULTS, VIEWS, snapshotView, withView, MAX_VIEWS } from './model/settings.js';
 import { buildBoard, planCardMove, newCardFields, cellText, LANE_KINDS, FIELD_KINDS } from './model/board.js';
@@ -2023,6 +2024,7 @@ async function undo() {
     if (!steps) return;
     for (const s of steps) {
       if (s.table === 'time') { undoTimeStep(s); continue; }
+      if (s.table === 'rows') { if (s.remove) S.rows = [...S.rows, s.remove]; else if (s.add) S.rows = S.rows.filter((r) => r.id !== s.add.id); S.signature = ''; continue; }
       const row = rowById(s.id); if (row) replaceRow(s.id, { ...row, ...s.before });
     }
     if (steps.some((s) => s.table === 'time')) { refreshEntries(); timesheetPanel?.refresh(S.entries); S.signature = ''; }
@@ -2039,6 +2041,7 @@ async function redo() {
     if (!steps) return;
     for (const s of steps) {
       if (s.table === 'time') { redoTimeStep(s); continue; }
+      if (s.table === 'rows') { if (s.remove) S.rows = S.rows.filter((r) => r.id !== s.remove.id); else if (s.add) S.rows = [...S.rows, s.add]; S.signature = ''; continue; }
       const row = rowById(s.id); if (row) replaceRow(s.id, { ...row, ...s.after });
     }
     if (steps.some((s) => s.table === 'time')) { refreshEntries(); timesheetPanel?.refresh(S.entries); S.signature = ''; }
@@ -2467,9 +2470,10 @@ document.addEventListener('keydown', (e) => {
     openHelpPanel();
     return;
   }
-  // / goes to the search, D opens or closes Display: from anywhere but a text box or a dialog
+  // / goes to the search, D opens or closes Display, Delete asks to delete the selected task: from anywhere but a text box or a dialog
   if (!e.ctrlKey && !e.metaKey && !e.altKey && !typing && !shell.querySelector('.ps-dialog, .ps-drawer')) {
-    if (e.key === '/') {
+    if (e.key === 'Delete' && S.selectedId != null && canEdit() && S.mode !== 'workload' && S.mode !== 'overview') { e.preventDefault(); deleteTask(S.selectedId); }
+    else if (e.key === '/') {
       const box = document.querySelector('.ps-find__input');
       if (box && !box.closest('[hidden]')) { e.preventDefault(); box.focus(); box.select?.(); }
     } else if ((e.key === 'd' || e.key === 'D') && DISPLAY_SECTIONS[S.mode]) {
@@ -2491,7 +2495,7 @@ function openQuick(id, note = null) {
   const labels = { ...S.labels };
   for (const role of ['parent', 'dependsOn']) if (S.roles[role]) labels[S.roles[role]] = names;
   openQuickEdit(shell, {
-    row, roles: S.roles, columns: S.columns, labels, editable: canEdit(), canOpenCard: S.live, note, booking: S.mode === 'booking',
+    row, roles: S.roles, columns: S.columns, labels, editable: canEdit(), canOpenCard: S.live, canCopy: canEdit(), note, booking: S.mode === 'booking',
     calendar: calendarWords(id),
     plan: slipText(taskById(id) || {}),
     time: {
@@ -2500,6 +2504,8 @@ function openQuick(id, note = null) {
     },
   }, {
     onCalendar: () => exportCalendar([id]),
+    onDuplicate: () => duplicateTask(id),
+    onDelete: () => deleteTask(id),
     onStartTimer: () => startTimer(id),
     onStopTimer: () => stopTimer(),
     onLogTime: () => logTime(id),
@@ -2598,6 +2604,98 @@ async function newTask(onDay) {
     if (rowById(id)) openPending();
   } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
 }
+// ---- delete and duplicate (M20) -----------------------------------------------------------------------------
+/** Delete a task, after asking; its sub-tasks move up a level or go with it, and what waited for it is let go: one action, one Undo. */
+async function deleteTask(id) {
+  if (!canEdit()) return;
+  const task = taskById(id);
+  const all = everyTask();
+  const list = [...all.tasks, ...all.unscheduled];
+  if (!task || !list.some((x) => x.id === id)) return;
+  const below = descendantsOf(list, id);
+  const name = task.title || t('(no name)');
+  let children = 'keep';
+  if (below.length) {
+    children = await chooseBox(shell, {
+      title: t('Delete “{name}”?', { name }), body: tn(below.length, 'It has {n} sub-task.', 'It has {n} sub-tasks.') + ' ' + t('Grist’s Undo brings it all back.'),
+      label: t('What happens to them'), value: 'keep', ok: t('Delete'),
+      options: [{ value: 'keep', label: t('Keep them, one level up') }, { value: 'delete', label: t('Delete them too') }],
+    });
+    if (!children) return;
+  } else if (!(await confirmBox(shell, {
+    title: t('Delete “{name}”?', { name }), body: (S.mode === 'booking' ? t('The booking is removed from {table}. Grist’s Undo brings it back.', { table: S.tableId || t('the table') }) : t('The task is removed from {table}. Grist’s Undo brings it back.', { table: S.tableId || t('the table') })), ok: t('Delete'),
+  }))) return;
+  const plan = planDelete({ tableId: S.tableId, roles: S.roles, columns: S.columns }, list, id, { children });
+  if (plan.error === 'parentFormula') { toast(t('Its sub-tasks can’t be moved up: “{col}” is a formula. Delete them too, or change that column.', { col: colById(S.roles.parent)?.label || '' })); return; }
+  if (plan.error) return;
+  const extra = [plan.moved ? tn(plan.moved, '{n} sub-task moved up.', '{n} sub-tasks moved up.') : null,
+    plan.removed.length > 1 ? tn(plan.removed.length - 1, '{n} sub-task deleted with it.', '{n} sub-tasks deleted with it.') : null].filter(Boolean).join(' ');
+  const message = [t('Deleted “{name}”.', { name }), extra].filter(Boolean).join(' ');
+  if (S.selectedId === id || plan.removed.includes(S.selectedId)) S.selectedId = null;
+  if (S.demo) {
+    const steps = [];
+    for (const u of plan.updates) { const row = rowById(u.id); if (row) { steps.push({ id: u.id, fields: u.fields, before: Object.fromEntries(Object.keys(u.patch).map((k) => [k, row[k] ?? null])), after: u.patch }); replaceRow(u.id, { ...row, ...u.patch }); } }
+    for (const rid of plan.removed) { const row = rowById(rid); if (row) steps.push({ table: 'rows', remove: row }); }
+    S.rows = S.rows.filter((r) => !plan.removed.includes(r.id));
+    demoHistory.undo.push(steps); demoHistory.redo.length = 0;
+    S.signature = '';
+    recompute();
+    toast(message, { label: t('Undo'), run: undo });
+    return;
+  }
+  try {
+    await apply([...plan.updates.map((u) => ['UpdateRecord', S.tableId, u.id, u.fields]), ['BulkRemoveRecord', S.tableId, plan.removed]]);
+    toast(message, { label: t('Undo'), run: undo });
+  } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
+}
+
+/** Duplicate a task, with its sub-tasks when it has some and the person says so; the copy opens in the quick edit. */
+async function duplicateTask(id) {
+  if (!canEdit()) return;
+  const task = taskById(id);
+  const all = everyTask();
+  const list = [...all.tasks, ...all.unscheduled];
+  if (!task || !list.some((x) => x.id === id)) return;
+  const below = descendantsOf(list, id);
+  let children = 'none';
+  if (below.length) {
+    const pick = await chooseBox(shell, {
+      title: t('Duplicate “{name}”?', { name: task.title || t('(no name)') }), body: tn(below.length, 'It has {n} sub-task.', 'It has {n} sub-tasks.'),
+      label: t('Copy'), value: 'all', ok: t('Duplicate'),
+      options: [{ value: 'all', label: t('The task and its sub-tasks') }, { value: 'none', label: t('Only the task') }],
+    });
+    if (!pick) return;
+    children = pick;
+  }
+  let firstId;
+  if (S.demo) firstId = Math.max(0, ...S.rows.map((r) => r.id)) + 1;
+  else {
+    // the highest row number in the whole table (the widget may only see the rows Grist's filters leave), so the copies get free ones
+    try { firstId = Math.max(0, ...((await loadTable(S.tableId))?.rows || []).map((r) => r.id)) + 1; } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); return; }
+  }
+  const plan = planDuplicate({ tableId: S.tableId, roles: S.roles, columns: S.columns }, list, S.rows, id, { children, firstId, copyTitle: (s) => t('{name} (copy)', { name: s }) });
+  if (plan.error) return;
+  const first = plan.ids[0];
+  S.pinned.add(first);
+  for (const x of plan.ids) S.pinned.add(x);
+  S.selectedId = first;
+  if (S.demo) {
+    S.rows = [...S.rows, ...plan.rows];
+    demoHistory.undo.push(plan.rows.map((row) => ({ table: 'rows', add: row }))); demoHistory.redo.length = 0;
+    S.signature = '';
+    recompute();
+    current()?.reveal(first);
+    openQuick(first);
+    return;
+  }
+  try {
+    await apply([plan.action]);
+    S.pendingEdit = { id: first, note: null };
+    moveCursor(first).catch(() => {});
+    if (rowById(first)) openPending();
+  } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
+}
+
 function openPending() {
   const p = S.pendingEdit;
   if (!p) return;
