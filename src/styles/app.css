@@ -501,3 +501,25 @@ button, input, select { font: inherit; color: inherit; }
 .ps-rm__steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; line-height: 1.45; }
 .ps-rm__steps li::marker { color: var(--ps-muted); font-variant-numeric: tabular-nums; }
 .ps-qe-cal p { margin: 0 0 8px; }
+
+/* ---- saved views (M12) ---- */
+.ps-vw { display: flex; flex-direction: column; gap: 10px; }
+.ps-vw__list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ps-line); }
+.ps-vw__item { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--ps-line); }
+.ps-vw__apply {
+  flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 4px; min-height: 44px; box-sizing: border-box;
+  border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 6px;
+}
+.ps-vw__apply:hover { background: var(--ps-hover); }
+.ps-vw__name { font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+.ps-vw__mode { font-size: 12px; color: var(--ps-muted); }
+.ps-vw__note { margin: 0; }
+.ps-vw__form { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.ps-vw__form label { font-weight: 600; }
+.ps-vw__row { display: flex; gap: 8px; }
+.ps-vw__row .ps-input { flex: 1 1 auto; min-width: 0; }
+.ps-vw__form .ps-hint { margin: 0; }
+
+/* The links in the toolbar's counts ("5 without dates", "3 days over capacity") are 24px targets that take no room. */
+.ps-toolbar .ps-counts .ps-link { padding: 3px 4px; margin: -3px -4px; }
+@media (max-width: 599px) { .ps-vw__item .ps-btn { min-height: 36px; } }

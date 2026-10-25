@@ -184,3 +184,56 @@
 .ps-ag__empty { max-width: 420px; padding: 36px 18px; }
 .ps-ag__empty h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
 .ps-ag__empty p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ps-muted); }
+
+/* ---- the calendar (M12) ----
+   Rows of seven days between hairlines. A bar is a task on the days it covers: the task's colour as a
+   stripe on its left, as on the board's cards, and its name. Blue is only for today and for what is
+   selected; there is no red here, because late is the agenda's word. Weekends and holidays are tinted. */
+.ps-cal { --bar-h: 24px; position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--ps-ground); outline: none; }
+.ps-cal--week { --bar-h: 30px; }
+.ps-cal:focus-visible { box-shadow: inset 0 0 0 2px var(--ps-focus); }
+.ps-cal__head { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 12px 8px; flex-wrap: wrap; }
+.ps-cal__nav { padding: 3px 11px; font-size: 18px; line-height: 1.2; }
+.ps-cal__title { flex: 1 1 auto; min-width: 10ch; margin: 0 6px; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+.ps-cal__weekdays, .ps-cal__week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.ps-cal__weekdays { flex: none; margin: 0 12px; border: 1px solid var(--ps-line-strong); border-bottom: 0; border-radius: 6px 6px 0 0; background: var(--ps-surface-2); }
+.ps-cal__weekdays span { padding: 5px 8px; font-size: 12px; font-weight: 600; color: var(--ps-muted); }
+.ps-cal__weeks { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 12px 12px; display: flex; flex-direction: column; border: 1px solid var(--ps-line-strong); border-radius: 0 0 6px 6px; background: var(--ps-surface); }
+.ps-cal__week {
+  position: relative; flex: 1 0 auto; border-bottom: 1px solid var(--ps-line);
+  grid-template-rows: 28px repeat(var(--tracks), var(--bar-h)) minmax(20px, auto);
+  min-height: calc(28px + var(--tracks) * var(--bar-h) + 20px);
+}
+.ps-cal__week:last-child { border-bottom: 0; }
+.ps-cal__day { grid-row: 1 / -1; display: flex; align-items: flex-start; min-width: 0; padding: 3px 4px; border-right: 1px solid var(--ps-line); }
+.ps-cal__day:nth-child(7) { border-right: 0; }
+.ps-cal__day.is-off { background: var(--ps-weekend); }
+.ps-cal__day.is-drop { background: var(--ps-sel); box-shadow: inset 0 0 0 2px var(--ps-focus); }
+.ps-cal__num {
+  min-width: 24px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 0; border-radius: 11px; background: none; color: var(--ps-ink);
+  font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.ps-cal__num:hover { background: var(--ps-hover); }
+.ps-cal__day.is-outside .ps-cal__num { color: var(--ps-muted); }
+.ps-cal__num.is-today { background: var(--ps-accent); color: var(--ps-accent-ink); font-weight: 700; }
+.ps-cal__chip {
+  align-self: center; min-width: 0; height: calc(var(--bar-h) - 3px); margin: 0 3px; padding: 0 6px 0 5px; box-sizing: border-box; display: flex; align-items: center;
+  border: 1px solid var(--ps-card-line); border-left: 3px solid var(--stripe, var(--ps-line-strong)); border-radius: 4px; background: var(--ps-card); color: var(--ps-ink);
+  font: inherit; font-size: 12px; font-weight: 500; text-align: left; cursor: pointer; touch-action: pan-y; user-select: none;
+}
+.ps-cal--week .ps-cal__chip { font-size: 13px; }
+.ps-cal__chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-cal__chip-meta { flex: 0 100 auto; min-width: 0; margin-left: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ps-muted); font-size: 12px; font-weight: 400; }
+.ps-cal__chip:hover { border-color: var(--ps-line-strong); border-left-color: var(--stripe, var(--ps-line-strong)); }
+.ps-cal__chip.is-movable { cursor: grab; }
+.ps-cal__chip.is-from-left { margin-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.ps-cal__chip.is-to-right { margin-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.ps-cal__chip.is-milestone::before { content: "◆"; flex: none; margin-right: 5px; font-size: 8px; color: var(--stripe, var(--ps-muted)); }
+.ps-cal__chip.is-done { color: var(--ps-muted); }
+.ps-cal__chip.is-done .ps-cal__chip-text { text-decoration: line-through; }
+.ps-cal__chip.is-selected, .ps-cal__chip:focus-visible { outline: none; border-color: var(--ps-focus); border-left-color: var(--stripe, var(--ps-focus)); box-shadow: 0 0 0 1px var(--ps-focus); }
+.ps-cal__chip.is-dragging { opacity: 0.4; }
+.ps-cal.is-dragging, .ps-cal.is-dragging .ps-cal__chip { cursor: grabbing; }
+.ps-cal__more { align-self: start; height: 18px; padding: 0 8px; border: 0; background: none; color: var(--ps-muted); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.ps-cal__more:hover { color: var(--ps-ink); text-decoration: underline; }
+.ps-cal__ghost { position: fixed; z-index: 30; max-width: 320px; padding: 5px 9px; border-radius: 6px; background: var(--ps-tip-bg); color: var(--ps-tip-ink); font-size: 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

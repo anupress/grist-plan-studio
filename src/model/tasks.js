@@ -25,7 +25,7 @@ export const PALETTE = getPalette('access').series;
 const isHex = (s) => typeof s === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(s.trim());
 
 // A status that means finished, in English, German and French.
-const DONE_WORDS = /^(done|complete|completed|closed|finished|shipped|resolved|erledigt|fertig|abgeschlossen|geschlossen|termine|terminee|fait|clos|cloture)$/;
+export const DONE_WORDS = /^(done|complete|completed|closed|finished|shipped|resolved|archived|archive|archivee|archiviert|erledigt|fertig|abgeschlossen|geschlossen|termine|terminee|fait|clos|cloture)$/;
 export const isDoneStatus = (s) => DONE_WORDS.test(String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase());
 
 /** Grist's default choice fill is white or unset: treat both as "no colour chosen". */

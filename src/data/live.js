@@ -63,6 +63,8 @@ export async function loadOwnSection(tableId, options = null) {
   } catch { return null; }
 }
 
+const NAME_COLUMN = /^(name|nom|title|titre|label|bezeichnung|description)$/i;
+
 /** The column mapping a previous widget left in this section (customView.columnsMapping). */
 export async function loadForeignMapping(tableId) {
   const own = await loadOwnSection(tableId);
@@ -90,7 +92,10 @@ export async function loadLabels(columns, roles) {
     if (!tables.has(c.refTable)) tables.set(c.refTable, fetchRows(c.refTable).catch(() => []));
     const rows = await tables.get(c.refTable);
     const target = m.tables.find((t) => t.tableId === c.refTable);
-    const shown = target && c.visibleColId ? m.columns.find((x) => x.parentId === target.id && x.colId === c.visibleColId) : null;
+    const inTarget = target ? m.columns.filter((x) => x.parentId === target.id) : [];
+    // A Reference nobody gave a show column (Gestion de Projet's Project_Id) would read PM_Projects[3], as it does
+    // in Grist; the table's own name column says more.
+    const shown = target && (c.visibleColId ? inTarget.find((x) => x.colId === c.visibleColId) : inTarget.find((x) => x.type === 'Text' && NAME_COLUMN.test(x.colId)));
     const map = new Map();
     // In the referenced table's own order (its manualSort), so lanes made from it line up the same way.
     const ordered = rows.some((r) => typeof r.manualSort === 'number') ? [...rows].sort((a, b) => (a.manualSort ?? 0) - (b.manualSort ?? 0)) : rows;

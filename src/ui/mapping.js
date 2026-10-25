@@ -130,7 +130,7 @@ export function openMapping(host, s, on) {
       el('h3', { text: t('Board') }),
       el('div', { class: 'ps-field' }, [
         el('label', { for: 'ps-opens', text: t('This widget opens as') }),
-        sel('ps-opens', opensAs, [['auto', t('Automatic')], ['gantt', t('Gantt chart')], ['timeline', t('Timeline')], ['board', t('Board')], ['booking', t('Booking grid')], ['workload', t('Workload')], ['agenda', t('Agenda')]], (e) => { opensAs = e.target.value; }),
+        sel('ps-opens', opensAs, [['auto', t('Automatic')], ['gantt', t('Gantt chart')], ['timeline', t('Timeline')], ['board', t('Board')], ['booking', t('Booking grid')], ['workload', t('Workload')], ['agenda', t('Agenda')], ['calendar', t('Calendar')]], (e) => { opensAs = e.target.value; }),
         el('p', { class: 'ps-hint', text: t('Automatic: the Agenda on a phone, otherwise the Gantt chart when the table has dates, or else the board. For everyone who opens this page; the toolbar switches the view in this browser only.') }),
       ]),
       el('div', { class: 'ps-field' }, [

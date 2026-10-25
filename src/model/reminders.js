@@ -8,6 +8,8 @@
 // or Erledigt. Each person gets their own tasks at the address in the people table's email column, or
 // one address gets everyone's.
 
+import { DONE_WORDS } from './tasks.js';
+
 /** A people table's email column, by its name or by values that are addresses. */
 export function detectEmailColumn(columns, rows = []) {
   const text = columns.filter((c) => c.kind === 'Text' || c.kind === 'Any');
@@ -28,7 +30,7 @@ export function reminderScript(cfg) {
   const config = JSON.stringify({
     api: cfg.api, docUrl: cfg.docUrl, tasks: cfg.tasks, people: cfg.people, sendTo: cfg.sendTo || '',
     daysAhead: cfg.daysAhead, hour: cfg.hour, months: cfg.months, dayPattern: cfg.dayPattern, words: cfg.words,
-    doneWords: '^(done|complete|completed|closed|finished|shipped|resolved|erledigt|fertig|abgeschlossen|geschlossen|termine|terminee|fait|clos|cloture)$',
+    doneWords: DONE_WORDS.source,   // the same words Plan Studio finishes a task by
   }, null, 2);
   const name = String(cfg.docName || '').replace(/[\r\n]+/g, ' ');
   return [

@@ -80,6 +80,10 @@ eq('trailing underscore', norm('Completed_'), 'completed');
   const d = detectRoles(columnsFromFixture(rivals.taskflow.tables.Tasks), { tableId: 'Tasks' });
   eq('TaskFlow recognised', d.source.name, 'TaskFlow');
   eq('TaskFlow roles', d.roles, Object.fromEntries(Object.entries(rivals.taskflow.expect)));
+  const g = detectRoles(columnsFromFixture(rivals['gestion-projet'].tables.PM_Tasks), { tableId: 'PM_Tasks' });
+  eq('Gestion de Projet recognised', g.source.name, 'Gestion de Projet');
+  eq('Gestion de Projet roles', g.roles, rivals['gestion-projet'].expect);
+  eq('its time entries are not mistaken for tasks', detectRoles(columnsFromFixture(rivals['gestion-projet'].tables.PM_TimeEntries), { tableId: 'PM_TimeEntries' }).source.kind, 'names');
 }
 
 // ---- English, German and French tables written by people

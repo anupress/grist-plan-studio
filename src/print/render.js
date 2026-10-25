@@ -257,6 +257,40 @@ export function renderWorkloadPrint(s) {
   return root;
 }
 
+// ---- calendar ------------------------------------------------------------------------------------------
+
+/**
+ * A month or a week: rows of seven days, a bar for each task on the days it covers, as on screen.
+ * @param s {title, subtitle, paper, weekdays: [7], weeks: [{days: [{text, outside, off}], tracks, more: [7 texts, '' for none],
+ *           segments: [{col0, col1, track, title, colour, done, milestone, fromLeft, toRight}]}]}
+ */
+export function renderCalendarPrint(s) {
+  const page = pageArea(s.paper);
+  const bar = Math.round(4.6 * MM);
+  const root = el('div', { class: 'pp-root' });
+  const sheet = el('div', { class: 'pp-sheet pp-cal', style: { width: page.w + 'px' } }, [
+    el('div', { class: 'pp-title' }, [el('span', { class: 'pp-title__main', text: s.title }), el('span', { class: 'pp-title__sub', text: s.subtitle })]),
+    el('div', { class: 'pp-cal__weekdays' }, s.weekdays.map((d) => el('span', { text: d }))),
+  ]);
+  for (const w of s.weeks) {
+    const rows = `${Math.round(4.8 * MM)}px repeat(${w.tracks}, ${bar}px) auto`;
+    const week = el('div', { class: 'pp-cal__week', style: { gridTemplateRows: rows } });
+    w.days.forEach((d, i) => week.appendChild(el('div', { class: 'pp-cal__day' + (d.off ? ' is-off' : '') + (d.outside ? ' is-outside' : ''), style: { gridColumn: String(i + 1) } }, [
+      el('span', { class: 'pp-cal__num', text: d.text }),
+    ])));
+    for (const g of w.segments) {
+      week.appendChild(el('div', {
+        class: 'pp-cal__chip' + (g.done ? ' is-done' : '') + (g.milestone ? ' is-milestone' : '') + (g.fromLeft ? ' is-from-left' : '') + (g.toRight ? ' is-to-right' : ''),
+        style: { gridColumn: `${g.col0 + 1} / ${g.col1 + 2}`, gridRow: String(g.track + 2), ...(g.colour ? { borderLeftColor: g.colour } : {}) },
+      }, [el('span', { text: (g.milestone ? '◆ ' : '') + g.title })]));
+    }
+    w.more.forEach((text, i) => { if (text) week.appendChild(el('div', { class: 'pp-cal__more', style: { gridColumn: String(i + 1), gridRow: String(w.tracks + 2) }, text })); });
+    sheet.appendChild(week);
+  }
+  root.appendChild(sheet);
+  return root;
+}
+
 /** "Gantt chart · 21 tasks · printed 24 Oct 2026" */
 export function subtitleFor(view, count, locale, today) {
   const printed = new Intl.DateTimeFormat(locale, { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' }).format(dateFromDay(today));

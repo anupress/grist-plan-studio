@@ -103,3 +103,28 @@
 .pp-load.has-overdays .pp-flag { color: var(--pp-crit); }
 /* flat on paper: a fine hatch over hundreds of cells makes the PDF crawl */
 .pp-off { background: #eef1f4; }
+
+/* The calendar: a month or a week as seven columns; a bar is a task on the days it covers. */
+.pp-cal { display: block; }
+.pp-cal .pp-title { display: block; }
+.pp-cal__weekdays, .pp-cal__week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.pp-cal__weekdays { border: 1px solid var(--pp-line-strong); border-bottom: 0; background: var(--pp-ground); }
+.pp-cal__weekdays span { padding: 1mm 1.6mm; font-size: 9px; font-weight: 600; color: var(--pp-muted); }
+.pp-cal__week { position: relative; border: 1px solid var(--pp-line-strong); border-top: 0; break-inside: avoid; min-height: 14mm; }
+.pp-cal__day { grid-row: 1 / -1; border-right: 1px solid var(--pp-line); padding: 0.6mm 1.2mm; }
+.pp-cal__day:nth-child(7) { border-right: 0; }
+.pp-cal__day.is-off { background: var(--pp-ground); }
+.pp-cal__day.is-outside .pp-cal__num { color: var(--pp-muted); }
+.pp-cal__num { font-size: 9px; font-variant-numeric: tabular-nums; }
+.pp-cal__chip {
+  align-self: center; min-width: 0; margin: 0 0.8mm; height: 4mm; box-sizing: border-box; display: flex; align-items: center; padding: 0 1.2mm;
+  border: 0.2mm solid var(--pp-line-strong); border-left: 0.9mm solid var(--pp-line-strong); border-radius: 0.8mm; background: #fff; font-size: 9px; line-height: 1;
+}
+.pp-cal__chip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-cal__chip.is-from-left { margin-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.pp-cal__chip.is-to-right { margin-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.pp-cal__chip.is-done { color: var(--pp-muted); }
+.pp-cal__chip.is-done span { text-decoration: line-through; }
+.pp-cal__more { align-self: start; padding: 0 1.6mm; font-size: 8.5px; color: var(--pp-muted); }
+.pp-png .pp-cal { break-inside: auto; }
+.pp-png .pp-sheet + .pp-sheet { margin-top: 12mm; }

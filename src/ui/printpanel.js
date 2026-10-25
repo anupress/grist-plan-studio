@@ -1,4 +1,4 @@
-// The Print panel: paper and fit, then the browser's own print dialog (which also saves a PDF).
+// The Print panel: paper and fit, then the browser's own print dialog (which also saves a PDF), or a PNG of the same layout.
 
 import { el } from '../core/util.js';
 import { t } from '../i18n/index.js';
@@ -13,7 +13,7 @@ const remember = (v) => { try { localStorage.setItem(KEY, JSON.stringify(v)); } 
 
 /**
  * @param s  {canPages: the view can keep its zoom across several pages (Gantt chart, timeline)}
- * @param on {onPrint({paper, fit}), onClose()}
+ * @param on {onPrint({paper, fit, png}), onClose()}
  */
 export function openPrint(host, s, on) {
   const v = storedPrint();
@@ -21,12 +21,12 @@ export function openPrint(host, s, on) {
     el('input', { type: 'radio', name, value, checked: v[name] === value, onchange: () => { v[name] = value; } }),
     el('span', {}, [el('span', { text: label }), hint ? el('span', { class: 'ps-radio__hint', text: hint }) : null]),
   ]);
-  const done = (go) => {
+  const done = (go, extra = {}) => {
     release();
     scrim.remove();
     box.remove();
     on.onClose?.();
-    if (go) { remember(v); on.onPrint?.({ ...v }); }
+    if (go) { remember(v); on.onPrint?.({ ...v, ...extra }); }
   };
   const scrim = el('div', { class: 'ps-scrim', onclick: () => done(false) });
   const printBtn = el('button', { type: 'button', class: 'ps-btn ps-btn--primary', text: t('Print…'), onclick: () => done(true) });
@@ -44,7 +44,12 @@ export function openPrint(host, s, on) {
       ]),
     ]) : null,
     el('p', { class: 'ps-hint', text: t('To get a PDF, choose “Save as PDF” as the printer in the dialog that opens.') }),
-    el('div', { class: 'ps-dialog__foot' }, [el('button', { type: 'button', class: 'ps-btn', text: t('Cancel'), onclick: () => done(false) }), printBtn]),
+    el('p', { class: 'ps-hint', text: t('Save as PNG draws the same layout as a picture, for a slide or a message.') }),
+    el('div', { class: 'ps-dialog__foot' }, [
+      el('button', { type: 'button', class: 'ps-btn', text: t('Cancel'), onclick: () => done(false) }),
+      el('button', { type: 'button', class: 'ps-btn', text: t('Save as PNG'), onclick: () => done(true, { png: true }) }),
+      printBtn,
+    ]),
   ]);
   host.append(scrim, box);
   const release = trapFocus(box, () => done(false));

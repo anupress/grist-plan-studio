@@ -1,12 +1,12 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.3.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
-**board**, a **booking grid**, a **workload** or an **agenda** for your phone, and writes every change straight
-back to that table. It maps onto your own columns, follows Grist's filters and linking, prints to PDF,
+**board**, a **calendar**, a **booking grid**, a **workload** or an **agenda** for your phone, and writes every change
+straight back to that table. It maps onto your own columns, follows Grist's filters and linking, prints to PDF,
 and runs entirely in the viewer's browser: there is no server, and nothing leaves your document.
 
 Paste this into Grist (**Add widget → Custom → Enter Custom URL**):
@@ -26,13 +26,14 @@ Opened in a plain browser tab, the widget runs on sample data and saves nothing:
 - **[Pop-up stores over weekends](https://anupress.github.io/grist-plan-studio/?example=stores)**:
   the booking grid, with no dates at all
 
-## The six views
+## The seven views
 
 | View | Rows are | What you do in it |
 |---|---|---|
 | **Gantt chart** | tasks, with parents and dependencies | drag bars and their ends, link tasks, fold parents, show the critical path |
 | **Timeline** | a band per person, room or project | drag a bar to another band to reassign it, or along it to move its dates |
 | **Board** | cards in a lane per status, person or any other column | drag cards between and within lanes, add cards, set lane limits |
+| **Calendar** | a month or a week, a bar for each task on its days | drag a bar to another day; the task keeps its length |
 | **Booking grid** | resources × days, weeks, months or your own periods | see free cells counted per period, click one to book it, spot double bookings |
 | **Workload** | people × days, weeks or months, hours against capacity | see who is over and when, list the tasks behind a cell, **Level** the plan |
 | **Agenda** | open tasks under the day they need someone | late first, then today, tomorrow and the weeks ahead; **Mine** or **Everyone**; the first view on a phone |
@@ -46,6 +47,8 @@ Opened in a plain browser tab, the widget runs on sample data and saves nothing:
 ![The workload: hours against capacity per person and week, with the days over capacity said in words](docs/images/workload.png)
 
 ![The agenda: late tasks first, then today, tomorrow and the weeks ahead, each with its due day](docs/images/agenda.png)
+
+![The calendar: a month, a bar for each task on the days it covers, today as a filled circle](docs/images/calendar.png)
 
 ## Workload and levelling
 
@@ -110,7 +113,10 @@ picker, with nothing to paste: start Grist with `GRIST_WIDGET_LIST_URL` set to
 **Print** in the toolbar (or Ctrl+P in the widget) prints the view on show, A4 or A3 landscape. A
 Gantt chart or timeline either fits the page width or keeps its zoom, split into page-wide slices.
 Every page repeats the title and the header, and rows never split across a page edge. Choose "Save
-as PDF" in the browser's print dialog for a PDF.
+as PDF" in the browser's print dialog for a PDF. **Save as PNG**, in the same panel, draws the same layout as
+a picture for a slide or a message. It is drawn by the browser from the printout, so it is the layout of the
+printout, in light colours whatever the theme; a plan too large for a picture says so and points to the PDF.
+Tested in Chrome: a browser that will not draw it says so too. The agenda has no printout.
 
 ## Languages and keys
 
@@ -171,11 +177,40 @@ folds into one menu and the controls a thumb can hit.
   can send 100 emails a day, a Workspace account 1,500. Anything else that can call that API and send
   mail, such as n8n or Make, can do the same.
 
+## The calendar
+
+A month or a week as seven columns, and a bar for each task on the days it covers: a task that runs over
+several weeks is a bar on each row it touches, squared off where it continues. Weekends and holidays are
+tinted, finished tasks struck through, today is a filled circle. A day with more bars than a month's cell holds
+says `+3 more`, and a click on it (or on a day's number) opens that week, where every bar fits and carries
+who and what state it is in.
+
+**Drag a bar to another day** and the task keeps its length and moves there, by the rules the Gantt chart
+uses: a task with only a due date moves its due date, dates that are formulas refuse, and what waits for the
+task is asked about. Alt + arrows move it a day, Alt + up and down a week; PageUp and PageDown step the
+month. A touch drags after half a second's rest, so a swipe still scrolls. The calendar has seven columns to
+fill, so on a phone the Agenda opens instead, and a saved view of the calendar opens as the Agenda there.
+
+## Saved views, and moving over from another widget
+
+**Views** in the toolbar lists the views people saved for this widget: a name, and how the widget was set up
+when it was saved: which view, the zoom, what to group by, the board's lane column, the booking grid's rows
+and periods, the workload's measure, Mine or Everyone, month or week. A click applies one (nothing is written
+to the document); **Update** replaces it with how the widget looks now; the form saves the current view under
+a name, and a name that exists is replaced. They are kept in the widget's options, so everyone who opens the
+page sees them, and only people who can edit the document can save one.
+
+Plan Studio recognises the tables of **TaskFlow** (Team, Projects, Tasks) and **Gestion de Projet**
+(`PM_Tasks`) by their columns, as it does Grist's own templates: add Plan Studio on the table and it draws
+the plan with nothing mapped and nothing added to your document. Gestion de Projet's `archived` counts as
+finished, its `Project_Id` reads as the project's name, and its hours (`Estimated_Hours`) feed the workload.
+
 ## Where settings live
 
 - **In the widget's options**, saved in the document and shared by everyone, written only when
   someone presses Save in Columns: the column mapping, how dates are read, the view the widget
-  opens in, what a card shows, lane limits, the booking grid's periods and the time-entries table.
+  opens in, what a card shows, lane limits, the booking grid's periods, the time-entries table and the
+  saved views (when someone presses Save in Views).
 - **In this browser**: zoom, grouping, folded rows, the lane column and the last view, the
   interface language, who you are for timers and for Mine, and Mine or Everyone. Looking around never writes to the document.
 

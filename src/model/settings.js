@@ -3,7 +3,8 @@
 // In the widget's options (saved in the document, shared by everyone who opens the page, written
 // only when someone presses Save in the Columns panel): the column mapping, how dates are read,
 // which view the widget opens in, what a board card shows and the lanes' limits, the booking grid's
-// periods table and cell label, the workload's working day and capacity column, and the time-entries table.
+// periods table and cell label, the workload's working day and capacity column, the time-entries table,
+// and the saved views (a name for a view and how it was set up; saved by pressing Save in Views).
 // Writing options is a document action, so nothing that changes while someone merely looks around
 // (zoom, scroll position) goes there.
 //
@@ -41,7 +42,7 @@ export const TIME_DEFAULTS = Object.freeze({
   table: null,              // the time-entries table picked in Columns, or null (found by its columns)
   cols: null,               // {task, person, date, start, end, hours, note}: its columns, or null (found by name)
 });
-export const VIEWS = ['gantt', 'timeline', 'board', 'booking', 'workload', 'agenda'];
+export const VIEWS = ['gantt', 'timeline', 'board', 'booking', 'workload', 'agenda', 'calendar'];
 const REGION = /^(DE(-[A-Z]{2})?|AT|CH|FR|UK-EW|US)$/;
 
 /** Widget options as Grist returns them (or null) -> {roles (stored form or null), gantt}. */
@@ -78,11 +79,11 @@ export function readOptions(options) {
   if (typeof tm.table === 'string' && tm.table) time.table = tm.table;
   if (tm.cols && typeof tm.cols === 'object' && typeof tm.cols.task === 'string') time.cols = Object.fromEntries(['task', 'person', 'date', 'start', 'end', 'hours', 'note'].map((k) => [k, typeof tm.cols[k] === 'string' ? tm.cols[k] : null]));
   const view = VIEWS.includes(o.view) ? o.view : 'auto';
-  return { roles: o.roles && typeof o.roles === 'object' ? o.roles : null, gantt, board, booking, workload, time, view };
+  return { roles: o.roles && typeof o.roles === 'object' ? o.roles : null, gantt, board, booking, workload, time, view, views: cleanViews(o.views) };
 }
 
 /** What Save writes. Other keys already in the options (from a later version) are kept. */
-export function writeOptions(previous, { storedRoles, gantt, board, booking, workload, time, view }) {
+export function writeOptions(previous, { storedRoles, gantt, board, booking, workload, time, view, views }) {
   const prev = previous && typeof previous === 'object' ? previous : {};
   const out = { ...prev, v: SETTINGS_VERSION };
   if (storedRoles !== undefined) out.roles = storedRoles;
@@ -92,7 +93,61 @@ export function writeOptions(previous, { storedRoles, gantt, board, booking, wor
   if (workload) out.workload = { ...workload };
   if (time) out.time = { ...time };
   if (view !== undefined) out.view = view;
+  if (views !== undefined) out.views = views.map((v) => ({ ...v, view: { ...v.view } }));
   return out;
+}
+
+// ---- saved views -------------------------------------------------------------------------------------
+// A saved view is a name and how the widget was set up when it was saved: which view, the zoom, and the
+// choices this browser otherwise keeps (what to group by, the board's lane column, the booking grid's
+// rows and periods, the workload's measure, Mine or Everyone, month or week). Folded rows are left out:
+// they name rows that come and go. Applying one writes nothing to the document.
+
+export const MAX_VIEWS = 30;
+const text = (v) => typeof v === 'string' && v.length > 0 && v.length < 200;
+const oneOf = (...list) => (v) => list.includes(v);
+const SNAPSHOT = {
+  groupBy: text, critical: (v) => v === true, laneBy: text, tlLaneBy: text, bookRows: text, bookPeriods: text, bookFilter: text,
+  wlRows: text, wlUnit: oneOf('day', 'week', 'month'), wlMeasure: oneOf('planned', 'logged', 'remaining'),
+  agendaWho: oneOf('mine', 'all'), calMode: oneOf('month', 'week'),
+};
+const ZOOMS = ['day', 'week', 'month', 'quarter', 'year'];
+
+/** What to keep of the widget's state: {mode, zoom, view: {key: value | null}}. */
+export function snapshotView({ mode, zoom, view }) {
+  const kept = {};
+  for (const [k, ok] of Object.entries(SNAPSHOT)) kept[k] = ok(view?.[k]) ? view[k] : null;
+  return { mode: VIEWS.includes(mode) ? mode : 'gantt', zoom: ZOOMS.includes(zoom) ? zoom : null, view: kept };
+}
+
+/** Saved views as the options hold them -> a clean list: [{id, name, mode, zoom, view}], at most MAX_VIEWS. */
+export function cleanViews(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [], seen = new Set();
+  for (const v of list) {
+    if (!v || typeof v !== 'object' || typeof v.name !== 'string' || !VIEWS.includes(v.mode)) continue;
+    const name = v.name.replace(/\s+/g, ' ').trim().slice(0, 60);
+    const id = typeof v.id === 'string' && /^[\w-]{1,24}$/.test(v.id) ? v.id : null;
+    if (!name || !id || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, name, ...snapshotView({ mode: v.mode, zoom: v.zoom, view: v.view }) });
+    if (out.length >= MAX_VIEWS) break;
+  }
+  return out;
+}
+
+/**
+ * The list after saving a view under a name: a view with that name (any capitals) is replaced and keeps
+ * its place, else the new one goes last. Null when the list is full.
+ * @returns {{views: Array, replaced: boolean} | null}
+ */
+export function withView(views, name, snapshot, makeId) {
+  const clean = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (!clean) return null;
+  const at = views.findIndex((v) => v.name.toLowerCase() === clean.toLowerCase());
+  if (at >= 0) return { views: views.map((v, i) => (i === at ? { ...v, name: clean, ...snapshot } : v)), replaced: true };
+  if (views.length >= MAX_VIEWS) return null;
+  return { views: [...views, { id: makeId(), name: clean, ...snapshot }], replaced: false };
 }
 
 const zoomKey = (tableId) => 'planStudio.zoom.' + (tableId || 'demo');
@@ -128,6 +183,7 @@ export function storedView(tableId) {
     wlUnit: ['day', 'week', 'month'].includes(v.wlUnit) ? v.wlUnit : null,
     wlMeasure: ['planned', 'logged', 'remaining'].includes(v.wlMeasure) ? v.wlMeasure : null,
     agendaWho: ['mine', 'all'].includes(v.agendaWho) ? v.agendaWho : null,
+    calMode: ['month', 'week'].includes(v.calMode) ? v.calMode : null,
   };
 }
 export function rememberView(tableId, view) { keep(viewKey(tableId), view); }

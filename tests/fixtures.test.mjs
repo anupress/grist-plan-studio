@@ -48,6 +48,8 @@ for (const [tpl, table] of [['project-management', 'All_Tasks'], ['lab-project-m
 const rivals = read('rivals.json');
 const tf = rivals.taskflow.tables.Tasks.map((c) => c.id);
 for (const [role, id] of Object.entries(rivals.taskflow.expect)) ok(`TaskFlow Tasks.${id} exists for ${role}`, tf.includes(id));
+const gp = rivals['gestion-projet'].tables.PM_Tasks.map((c) => c.id);
+for (const [role, id] of Object.entries(rivals['gestion-projet'].expect)) ok(`Gestion de Projet PM_Tasks.${id} exists for ${role}`, gp.includes(id));
 ok('Varamil Kanban maps a status and a title', Object.values(rivals['varamil-kanban'].mapping).includes('status') && Object.values(rivals['varamil-kanban'].mapping).includes('title'));
 ok('old calendar maps start and title', rivals['grist-calendar'].mapping.startDate === 'start' && rivals['grist-calendar'].mapping.title === 'title');
 

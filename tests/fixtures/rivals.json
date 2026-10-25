@@ -1,20 +1,313 @@
 {
- "_comment": "Schemas and column mappings of the widgets people may switch from, read from their published code on 2026-10-24. Used by the detection tests: a table built for one of these should be recognised without setup. Mapping names are the custom-widget column-mapping keys Grist stores in the section's customView.columnsMapping.",
- "taskflow": {
-  "source": "https://nic01asfr.github.io/Widgets-Grist/taskflow/kanban/ (TASKFLOW_SCHEMA)",
-  "tables": {
-   "Team": [{"id": "nom", "type": "Text"}, {"id": "email", "type": "Text"}, {"id": "avatar", "type": "Text"}, {"id": "role", "type": "Choice"}, {"id": "actif", "type": "Bool"}, {"id": "couleur", "type": "Text"}],
-   "Projects": [{"id": "nom", "type": "Text"}, {"id": "couleur", "type": "Text"}, {"id": "dateDebut", "type": "Date"}, {"id": "dateFin", "type": "Date"}, {"id": "responsable", "type": "Ref:Team"}, {"id": "actif", "type": "Bool"}],
-   "Tasks": [{"id": "titre", "type": "Text"}, {"id": "description", "type": "Text"}, {"id": "dateDebut", "type": "Date"}, {"id": "dateEcheance", "type": "Date"}, {"id": "priorite", "type": "Choice"}, {"id": "statut", "type": "Choice"}, {"id": "progression", "type": "Numeric"}, {"id": "projet", "type": "Ref:Projects"}, {"id": "assignees", "type": "RefList:Team"}, {"id": "type", "type": "Choice"}, {"id": "dependDe", "type": "RefList:Tasks"}, {"id": "tags", "type": "ChoiceList"}, {"id": "estimationH", "type": "Numeric"}, {"id": "tempsPasse", "type": "Numeric"}, {"id": "couleur", "type": "Text"}, {"id": "subtasks", "type": "Text"}, {"id": "parentTask", "type": "Ref:Tasks"}]
+  "_comment": "Schemas and column mappings of the widgets people may switch from, read from their published code on 2026-10-24. Used by the detection tests: a table built for one of these should be recognised without setup. Mapping names are the custom-widget column-mapping keys Grist stores in the section's customView.columnsMapping.",
+  "taskflow": {
+    "source": "https://nic01asfr.github.io/Widgets-Grist/taskflow/kanban/ (TASKFLOW_SCHEMA)",
+    "tables": {
+      "Team": [
+        {
+          "id": "nom",
+          "type": "Text"
+        },
+        {
+          "id": "email",
+          "type": "Text"
+        },
+        {
+          "id": "avatar",
+          "type": "Text"
+        },
+        {
+          "id": "role",
+          "type": "Choice"
+        },
+        {
+          "id": "actif",
+          "type": "Bool"
+        },
+        {
+          "id": "couleur",
+          "type": "Text"
+        }
+      ],
+      "Projects": [
+        {
+          "id": "nom",
+          "type": "Text"
+        },
+        {
+          "id": "couleur",
+          "type": "Text"
+        },
+        {
+          "id": "dateDebut",
+          "type": "Date"
+        },
+        {
+          "id": "dateFin",
+          "type": "Date"
+        },
+        {
+          "id": "responsable",
+          "type": "Ref:Team"
+        },
+        {
+          "id": "actif",
+          "type": "Bool"
+        }
+      ],
+      "Tasks": [
+        {
+          "id": "titre",
+          "type": "Text"
+        },
+        {
+          "id": "description",
+          "type": "Text"
+        },
+        {
+          "id": "dateDebut",
+          "type": "Date"
+        },
+        {
+          "id": "dateEcheance",
+          "type": "Date"
+        },
+        {
+          "id": "priorite",
+          "type": "Choice"
+        },
+        {
+          "id": "statut",
+          "type": "Choice"
+        },
+        {
+          "id": "progression",
+          "type": "Numeric"
+        },
+        {
+          "id": "projet",
+          "type": "Ref:Projects"
+        },
+        {
+          "id": "assignees",
+          "type": "RefList:Team"
+        },
+        {
+          "id": "type",
+          "type": "Choice"
+        },
+        {
+          "id": "dependDe",
+          "type": "RefList:Tasks"
+        },
+        {
+          "id": "tags",
+          "type": "ChoiceList"
+        },
+        {
+          "id": "estimationH",
+          "type": "Numeric"
+        },
+        {
+          "id": "tempsPasse",
+          "type": "Numeric"
+        },
+        {
+          "id": "couleur",
+          "type": "Text"
+        },
+        {
+          "id": "subtasks",
+          "type": "Text"
+        },
+        {
+          "id": "parentTask",
+          "type": "Ref:Tasks"
+        }
+      ]
+    },
+    "expect": {
+      "title": "titre",
+      "start": "dateDebut",
+      "due": "dateEcheance",
+      "status": "statut",
+      "progress": "progression",
+      "project": "projet",
+      "assignee": "assignees",
+      "dependsOn": "dependDe",
+      "parent": "parentTask",
+      "effort": "estimationH",
+      "colour": "couleur"
+    }
   },
-  "expect": {"title": "titre", "start": "dateDebut", "due": "dateEcheance", "status": "statut", "progress": "progression", "project": "projet", "assignee": "assignees", "dependsOn": "dependDe", "parent": "parentTask", "effort": "estimationH", "colour": "couleur"}
- },
- "varamil-kanban": {
-  "source": "https://varamil.github.io/grist-widget/kanban2/min/widget.js (grist.ready columns)",
-  "mapping": {"STATUT": "status", "DESCRIPTION": "title", "DEADLINE": "due", "REFERENCE_PROJET": "project", "RESPONSABLE": "assignee", "COULEUR": "colour", "TAGS": "cardFields", "NOTES": null, "TYPE": null, "DESCRIPTION_DISPLAY": null, "CREE_PAR": null, "CREE_LE": null, "DERNIERE_MISE_A_JOUR": null}
- },
- "grist-calendar": {
-  "source": "https://github.com/gristlabs/grist-widget/blob/master/calendar/page.js (before the calendar became native in 1.7.19)",
-  "mapping": {"startDate": "start", "endDate": "end", "title": "title", "type": "colour", "isAllDay": null}
- }
+  "varamil-kanban": {
+    "source": "https://varamil.github.io/grist-widget/kanban2/min/widget.js (grist.ready columns)",
+    "mapping": {
+      "STATUT": "status",
+      "DESCRIPTION": "title",
+      "DEADLINE": "due",
+      "REFERENCE_PROJET": "project",
+      "RESPONSABLE": "assignee",
+      "COULEUR": "colour",
+      "TAGS": "cardFields",
+      "NOTES": null,
+      "TYPE": null,
+      "DESCRIPTION_DISPLAY": null,
+      "CREE_PAR": null,
+      "CREE_LE": null,
+      "DERNIERE_MISE_A_JOUR": null
+    }
+  },
+  "grist-calendar": {
+    "source": "https://github.com/gristlabs/grist-widget/blob/master/calendar/page.js (before the calendar became native in 1.7.19)",
+    "mapping": {
+      "startDate": "start",
+      "endDate": "end",
+      "title": "title",
+      "type": "colour",
+      "isAllDay": null
+    }
+  },
+  "gestion-projet": {
+    "source": "https://isaytoo.github.io/grist-project-manager-widget/widget.js (the AddTable and AddColumn actions it runs, read 2026-10-25)",
+    "tables": {
+      "PM_Tasks": [
+        {
+          "id": "Title",
+          "type": "Text"
+        },
+        {
+          "id": "Description",
+          "type": "Text"
+        },
+        {
+          "id": "Status",
+          "type": "Choice"
+        },
+        {
+          "id": "Priority",
+          "type": "Choice"
+        },
+        {
+          "id": "Assignee",
+          "type": "Text"
+        },
+        {
+          "id": "Group_Name",
+          "type": "Text"
+        },
+        {
+          "id": "Start_Date",
+          "type": "Date"
+        },
+        {
+          "id": "Due_Date",
+          "type": "Date"
+        },
+        {
+          "id": "Category",
+          "type": "Text"
+        },
+        {
+          "id": "Tag",
+          "type": "Text"
+        },
+        {
+          "id": "Recurrence",
+          "type": "Choice"
+        },
+        {
+          "id": "Estimated_Hours",
+          "type": "Numeric"
+        },
+        {
+          "id": "Created_At",
+          "type": "Date"
+        },
+        {
+          "id": "Project_Id",
+          "type": "Ref:PM_Projects"
+        },
+        {
+          "id": "Accountable",
+          "type": "Text"
+        },
+        {
+          "id": "Consulted",
+          "type": "Text"
+        },
+        {
+          "id": "Informed",
+          "type": "Text"
+        },
+        {
+          "id": "Extension_Date",
+          "type": "Date"
+        },
+        {
+          "id": "Auto_Extend",
+          "type": "Bool"
+        }
+      ],
+      "PM_Users": [
+        {
+          "id": "Name",
+          "type": "Text"
+        },
+        {
+          "id": "Email",
+          "type": "Text"
+        },
+        {
+          "id": "Role",
+          "type": "Choice"
+        },
+        {
+          "id": "Group_Name",
+          "type": "Text"
+        }
+      ],
+      "PM_TimeEntries": [
+        {
+          "id": "Task_Id",
+          "type": "Int"
+        },
+        {
+          "id": "User",
+          "type": "Text"
+        },
+        {
+          "id": "Start_Time",
+          "type": "Date"
+        },
+        {
+          "id": "End_Time",
+          "type": "Date"
+        },
+        {
+          "id": "Duration",
+          "type": "Int"
+        },
+        {
+          "id": "Description",
+          "type": "Text"
+        }
+      ]
+    },
+    "statuses": [
+      "todo",
+      "progress",
+      "done",
+      "archived"
+    ],
+    "expect": {
+      "title": "Title",
+      "start": "Start_Date",
+      "due": "Due_Date",
+      "status": "Status",
+      "assignee": "Assignee",
+      "project": "Project_Id",
+      "effort": "Estimated_Hours"
+    }
+  }
 }

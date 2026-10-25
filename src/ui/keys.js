@@ -36,6 +36,12 @@ const BY_VIEW = {
     ['← → ↑ ↓', 'Move from cell to cell'],
     ['Enter', 'Book a free cell, or edit the booking'],
   ],
+  calendar: [
+    ['↑ ↓ ← →', 'Select the previous or next task'],
+    ['Alt+← →', 'Move the task a day'],
+    ['Alt+↑ ↓', 'Move the task a week'],
+    ['PageUp  PageDown', 'The previous or next month or week'],
+  ],
   agenda: [
     ['↑ ↓', 'Move from task to task'],
     ['Enter', 'Edit the task'],

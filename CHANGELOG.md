@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.4.0
+
+A calendar, saved views, a way over from TaskFlow and Gestion de Projet, and PNG pictures.
+Tested in Grist 1.7.20 on docs.getgrist.com.
+
+- **Calendar**, a seventh view: a month or a week, a bar for each task on the days it covers (a task over
+  several weeks is one bar per row, squared off where it continues), weekends and holidays tinted, finished
+  tasks struck through, today a filled circle. A day with more bars than its cell holds says `+3 more`;
+  that, and a day's number, open the week, which shows every bar with who and what state.
+- **Drag a bar to another day**: the task keeps its length and moves there, by the Gantt chart's rules
+  (a due-only task moves its due date, formulas refuse, what waits for it is asked about); one action, one
+  Undo. Alt + arrows move a day (Alt + up and down a week), PageUp and PageDown step the month, Escape cancels
+  a drag. Touch drags after half a second's rest. On a phone the Agenda opens instead of the calendar.
+- **Saved views**: **Views** in the toolbar. A name and how the widget was set up (the view, zoom, grouping,
+  lane column, rows and periods, workload measure, Mine or Everyone, month or week), kept in the widget's
+  options so everyone sees them, saved by people who can edit the document. Apply, Update, Delete (with Undo).
+- **Moving over**: Gestion de Projet's `PM_Tasks` is recognised by its columns, as TaskFlow's tables
+  already were, so a document from either opens in Plan Studio with nothing mapped. Its `archived` status
+  counts as finished; a Reference with no show column (its `Project_Id`) now reads as the table's name
+  column instead of `PM_Projects[3]`.
+- **Save as PNG** in the Print panel: the printout as a picture, for every view that prints (the Gantt
+  chart, timeline, board, booking grid, workload and the calendar). Drawn in the browser, nothing sent anywhere.
+- The calendar prints too: a month or a week on one landscape page.
+- The toolbar's count links ("5 without dates") are 24 px targets, and the reminder script now finishes a task
+  by the same words Plan Studio does (it had its own, shorter list).
+
 ## 1.3.0
 
 An agenda for the phone, a calendar file with a reminder, and morning email reminders on the free plan.
