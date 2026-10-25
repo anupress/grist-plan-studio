@@ -305,6 +305,18 @@ button, input, select { font: inherit; color: inherit; }
 .ps-sum.is-selected { outline: 2px solid var(--ps-focus); outline-offset: 4px; }
 .ps-sum.is-critical { background: var(--ps-crit); opacity: 1; }
 .ps-bar__out--sum { font-weight: 600; }
+/* Plan against actual (M18). The plan is a thin line under a bar that has moved: quiet, never red (late is the
+   words' job, "4 days later than planned"). The ✓ is the day the task was really done: ink on the surface, so it
+   reads on any bar colour; it is only a handle when the column can be written. */
+.ps-plan { position: absolute; height: 3px; border-radius: 2px; background: var(--ps-muted); z-index: 1; }
+.ps-done {
+  position: absolute; width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; z-index: 3;
+  border: 2px solid var(--ps-ink); background: var(--ps-surface);
+}
+.ps-done::after { content: ""; position: absolute; left: 3px; top: 0; width: 3px; height: 7px; border: solid var(--ps-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.ps-done.can-move { cursor: grab; }
+.ps-app[data-density="compact"] .ps-plan { height: 2px; }
+.ps-qe-plan { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--ps-ink); }
 .ps-grpbar { position: absolute; height: 4px; margin-top: calc((var(--bar-h, 20px) - 4px) / 2); border-radius: 2px; background: var(--ps-muted); opacity: 0.45; cursor: pointer; }
 
 .ps-bar.is-critical { box-shadow: 0 0 0 2px var(--ps-crit); }

@@ -259,3 +259,34 @@ export function planUnlink(row, ctx, predId) {
   const next = rest.length ? ['L', ...rest] : null;
   return { fields: { [col.id]: next }, patch: { [col.id]: next } };
 }
+
+// ---- plan against actual (M18) -------------------------------------------------------------------------
+
+/** True when Plan Studio may write the planned dates, and which of the two columns it can. */
+export function baselineColumns(ctx) {
+  return { start: !!writableCol(ctx, 'baselineStart'), end: !!writableCol(ctx, 'baselineEnd') };
+}
+
+/**
+ * A task's plan: today's start and end into the planned-date columns (one row, one UpdateRecord).
+ * @returns {{fields, patch}}  empty when neither column can be written
+ */
+export function baselineFields(ctx, start, end, oldRow = null) {
+  const out = { fields: {}, patch: {} };
+  const s = writableCol(ctx, 'baselineStart'), e = writableCol(ctx, 'baselineEnd');
+  if (s) putDay(out, s, start, oldRow?.[s.id]);
+  if (e) putDay(out, e, storedEnd(ctx, end), oldRow?.[e.id]);
+  return out;
+}
+
+/** The day a task was really done (null clears it); empty when the column is a formula or there is none. */
+export function doneOnFields(ctx, day, oldRow = null) {
+  const out = { fields: {}, patch: {} };
+  const c = writableCol(ctx, 'doneOn');
+  if (!c) return out;
+  if (day == null) put(out, c, null, null); else putDay(out, c, day, oldRow?.[c.id]);
+  return out;
+}
+
+/** Can the marker be dragged: the column is there and is not a formula. */
+export const canMoveDoneOn = (ctx) => !!ctx.editable && !!writableCol(ctx, 'doneOn');

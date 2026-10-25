@@ -73,6 +73,14 @@ export function renderTimePrint(s) {
         const a = Math.max(b.start, frame.from), z = Math.min(b.end, frame.to);
         const x = xOf(frame, a), w = Math.max(2, (z - a + 1) * frame.px);
         const top = (b.track || 0) * TRACK + (TRACK - BAR) / 2;
+        // the plan under a bar that has moved, and the day it was really done (M18)
+        if (b.plan) {
+          const pa = Math.max(b.plan.start, frame.from), pz = Math.min(b.plan.end, frame.to);
+          if (pz >= pa) strip.appendChild(el('div', { class: 'pp-plan', style: { left: xOf(frame, pa) + 'px', top: top + BAR + 1 + 'px', width: Math.max(2, (pz - pa + 1) * frame.px) + 'px' } }));
+        }
+        if (b.doneOn != null && b.doneOn >= frame.from && b.doneOn <= frame.to) {
+          strip.appendChild(el('div', { class: 'pp-done', style: { left: xOf(frame, b.doneOn) + frame.px / 2 - 4.5 + 'px', top: top + (BAR - 9) / 2 + 'px' } }));
+        }
         if (b.kind === 'milestone') {
           strip.appendChild(el('div', { class: 'pp-ms' + (b.critical ? ' is-critical' : '') + (b.clash ? ' is-clash' : ''), style: { left: x + frame.px / 2 - BAR / 2 + 'px', top: top + 'px', width: BAR + 'px', height: BAR + 'px', '--fill': b.colour || '#3d73b8' } }));
           if (!s.labelsInside) strip.appendChild(el('span', { class: 'pp-out', style: { left: x + frame.px / 2 + BAR / 2 + 3 + 'px', top: top + 'px', lineHeight: BAR + 'px' }, text: b.title }));

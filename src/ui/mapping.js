@@ -37,6 +37,9 @@ const ROLE_TEXT = {
   order: ['Order in a lane', 'A number column. Dragging a card up or down on the board writes it.'],
   resource: ['Resource', 'A room, store, flat or vehicle: the booking grid has a row for each.'],
   period: ['Period', 'A column that names when, such as Weekend 1, 2, 3: the booking grid has a column for each. Not needed when bookings have dates.'],
+  baselineStart: ['Planned start', 'The day the task was promised to start. The Gantt chart draws the plan under each bar that has moved. “Set baseline” fills it in.'],
+  baselineEnd: ['Planned end', 'The day the task was promised to end.'],
+  doneOn: ['Done on', 'The day it really finished: a marker on the task’s row, which can be dragged.'],
   effort: ['Hours of work', 'The work a task needs: hours, or person-days when the column’s name says days. The workload spreads it over the task’s working days.'],
 };
 // Columns a chart can be coloured by

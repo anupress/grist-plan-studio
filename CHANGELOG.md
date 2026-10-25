@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.10.0
+
+Plan against actual. Tested in Grist 1.7.20 (a table of 12 tasks).
+
+- **Set baseline**: today's start and end of every task become its plan, in two Date columns that are found by name or
+  added after asking, as one step in Undo. Tasks that already have a plan can be left as they are.
+- **The plan under the bars**: a bar that has moved from its plan shows it as a thin line under it, and says how far in words
+  (“4 days later than planned”) in the tooltip, the quick edit and for a screen reader. Display gets “Plan under the bars”
+  and a list column, **Against the plan** (“+4 d”). Print and PNG carry the lines.
+- **Done on**: a Date column puts a ✓ on the day a task really finished; drag it to change the day. It writes only that cell.
+- The plan columns are found by name even when a mapping was saved before they existed.
+- A table with only planned dates uses them as its dates.
+- German's week headings no longer run into each other: the date is left out of a heading too narrow for it.
+- German and French for every new word.
+
 ## 1.9.0
 
 The small things left over from 1.5 to 1.8. Tested in Grist 1.7.20 (a table of 12 tasks and one of 2,000).

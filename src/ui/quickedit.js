@@ -12,7 +12,7 @@ import { trapFocus } from './dialog.js';
 const FIELD_LABELS = {
   title: 'Name', start: 'Start date', end: 'End date', due: 'Due date', duration: 'Duration in days',
   status: 'Status', progress: 'Progress', done: 'Done', milestone: 'Milestone', assignee: 'Assigned to', project: 'Project',
-  parent: 'Parent task', dependsOn: 'Depends on',
+  parent: 'Parent task', dependsOn: 'Depends on', baselineStart: 'Planned start', baselineEnd: 'Planned end', doneOn: 'Done on',
 };
 
 const sortedLabels = (map) => [...(map || new Map()).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])));
@@ -99,7 +99,7 @@ function calendarSection(c, on, close) {
 
 /**
  * @param s  {row, roles, columns, labels, editable, canOpenCard, note, booking: true in the booking grid, time: see timeSection,
- *            calendar: {words} | null}
+ *            calendar: {words} | null, plan: how far the task has drifted from its plan, in words | null}
  * @param on {onSave({fields, patch}), onOpenCard(), onClose(), onStartTimer(), onStopTimer(), onLogTime(), onSetupTime(), onCalendar()}
  */
 export function openQuickEdit(host, s, on) {
@@ -141,6 +141,7 @@ export function openQuickEdit(host, s, on) {
     ]),
     el('form', { class: 'ps-drawer__body', onsubmit: (e) => { e.preventDefault(); if (s.editable) save(); } }, [
       s.note ? el('p', { class: 'ps-note', text: s.note }) : null,
+      s.plan ? el('p', { class: 'ps-qe-plan', text: s.plan }) : null,
       ...fieldRows,
       el('button', { type: 'submit', hidden: true }),
     ]),

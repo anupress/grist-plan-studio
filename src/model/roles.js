@@ -62,6 +62,20 @@ export const ROLES = [
     strong: ['due', 'due date', 'deadline', 'due on', 'faellig', 'fallig', 'frist', 'abgabe', 'echeance', 'date echeance',
       'date limite', 'date d echeance'],
     weak: ['target date', 'zieldatum'] },
+  // The plan against what happened (M18): the dates a task was promised for, and the day it was really done.
+  { id: 'baselineStart', kinds: DATE, panel: true,
+    strong: ['baseline start', 'baseline start date', 'planned start', 'planned start date', 'plan start', 'original start', 'initial start',
+      'geplanter beginn', 'geplanter start', 'geplanter anfang', 'plan beginn', 'soll beginn', 'soll start', 'debut prevu', 'debut planifie',
+      'debut initial', 'debut previsionnel', 'date de debut prevue', 'date de debut previsionnelle', 'debut de reference'], weak: [] },
+  { id: 'baselineEnd', kinds: DATE, panel: true,
+    strong: ['baseline end', 'baseline end date', 'baseline finish', 'planned end', 'planned end date', 'planned finish', 'plan end',
+      'original end', 'initial end', 'geplantes ende', 'geplanter abschluss', 'plan ende', 'soll ende', 'fin prevue', 'fin planifiee',
+      'fin initiale', 'fin previsionnelle', 'date de fin prevue', 'date de fin previsionnelle', 'fin de reference'], weak: [] },
+  { id: 'doneOn', kinds: DATE, panel: true,
+    strong: ['done on', 'done date', 'completed on', 'completion date', 'completed date', 'finished on', 'date done', 'date completed',
+      'actual end', 'actual finish', 'actual end date', 'resolved on', 'erledigt am', 'abgeschlossen am', 'fertiggestellt am',
+      'erledigungsdatum', 'abschlussdatum', 'termine le', 'date de fin reelle', 'fin reelle', 'realise le', 'date de realisation',
+      'date de cloture', 'cloture le'], weak: [] },
   { id: 'duration', kinds: NUM, panel: true,
     strong: ['duration', 'days', 'length', 'duration days', 'dauer', 'tage', 'duree', 'jours'], weak: [] },
   { id: 'status', kinds: ['Choice', 'Ref', 'Text'], panel: true,
@@ -218,10 +232,10 @@ function typeOnlyScore(roleId, col, tableId) {
  * Every role -> the column that fills it.
  *
  * @param {Array} columns  from schema.tableColumns()
- * @param {{tableId?: string, foreignMapping?: object}} opts
+ * @param {{tableId?: string, foreignMapping?: object, keepPlan?: boolean}} opts  keepPlan: a planned date stays a plan even when no other date was found
  * @returns {{roles: Object<string,string>, source: {kind: string, name?: string}}}
  */
-export function detectRoles(columns, { tableId = null, foreignMapping = null } = {}) {
+export function detectRoles(columns, { tableId = null, foreignMapping = null, keepPlan = false } = {}) {
   const roles = {};
   const used = new Set();
   const take = (role, colId) => { if (!roles[role] && colId && !used.has(colId)) { roles[role] = colId; used.add(colId); } };
@@ -255,6 +269,12 @@ export function detectRoles(columns, { tableId = null, foreignMapping = null } =
   });
   candidates.sort((a, b) => b.s - a.s || a.ri - b.ri || a.ci - b.ci);
   for (const c of candidates) take(c.role, c.col);
+
+  // A table that has only planned dates has no other: they are its dates.
+  if (!keepPlan && !roles.start && !roles.end && !roles.due) {
+    if (roles.baselineStart) { roles.start = roles.baselineStart; delete roles.baselineStart; }
+    if (roles.baselineEnd) { roles.end = roles.baselineEnd; delete roles.baselineEnd; }
+  }
 
   // A table always has something to call its rows: the first text column, data before formulas.
   if (!roles.title) {
@@ -295,4 +315,23 @@ export function fromStored(stored, columns, tableId) {
     if (col && fits(role, col, tableId)) roles[role] = col.id;
   }
   return roles;
+}
+
+// ---- columns added after the mapping was saved --------------------------------------------------------------
+
+/** The roles of the plan against actual: columns a person adds later, by their names, without a visit to Settings. */
+export const PLAN_ROLES = ['baselineStart', 'baselineEnd', 'doneOn'];
+
+/**
+ * A saved mapping, plus the plan roles it does not name, found by column name among the columns it does not use.
+ * (Only these: a person who set another role to "none" meant it; nobody sets "planned start" to none.)
+ */
+export function withPlanRoles(saved, columns, tableId) {
+  const missing = PLAN_ROLES.filter((r) => !saved[r]);
+  if (!missing.length) return saved;
+  const used = new Set(Object.values(saved));
+  const found = detectRoles(columns.filter((c) => !used.has(c.id)), { tableId, keepPlan: true }).roles;
+  const out = { ...saved };
+  for (const r of missing) if (found[r]) out[r] = found[r];
+  return out;
 }

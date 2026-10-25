@@ -34,7 +34,10 @@ export function headLabel(F, unit, c, w, show = {}) {
     case 'day': return String(c.d);
     case 'week':
       if (show.weekNumbers === false) return w >= 44 ? F.dayMonth.format(dateFromDay(c.start)) : String(c.d);
-      return w >= 70 ? t('W{n}', { n: c.wk }) + ' · ' + F.dayMonth.format(dateFromDay(c.start)) : t('W{n}', { n: c.wk });
+      { // the date too, when this language's words fit the cell: German's 'KW 42 · 12. Okt.' needs more room than English's 'W42 · 12 Oct'
+        const full = t('W{n}', { n: c.wk }) + ' · ' + F.dayMonth.format(dateFromDay(c.start));
+        return full.length * 6 + 10 <= w ? full : t('W{n}', { n: c.wk });
+      }
     case 'month': return (w >= 80 ? F.month : F.monthShort).format(dateFromDay(c.start));
     case 'quarter': return t('Q{n}', { n: c.q });
     case 'year': return String(c.y);

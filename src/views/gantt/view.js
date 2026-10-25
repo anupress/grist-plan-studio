@@ -13,6 +13,8 @@
 //   drag the dot at a bar's end onto another bar                            link them (finish -> start)
 //   click an arrow        remove the link    click a ▸ / ▾                  fold or unfold a parent or group
 //   Alt+←/→               move by a day      Alt+Shift+←/→                  change the end by a day
+//   drag the ✓ at the day a task was really done                       move that day (M18)
+// Under a bar that has moved from its plan, a thin bar shows the days it was promised for.
 // The view writes nothing itself: it reports what was done (onEdit, onLink, onArrow, onToggle) and
 // the caller decides what that means for the table.
 
@@ -21,6 +23,8 @@ import { onColor } from '../../core/theme/apply.js';
 import { makeFrame, barBox, rowWindow, scrollLeftFor, xOf, dayAt, ROW_H, BAR_H } from './layout.js';
 import { formatters, rangeText, drawScale, drawShade } from './scale.js';
 import { dateFromDay } from '../../model/values.js';
+import { drifted } from '../../model/plan.js';
+import { slipText, doneText } from '../../ui/planwords.js';
 import { t } from '../../i18n/index.js';
 
 export const HEAD_H = 52;
@@ -57,7 +61,8 @@ export function createGantt(host, on = {}) {
 
   // {entries, span, links, critical, criticalLinks, holidays, caps(task), length(a, b), workdays,
   //  linkable, editable, showCritical, today, zoom, weekStart, locale, selectedId, titleLabel,
-  //  rowH, barH, labels ('auto' | 'beside' | 'off'), show {weekNumbers, weekends, today}, listCols [{id, label}], listText(task) -> [string]}
+  //  rowH, barH, labels ('auto' | 'beside' | 'off'), show {weekNumbers, weekends, today}, listCols [{id, label}], listText(task) -> [string],
+  //  showPlan (draw the planned days under a bar that has moved), canDoneOn(task) (the finish marker can be dragged)}
   let model = null;
   let rows = [];      // model.entries
   let frame = null;
@@ -108,13 +113,35 @@ export function createGantt(host, on = {}) {
     }, [el('span', { class: 'ps-caret__chevron' + (collapsed ? ' is-folded' : ''), 'aria-hidden': 'true' })]);
   }
 
+  /** The planned days under a bar that has moved, and the ✓ on the day it was really done (M18). */
+  function planElements(task, i, box) {
+    const out = [];
+    if (model.showPlan && drifted(task)) {
+      const pb = barBox(frame, { kind: 'bar', start: task.baseStart, end: task.baseEnd }, i, RH, BH);
+      out.push(el('div', {
+        class: 'ps-plan', dataset: { id: String(task.id), part: 'plan' }, 'aria-hidden': 'true',
+        style: { left: pb.x + 'px', top: box.y + BH + (RH >= 32 ? 3 : 1) + 'px', width: pb.w + 'px' },
+      }));
+    }
+    if (task.doneOn != null) {
+      const x = xOf(frame, task.doneOn) + frame.px / 2;
+      const can = model.canDoneOn?.(task);
+      const words = doneText(task, (d) => F.dayMonth.format(dateFromDay(d)));
+      out.push(el('div', {
+        class: 'ps-done' + (can ? ' can-move' : ''), dataset: { id: String(task.id), part: 'done' }, role: 'img', 'aria-label': words,
+        style: { left: x - 7 + 'px', top: i * RH + (RH - 14) / 2 + 'px' },
+      }));
+    }
+    return out;
+  }
+
   function barElements(e, i, selected) {
     const task = e.task;
     const span = spanOf(e);
     const box = barBox(frame, { kind: e.summary ? 'bar' : task.kind, start: span.start, end: span.end }, i, RH, BH);
     const title = task.title || t('(no name)');
     const mode = model.labels || 'auto';
-    const label = `${title}, ${rangeText(F, span)}`;
+    const label = [title, rangeText(F, span), slipText(task)].filter(Boolean).join(', ');
     const critical = model.showCritical && model.critical?.has(task.id);
     const link = model.linkable && !e.summary ? el('span', { class: 'ps-bar__link', dataset: { id: String(task.id), part: 'link' }, title: t('Drag onto another task: it starts after this one ends') }) : null;
     const out = [];
@@ -137,6 +164,7 @@ export function createGantt(host, on = {}) {
         role: 'img', 'aria-label': label,
       }, [link]));
       if (mode !== 'off') out.push(el('span', { class: 'ps-bar__out', dataset: { id: String(task.id) }, style: { left: box.x + box.w + 4 + 'px', top: box.y + 'px' }, text: title }));
+      out.push(...planElements(task, i, box));
       return out;
     }
     const inside = mode === 'auto' && labelFits(title, box.w);
@@ -153,6 +181,7 @@ export function createGantt(host, on = {}) {
       link,
     ]));
     if (!inside && mode !== 'off') out.push(el('span', { class: 'ps-bar__out', dataset: { id: String(task.id) }, style: { left: box.x + box.w + (link ? 14 : 6) + 'px', top: box.y + 'px' }, text: title }));
+    out.push(...planElements(task, i, box));
     return out;
   }
 
@@ -295,6 +324,12 @@ export function createGantt(host, on = {}) {
     if (task.people.length) lines.push(el('div', { text: task.people.join(', ') }));
     if (task.project) lines.push(el('div', { text: task.project }));
     if (task.progress != null) lines.push(el('div', { text: t('{n}% done', { n: Math.round(task.progress * 100) }) }));
+    // the plan (M18): how far the task has drifted, and when it was really done
+    const slip = model.showPlan ? slipText(task) : null;
+    if (slip) lines.push(el('div', { class: 'ps-tip__note', text: slip }));
+    if (task.baseStart != null && drifted(task)) lines.push(el('div', { class: 'ps-tip__note', text: t('Planned {range}', { range: rangeText(F, { start: task.baseStart, end: task.baseEnd }) }) }));
+    const finished = doneText(task, (d) => F.dayMonth.format(dateFromDay(d)));
+    if (finished) lines.push(el('div', { text: finished }));
     // hours logged against the plan, when time is tracked (M10)
     const timeText = model.timeText?.(task);
     if (timeText) lines.push(el('div', { text: timeText }));
@@ -315,6 +350,13 @@ export function createGantt(host, on = {}) {
 
   function dragPreview(d) {
     const { task, mode, start, end } = d;
+    if (mode === 'done') {
+      d.el.style.left = xOf(frame, d.day) + frame.px / 2 - 7 + 'px';
+      tip.classList.add('ps-tip--drag');
+      clear(tip).append(el('strong', { text: t('Done on {date}', { date: F.dayMonth.format(dateFromDay(d.day)) }) }));
+      tip.hidden = false;
+      return;
+    }
     if (mode === 'link') {
       const a = d.from;
       if (a) d.line.setAttribute('d', `M${a.x},${a.y} L${d.cx},${d.cy}`);
@@ -350,7 +392,7 @@ export function createGantt(host, on = {}) {
     const day0 = dayAt(frame, chartX(e.clientX));
     drag = {
       task, mode, row, el: node, x0: e.clientX, scroll0: scroll.scrollLeft, day0, moved: false, pointerId: e.pointerId,
-      start: task.start ?? day0, end: task.end ?? day0,
+      start: task.start ?? day0, end: task.end ?? day0, day: task.doneOn ?? day0,
       outLabel: node ? bars.querySelector(`.ps-bar__out[data-id="${task.id}"]`) : null,
     };
     if (mode === 'link') {
@@ -389,6 +431,7 @@ export function createGantt(host, on = {}) {
     }
     const delta = Math.round((e.clientX - d.x0 + scroll.scrollLeft - d.scroll0) / frame.px);
     const { task } = d;
+    if (d.mode === 'done') { d.day = task.doneOn + delta; dragPreview(d); placeTip(e.clientX, e.clientY); return; }
     if (d.mode === 'move') { d.start = task.start + delta; d.end = task.end + delta; }
     else if (d.mode === 'start') { d.start = Math.min(task.end, task.start + delta); d.end = task.end; }
     else if (d.mode === 'end') { d.start = task.start; d.end = Math.max(task.start, task.end + delta); }
@@ -414,6 +457,11 @@ export function createGantt(host, on = {}) {
       draw(true);
       return true;
     }
+    if (d.mode === 'done') {
+      if (!cancelled && d.day !== d.task.doneOn) on.onDoneOn?.({ id: d.task.id, day: d.day });
+      draw(true);
+      return true;
+    }
     const changed = d.mode === 'draw' || d.start !== d.task.start || d.end !== d.task.end;
     if (!cancelled && changed) on.onEdit?.({ id: d.task.id, mode: d.mode, start: d.start, end: d.end });
     draw(true);
@@ -430,7 +478,9 @@ export function createGantt(host, on = {}) {
     const c = caps(task);
     const part = e.target.dataset.part || n.dataset.part;
     let mode = null;
-    if (part === 'link') mode = model.linkable ? 'link' : null;
+    if (part === 'done') mode = task.doneOn != null && model.canDoneOn?.(task) ? 'done' : null;
+    else if (part === 'plan') mode = null;
+    else if (part === 'link') mode = model.linkable ? 'link' : null;
     else if (entry.summary) mode = null;
     else if (part === 'draw') mode = c.draw ? 'draw' : null;
     else if (part === 'start' && c.start) mode = 'start';
@@ -441,7 +491,7 @@ export function createGantt(host, on = {}) {
     e.stopPropagation();
     // preventDefault also stops the press from focusing the chart; keyboard shortcuts (Ctrl+Z) need it.
     scroll.focus({ preventScroll: true });
-    beginDrag(e, task, mode, indexOf.get(task.id), part === 'draw' || part === 'link' ? null : n.closest('.ps-bar, .ps-ms'));
+    beginDrag(e, task, mode, indexOf.get(task.id), part === 'draw' || part === 'link' ? null : part === 'done' ? n : n.closest('.ps-bar, .ps-ms'));
   });
   chart.addEventListener('pointermove', (e) => { if (drag) moveDrag(e); });
   chart.addEventListener('pointerup', (e) => { if (drag) endDrag(e); });

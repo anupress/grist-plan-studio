@@ -12,6 +12,9 @@
 //   no date at all           unscheduled: counted, not drawn
 //   end before start         drawn as one day at the start, and flagged
 //
+// Plan against actual (M18): a baseline start and/or end gives a task baseStart and baseEnd, the days it was
+// promised for (one of them missing is made up from the task's own length); doneOn is the day it really finished.
+//
 // Pure: tested in tests/tasks.test.mjs.
 
 import { dayOf, refId, listOf, plain, num, progressScale } from './values.js';
@@ -52,7 +55,7 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
   const byId = (id) => (id ? columns.find((c) => c.id === id) || null : null);
   const col = (role) => byId(roles[role]);
   const C = Object.fromEntries(['title', 'start', 'end', 'due', 'duration', 'status', 'progress', 'done', 'milestone',
-    'assignee', 'project', 'colour', 'parent', 'dependsOn'].map((r) => [r, col(r)]));
+    'assignee', 'project', 'colour', 'parent', 'dependsOn', 'baselineStart', 'baselineEnd', 'doneOn'].map((r) => [r, col(r)]));
   const colourBy = byId(S.colourBy);
   const groupBy = byId(S.groupBy);
   const cell = (row, role) => (C[role] ? row[C[role].id] : undefined);
@@ -103,6 +106,10 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
     if (end != null && !S.endInclusive) end -= 1;
     const dur = C.duration ? num(cell(row, 'duration')) : null;
     const isMilestone = C.milestone ? plain(cell(row, 'milestone')) === true : false;
+    const planStart = C.baselineStart ? dayOf(cell(row, 'baselineStart'), C.baselineStart.type) : null;
+    let planEnd = C.baselineEnd ? dayOf(cell(row, 'baselineEnd'), C.baselineEnd.type) : null;
+    if (planEnd != null && !S.endInclusive) planEnd -= 1;
+    const doneOn = C.doneOn ? dayOf(cell(row, 'doneOn'), C.doneOn.type) : null;
 
     const statusKey = text(row, 'status');
     const statusFill = C.status && C.status.kind === 'Choice' ? choiceFill(C.status, statusKey) : null;
@@ -129,6 +136,8 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
       group: groupBy ? textOf(row, groupBy, true) : null,
       title: text(row, 'title') || '',
       start: null, end: null, kind: 'bar', fromDue: false, flag: null,
+      // the days it was promised for (inclusive), and the day it was really done; null when the table has no such column or cell
+      baseStart: null, baseEnd: null, doneOn,
       // Which column the end came from, so an edit knows what to write: 'end' | 'due' | 'duration' | 'start'
       endFrom: null,
       status: statusKey, project: projectKey, people: people(row), colour, progress, done,
@@ -155,9 +164,14 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
       unscheduled.push(t);
       continue;
     }
+    if (planStart != null || planEnd != null) {
+      const len = t.end - t.start;
+      t.baseStart = planStart ?? planEnd - len;
+      t.baseEnd = Math.max(t.baseStart, planEnd ?? planStart + len);
+    }
     // What a redraw compares: the drawn facts of this task, nothing else.
     t.hash = [t.title, t.start, t.end, t.kind, t.flag, t.status, t.project, t.colour, t.progress, t.people.join('|'),
-      t.parentId, t.deps.join(','), t.group].join('\u0001');
+      t.parentId, t.deps.join(','), t.group, t.baseStart, t.baseEnd, t.doneOn].join('\u0001');
     tasks.push(t);
   }
   return { tasks, unscheduled, flagged };

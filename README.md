@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.9.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.10.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -269,6 +269,25 @@ These are this browser's choices, per table; a saved view keeps them; nothing is
 **Back to the defaults** undoes them all.
 
 ![Display: compact rows, Status and Owner beside the names, and the panel](docs/images/display.png)
+
+## Plan against actual
+
+A plan slips. The Gantt chart can remember what each task was promised for and show how far it has drifted, and when it
+really finished:
+
+- **Set baseline** (in the Gantt chart's toolbar) remembers today's start and end of every task as its plan, in two Date
+  columns, **Planned start** and **Planned end** (or **Baseline start**, **Geplanter Beginn**, **Début prévu** and the like:
+  they are found by name, and added after asking when the table has none). It is one step in Grist's Undo. When some tasks
+  have a plan already it asks whether to set only the tasks without one, or all of them again.
+- A bar that has moved from its plan shows the plan as a **thin line under it**, and the words say how far: “4 days later
+  than planned”, “Starts 2 days earlier than planned”, in the tooltip, in the quick edit and to a screen reader. A task
+  exactly on its plan draws nothing. In **Display**, “Plan under the bars” turns the lines off, and the column
+  **Against the plan** puts “+4 d” or “−2 d” beside the names.
+- **Done on** is a Date column (found by name too: Done on, Completed on, Erledigt am, Terminé le ...). The day it holds
+  is a **✓ on the task's row**; drag it to another day and that one cell is written, one step in Undo. The tooltip says
+  how many days after or before the task's end it finished. Moving the ✓ does not move the tasks that wait for it.
+- A table that has only planned dates (no other start or end) uses them as its dates. Print and PNG carry the lines and
+  the ✓.
 
 ## Saved views, and moving over from another widget
 

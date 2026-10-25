@@ -89,6 +89,7 @@ export function renderToolbar(host, s, on) {
         s.groupOptions?.length ? picker(t('Group'), t('Group rows by'), s.groupOptions, s.groupBy, on.onGroup, t('No groups')) : null,
         s.hasLinks ? el('button', { type: 'button', class: 'ps-btn' + (s.critical ? ' is-on' : ''), 'aria-pressed': s.critical ? 'true' : 'false',
           text: t('Critical path'), title: t('Show the tasks that decide the end date'), onclick: on.onCritical }) : null,
+        s.canBaseline ? button(t('Set baseline'), t('Remember today’s dates as the plan, to compare later moves with'), on.onBaseline) : null,
         ...zoomTools(),
       ];
     } else if (view === 'calendar') {

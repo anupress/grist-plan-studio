@@ -57,6 +57,8 @@
 .pp-bar__progress { position: absolute; left: 0; bottom: 0; height: 2px; background: rgba(0, 0, 0, 0.35); }
 .pp-bar.is-critical, .pp-ms.is-critical { box-shadow: 0 0 0 1.5px var(--pp-crit); }
 .pp-bar.is-clash, .pp-ms.is-clash { box-shadow: 0 0 0 1.5px var(--pp-crit); }
+.pp-plan { position: absolute; height: 2px; background: var(--pp-muted); }
+.pp-done { position: absolute; width: 9px; height: 9px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--pp-ink); background: #fff; z-index: 2; }
 .pp-ms { position: absolute; transform: rotate(45deg) scale(0.75); background: var(--fill); border-radius: 1px; }
 .pp-sum {
   position: absolute; height: 6px; background: var(--pp-ink); opacity: 0.8;

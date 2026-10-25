@@ -19,6 +19,7 @@ export const ROLE_VIEWS = {
   resource: ['booking', 'timeline'],
   period: ['booking'],
   effort: ['workload'],
+  baselineStart: ['gantt'], baselineEnd: ['gantt'], doneOn: ['gantt'],
 };
 
 /** The views that read a role, as a list of view ids ('all' resolved to every view). */

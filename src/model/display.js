@@ -21,6 +21,7 @@ export const DISPLAY_DEFAULTS = Object.freeze({
   colourBy: null,           // a column id, or null (what Settings says)
   labels: 'auto',           // where a bar's name goes: in it when it fits (else beside), beside always, or nowhere
   weekNumbers: true, weekends: true, today: true,
+  plan: true,               // the planned days under a bar that has moved (M18), when the table has a plan
   cols: [],                 // column ids shown beside the names in the Gantt chart's list
 });
 
@@ -35,7 +36,7 @@ export function cleanDisplay(v) {
   if (LANE_SORTS.includes(v.laneSort)) d.laneSort = v.laneSort;
   if (id(v.colourBy)) d.colourBy = v.colourBy;
   if (LABEL_MODES.includes(v.labels)) d.labels = v.labels;
-  for (const k of ['weekNumbers', 'weekends', 'today']) if (typeof v[k] === 'boolean') d[k] = v[k];
+  for (const k of ['weekNumbers', 'weekends', 'today', 'plan']) if (typeof v[k] === 'boolean') d[k] = v[k];
   if (Array.isArray(v.cols)) d.cols = [...new Set(v.cols.filter(id))].slice(0, MAX_LIST_COLS);
   return d;
 }

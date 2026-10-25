@@ -78,7 +78,8 @@ export function openDisplay(host, state, on) {
     if (sections.includes('show')) {
       body.push(el('div', { class: 'ps-disp__row' }, [
         el('span', { class: 'ps-disp__label', text: t('Show') }),
-        el('div', { class: 'ps-disp__checks' }, [check(t('Week numbers'), 'weekNumbers', d.weekNumbers), check(t('Weekends'), 'weekends', d.weekends), check(t('Today line'), 'today', d.today)]),
+        el('div', { class: 'ps-disp__checks' }, [check(t('Week numbers'), 'weekNumbers', d.weekNumbers), check(t('Weekends'), 'weekends', d.weekends), check(t('Today line'), 'today', d.today),
+          ...(s.mode === 'gantt' && s.hasPlan ? [check(t('Plan under the bars'), 'plan', d.plan)] : [])]),
       ]));
     }
     if (sections.includes('cols') && s.colOptions.length) {

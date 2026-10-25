@@ -182,10 +182,13 @@ export function columnForRole(role, t, tableId) {
     dependsOn: ['RefList:' + tableId, t('Depends on')],
     order: ['Numeric', t('Order in a lane')],
     effort: ['Numeric', t('Hours')],
+    baselineStart: ['Date', t('Planned start')],
+    baselineEnd: ['Date', t('Planned end')],
+    doneOn: ['Date', t('Done on')],
     period: ['Choice', t('Period'), choices([1, 2, 3].map((n) => t('Period {n}', { n })))],
   }[role];
   if (!C) return null;
   const [type, label, widgetOptions] = C;
   return { id: colIdFor(label), type, label, ...(widgetOptions ? { widgetOptions } : {}) };
 }
-export const ASSISTED_ROLES = ['start', 'end', 'due', 'duration', 'status', 'progress', 'done', 'milestone', 'parent', 'dependsOn', 'order', 'period', 'effort'];
+export const ASSISTED_ROLES = ['start', 'end', 'due', 'duration', 'status', 'progress', 'done', 'milestone', 'parent', 'dependsOn', 'order', 'period', 'effort', 'baselineStart', 'baselineEnd', 'doneOn'];

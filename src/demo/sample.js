@@ -31,6 +31,10 @@ export const SAMPLE_COLUMNS = [
   col(11, 'Phase', 'Ref:Tasks', { visibleColId: 'Task' }),
   col(12, 'Order', 'Numeric'),
   col(13, 'Hours', 'Numeric'),
+  // plan against actual: the days a task was promised for, and the day it was really done
+  col(14, 'Planned_start', 'Date'),
+  col(15, 'Planned_end', 'Date'),
+  col(16, 'Done_on', 'Date'),
 ];
 
 /** The people, with their hours a week (Dieter works part-time): the workload reads their capacity here. */
@@ -83,6 +87,11 @@ export function sampleRows(today = todayDay()) {
     22: ['Image rights', 36, 38, null, 'To do', 3, 0, false, 1, 3, [], 12],
   };
 
+  // The plan at the start (day offsets like the rows above): most of the plan has slipped a little, the visual design most.
+  const PLAN = { 6: [1, 3], 7: [1, 4], 8: [7, 10], 9: [11, 18], 10: [8, 18], 11: [25, 25], 12: [9, 21], 13: [28, 35], 14: [29, 35], 15: [29, 36], 18: [42, 46] };
+  // The day the finished tasks were really done: the audit ran a day over its end.
+  const DONE = { 5: 0, 6: 4, 7: 9, 8: 11 };
+
   return Object.entries(T).map(([id, [task, s, e, due, status, owner, progress, ms, project, phase, deps, hours]]) => ({
     id: Number(id), Task: task, Start: s == null ? null : d(s), End: e == null ? null : d(e), Due: due == null ? null : d(due),
     Status: status, Owner: R('People', owner), Progress: progress, Milestone: ms, Project: R('Projects', project),
@@ -90,6 +99,8 @@ export function sampleRows(today = todayDay()) {
     // The board's order within a lane: a rank per row, in steps of ten so a drag lands between two.
     Order: Number(id) * 10,
     Hours: hours,
+    Planned_start: PLAN[id] ? d(PLAN[id][0]) : null, Planned_end: PLAN[id] ? d(PLAN[id][1]) : null,
+    Done_on: DONE[id] != null ? d(DONE[id]) : null,
   }));
 }
 

@@ -13,14 +13,16 @@ import {
 } from './grist/connect.js';
 import { loadColumns, loadForeignMapping, loadLabels, loadOwnSection, loadHolidayDays, loadDaysOff, listDatedTables, loadTable, listTables, columnRefs, forgetMeta, listTablesWithColumns, docTimeZone } from './data/live.js';
 import { templates, structureActions, dataActions, columnForRole } from './model/templates.js';
-import { detectRoles, ganttReady, fromStored, toStored, fits, nameScore } from './model/roles.js';
+import { detectRoles, ganttReady, fromStored, toStored, fits, nameScore, withPlanRoles } from './model/roles.js';
 import { previewLines } from './model/settingsmap.js';
 import { buildTasks, spanOf } from './model/tasks.js';
 import { arrange } from './model/tree.js';
 import { linksOf, isLate, pushPlan, criticalPath, wouldLoop } from './model/schedule.js';
 import { makeCalendar, holidaysBetween } from './model/calendar.js';
 import { todayDay, dateFromDay, plain, dayOf, num, isoFromDay, dayFromISO, progressScale } from './model/values.js';
-import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink } from './model/edits.js';
+import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink, baselineFields, doneOnFields, canMoveDoneOn } from './model/edits.js';
+import { baselineSummary, baselineTargets, drifted } from './model/plan.js';
+import { slipText, slipShortText } from './ui/planwords.js';
 import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, storedMe, rememberMe, storedTab, rememberTab, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, TIME_DEFAULTS, VIEWS, snapshotView, withView, MAX_VIEWS } from './model/settings.js';
 import { buildBoard, planCardMove, newCardFields, cellText, LANE_KINDS, FIELD_KINDS } from './model/board.js';
 import { LANE_KINDS as TL_KINDS, planLaneChange, lanesOf } from './model/lanes.js';
@@ -152,6 +154,7 @@ function ensureView() {
     onOpen: (id) => openCard(id),
     onQuickEdit: (id) => openQuick(id),
     onEdit: (e) => editDates(e),
+    onDoneOn: (e) => moveDoneOn(e),
     onLink: (l) => addLink(l),
     onArrow: (l) => removeLink(l),
     onToggle: (key) => toggleFold(key),
@@ -624,16 +627,19 @@ function displayProps(withList) {
   const cols = withList ? listCols() : [];
   return {
     rowH: h.rowH, barH: h.barH, labels: d.labels, show: { weekNumbers: d.weekNumbers, weekends: d.weekends, today: d.today },
+    showPlan: d.plan && hasPlan(), canDoneOn: () => canMoveDoneOn(ctx()),
     listCols: cols.map((c) => ({ id: c.id, label: c.label })),
     listText: cols.length ? (task) => listTexts(task) : null,
   };
 }
 /** The columns beside the names that are still in the table. */
-const listCols = () => disp().cols.map((id) => colById(id)).filter(Boolean);
+const hasPlan = () => !!(S.roles.baselineStart || S.roles.baselineEnd);
+/** The columns beside the names; '@slip' is not a column but what the plan says about each task (M18). */
+const listCols = () => disp().cols.map((id) => (id === '@slip' ? (hasPlan() ? { id: '@slip', label: t('Against the plan') } : null) : colById(id))).filter(Boolean);
 /** A task's text in each of them. */
 function listTexts(task) {
   const row = rowById(task.id);
-  return listCols().map((c) => (row ? cellText(row, c, S.labels, fmtShort) || '' : ''));
+  return listCols().map((c) => (c.id === '@slip' ? slipShortText(task) || '' : row ? cellText(row, c, S.labels, fmtShort) || '' : ''));
 }
 let displayPanel = null;
 function displayState() {
@@ -642,7 +648,8 @@ function displayState() {
   const colourable = S.columns.filter((c) => (c.kind === 'Choice' || c.kind === 'ChoiceList' || c.kind === 'Ref' || c.kind === 'RefList' || c.kind === 'Text' || c.kind === 'Bool') && c.id !== S.roles.title && c.refTable !== S.tableId).map((c) => ({ id: c.id, label: c.label }));
   // the dates are said by the bars and by the list already: sorting by start or end has its own entries, and the list shows both
   const dates = new Set([S.roles.start, S.roles.end, S.roles.due]);
-  return { mode: S.mode, display: d, sortOptions: cand.filter((c) => !dates.has(c.id)), colourOptions: colourable, colOptions: cand.filter((c) => c.id !== S.roles.start && c.id !== S.roles.end), maxCols: MAX_LIST_COLS, isDefault: isDefaultDisplay(d) };
+  return { mode: S.mode, display: d, sortOptions: cand.filter((c) => !dates.has(c.id)), colourOptions: colourable, colOptions: [...(hasPlan() && S.mode === 'gantt' ? [{ id: '@slip', label: t('Against the plan') }] : []), ...cand.filter((c) => c.id !== S.roles.start && c.id !== S.roles.end && c.id !== S.roles.baselineStart && c.id !== S.roles.baselineEnd && c.id !== S.roles.doneOn)],
+    hasPlan: hasPlan(), maxCols: MAX_LIST_COLS, isDefault: isDefaultDisplay(d) };
 }
 function setDisplay(next) {
   S.view.display = cleanDisplay(next);
@@ -698,6 +705,7 @@ function drawToolbar(model = null, level = 'full') {
     groupOptions: asOptions(S.columns.filter(groupable)),
     groupBy: groupCol()?.id || null,
     hasLinks: !!(model && gantt && model.links.length), critical: S.view.critical,
+    canBaseline: gantt && canEdit() && ganttReady(S.roles) && !!(S.built && S.built.tasks.length),
     laneOptions: asOptions(S.columns.filter(laneable)), laneBy: laneCol()?.id || null,
     tlLaneOptions: asOptions(S.columns.filter(tlLaneable)), tlLaneBy: tlLaneCol()?.id || null,
     rowOptions: asOptions(S.columns.filter(rowable)), rowsBy: res?.id || null,
@@ -720,7 +728,7 @@ function drawToolbar(model = null, level = 'full') {
   }, {
     onMode: setMode,
     onZoom: (z) => setZoom(z), onFit: fit, onToday: () => current()?.scrollToToday?.(), onColumns: openColumns,
-    onNew: newTask, onUndated: () => view?.scrollToUndated(),
+    onNew: newTask, onUndated: () => view?.scrollToUndated(), onBaseline: setBaseline,
     onGroup: (id) => { S.view.groupBy = id || null; saveView(); S.signature = ''; recompute(); },
     onCritical: () => { S.view.critical = !S.view.critical; saveView(); S.signature = ''; recompute(); },
     onLanes: (id) => { S.view.laneBy = id || null; saveView(); S.signature = ''; reload('labels'); },
@@ -2033,6 +2041,68 @@ async function applyTemplate(tpl) {
   } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
 }
 
+/** Columns for roles that have none, added in one step and mapped at once (no question: the caller asked it). */
+async function addRoleColumns(roleIds) {
+  const cols = roleIds.map((r) => ({ role: r, col: columnForRole(r, t, S.tableId) })).filter((x) => x.col);
+  if (!cols.length) return false;
+  const res = await apply(cols.map(({ col }) => ['AddColumn', S.tableId, col.id, { type: col.type, label: col.label, ...(col.widgetOptions ? { widgetOptions: col.widgetOptions } : {}) }]));
+  const roles = { ...S.roles };
+  const stored = { ...toStored(S.roles, S.columns) };
+  cols.forEach(({ role, col }, i) => { const made = res?.retValues?.[i] || {}; roles[role] = made.colId || col.id; stored[role] = { ref: made.colRef || 0, id: made.colId || col.id }; });
+  const next = writeOptions(S.options, { storedRoles: stored, gantt: S.gantt });
+  await setOptions(next).catch(() => {});
+  S.options = next;
+  S.roles = roles;
+  S.source = { kind: 'saved' };
+  await reload('schema');
+  return true;
+}
+
+/** Plan against actual (M18): today's start and end of every task, remembered as the plan. */
+async function setBaseline() {
+  if (!canEdit() || S.mode !== 'gantt') return;
+  const tasks = everyTask().tasks;   // every dated task, whatever the filters hide: a plan set for some would be a half plan
+  const sum = baselineSummary(tasks);
+  if (!sum.dated) { toast(t('No task has dates yet, so there is nothing to remember.')); return; }
+  const need = ['baselineStart', 'baselineEnd'].filter((r) => !S.roles[r]);
+  const names = need.map((r) => columnForRole(r, t, S.tableId)?.label).filter(Boolean).join(', ');
+  const colsNote = need.length && S.live ? t('Plan Studio adds the columns {cols} to {table} first.', { cols: names, table: S.tableId }) : null;
+  let mode = 'all';
+  if (sum.planned && sum.missing) {
+    mode = await chooseBox(shell, {
+      title: t('Set the baseline'), body: t('{n} of {m} tasks already have a plan. Which tasks should today’s dates become the plan of?', { n: sum.planned, m: sum.dated }),
+      label: t('Set the plan of'), value: 'missing', ok: t('Set baseline'),
+      options: [{ value: 'missing', label: t('Only the {n} without a plan', { n: sum.missing }) }, { value: 'all', label: t('All {n}, replacing the plans there are', { n: sum.dated }) }],
+    });
+    if (!mode) return;
+  } else {
+    const yes = await confirmBox(shell, {
+      title: sum.planned ? t('Replace the plan?') : t('Set the baseline?'),
+      body: sum.planned ? t('All {n} tasks already have a plan. Today’s dates will replace it.', { n: sum.dated })
+        : t('Plan Studio remembers today’s start and end of the {n} tasks as their plan. Later moves show against it.', { n: sum.dated }),
+      note: colsNote || t('Grist’s Undo takes it back.'), ok: sum.planned ? t('Replace the plan') : t('Set baseline'),
+    });
+    if (!yes) return;
+  }
+  try {
+    if (need.length) {
+      if (!S.live) { toast(t('The demo has no table to add columns to.')); return; }
+      await addRoleColumns(need);
+    }
+  } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); return; }
+  const c = ctx();
+  const targets = baselineTargets(everyTask().tasks, mode);
+  await writeMany(targets.map((x) => ({ id: x.id, plan: baselineFields(c, x.start, x.end, rowById(x.id)) })),
+    t('Baseline set for {n} tasks.', { n: targets.length }));
+}
+
+/** The ✓ dragged to another day: the day the task was really done. */
+function moveDoneOn({ id, day }) {
+  const task = taskById(id);
+  if (!task || !canEdit()) return;
+  write(id, doneOnFields(ctx(), day, rowById(id)), t('“{name}” marked done on {date}.', { name: task.title || t('(no name)'), date: fmtShort(day) }));
+}
+
 /** The Columns panel's "Add a column for it": one column of the right type, mapped to the role at once. */
 async function addColumnFor(role) {
   const col = columnForRole(role, t, S.tableId);
@@ -2172,6 +2242,7 @@ function printNode({ paper, fit }) {
       const bars = e.undated ? [] : [{
         kind: e.summary ? 'summary' : x.kind, start: span.start, end: span.end, colour: x.colour, title: x.title || t('(no name)'),
         progress: x.progress, critical: S.view.critical && m.crit.tasks.has(x.id),
+        plan: disp().plan && hasPlan() && drifted(x) ? { start: x.baseStart, end: x.baseEnd } : null, doneOn: x.doneOn,
       }];
       return { label: x.title || t('(no name)'), depth: e.depth, kind: 'task', sub: e.undated ? t('No dates') : fmtShortRange(span.start, span.end), bars };
     });
@@ -2357,6 +2428,7 @@ function openQuick(id, note = null) {
   openQuickEdit(shell, {
     row, roles: S.roles, columns: S.columns, labels, editable: canEdit(), canOpenCard: S.live, note, booking: S.mode === 'booking',
     calendar: calendarWords(id),
+    plan: slipText(taskById(id) || {}),
     time: {
       logged: S.logged.get(id) || 0, planned: plannedOf(id), running: myTimer()?.task === id, hours: fmtHours,
       canTrack: hasTime() && (canEdit() || S.demo), canSetup: S.live && canEdit() && !hasTime(),
@@ -2537,7 +2609,7 @@ async function loadDocState() {
   S.opensAs = opts.view;
   const saved = opts.roles ? fromStored(opts.roles, S.columns, S.tableId) : {};
   if (Object.keys(saved).length) {
-    S.roles = saved;
+    S.roles = withPlanRoles(saved, S.columns, S.tableId);
     S.source = { kind: 'saved' };
   } else {
     const d = detectRoles(S.columns, { tableId: S.tableId, foreignMapping: await loadForeignMapping(S.tableId) });
@@ -2655,7 +2727,7 @@ function onOptions(options) {
   S.workload = o.workload;
   if (o.time.table !== S.time.table) { S.time = o.time; timeLookedFor = false; } else S.time = o.time;
   if (o.view !== S.opensAs) { S.opensAs = o.view; S.mode = resolveMode(); }
-  if (o.roles) { S.roles = fromStored(o.roles, S.columns, S.tableId); S.source = { kind: 'saved' }; }
+  if (o.roles) { S.roles = withPlanRoles(fromStored(o.roles, S.columns, S.tableId), S.columns, S.tableId); S.source = { kind: 'saved' }; }
   reload('labels');
 }
 
