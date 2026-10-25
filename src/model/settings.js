@@ -45,7 +45,7 @@ export const TIME_DEFAULTS = Object.freeze({
   table: null,              // the time-entries table picked in Columns, or null (found by its columns)
   cols: null,               // {task, person, date, start, end, hours, note}: its columns, or null (found by name)
 });
-export const VIEWS = ['gantt', 'timeline', 'board', 'booking', 'workload', 'agenda', 'calendar'];
+export const VIEWS = ['gantt', 'timeline', 'board', 'booking', 'workload', 'agenda', 'calendar', 'overview'];
 const REGION = /^(DE(-[A-Z]{2})?|AT|CH|FR|UK-EW|US)$/;
 
 /** Widget options as Grist returns them (or null) -> {roles (stored form or null), gantt}. */
@@ -114,6 +114,7 @@ const SNAPSHOT = {
   groupBy: text, critical: (v) => v === true, laneBy: text, tlLaneBy: text, bookRows: text, bookPeriods: text, bookFilter: text,
   wlRows: text, wlUnit: oneOf('day', 'week', 'month'), wlMeasure: oneOf('planned', 'logged', 'remaining'),
   agendaWho: oneOf('mine', 'all'), calMode: oneOf('month', 'week'),
+  ovBy0: text, ovBy1: text,   // the overview's two breakdowns (M19): a column id; the second may be '-' for none
 };
 const ZOOMS = ['day', 'week', 'month', 'quarter', 'year'];
 
@@ -194,6 +195,8 @@ export function storedView(tableId) {
     wlMeasure: ['planned', 'logged', 'remaining'].includes(v.wlMeasure) ? v.wlMeasure : null,
     agendaWho: ['mine', 'all'].includes(v.agendaWho) ? v.agendaWho : null,
     calMode: ['month', 'week'].includes(v.calMode) ? v.calMode : null,
+    ovBy0: typeof v.ovBy0 === 'string' ? v.ovBy0 : null,
+    ovBy1: typeof v.ovBy1 === 'string' ? v.ovBy1 : null,
     find: cleanFind(v.find),
     display: cleanDisplay(v.display),
   };

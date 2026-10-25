@@ -46,7 +46,7 @@ const ROLE_TEXT = {
 const COLOUR_KINDS = ['Choice', 'ChoiceList', 'Ref', 'RefList', 'Text', 'Bool'];
 const CORE = ['title', 'start', 'end'];           // what almost every plan needs
 const OTHER_DATES = ['due', 'duration'];          // other ways to give a task its date
-const VIEW_NAME = { gantt: 'Gantt chart', timeline: 'Timeline', board: 'Board', calendar: 'Calendar', booking: 'Booking grid', workload: 'Workload', agenda: 'Agenda' };
+const VIEW_NAME = { gantt: 'Gantt chart', timeline: 'Timeline', board: 'Board', calendar: 'Calendar', booking: 'Booking grid', workload: 'Workload', agenda: 'Agenda', overview: 'Overview' };
 const GROUP_TITLE = { colours: 'Colours', dates: 'Reading dates', working: 'Working days', board: 'Board', booking: 'Booking grid', workload: 'Workload', time: 'Time tracking', reminders: 'Reminders', browser: 'This browser' };
 const TABS = [['columns', 'Columns'], ['view', 'This view'], ['more', 'More']];
 
@@ -233,7 +233,7 @@ export function openMapping(host, s, on) {
   };
   const { here, more } = groupsFor(mode);
 
-  const opens = field(t('This view'), F(t('This widget opens as'), sel('ps-opens', opensAs, [['auto', t('Automatic')], ['gantt', t('Gantt chart')], ['timeline', t('Timeline')], ['board', t('Board')], ['calendar', t('Calendar')], ['booking', t('Booking grid')], ['workload', t('Workload')], ['agenda', t('Agenda')]], (e) => { opensAs = e.target.value; }),
+  const opens = field(t('This view'), F(t('This widget opens as'), sel('ps-opens', opensAs, [['auto', t('Automatic')], ['gantt', t('Gantt chart')], ['timeline', t('Timeline')], ['board', t('Board')], ['calendar', t('Calendar')], ['booking', t('Booking grid')], ['workload', t('Workload')], ['agenda', t('Agenda')], ['overview', t('Overview')]], (e) => { opensAs = e.target.value; }),
     t('Automatic: the Agenda on a phone, otherwise the Gantt chart when the table has dates, or else the board. For everyone who opens this page; the toolbar switches the view in this browser only.'), 'ps-opens'));
   const viewPane = el('div', { class: 'ps-pane is-off', dataset: { tab: 'view' }, role: 'tabpanel' }, [
     el('p', { class: 'ps-viewname', text: `${t('This view')}: ${t(VIEW_NAME[mode])}` }),

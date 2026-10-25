@@ -35,7 +35,9 @@ import { toIcs, fileName } from './model/ics.js';
 import { reminderScript, detectEmailColumn } from './model/reminders.js';
 import { detectTimeColumns, findTimeTable, readEntries, loggedByTask, runningOf, planStart, planStop, planLog, toCsv, timeTableSetup, timeTableShowActions } from './model/time.js';
 import { ZOOM_ORDER, ZOOMS, fitZoom, isoWeek, startOfUnit } from './views/gantt/layout.js';
-import { renderTimePrint, renderBoardPrint, renderBookingPrint, renderWorkloadPrint, renderCalendarPrint, subtitleFor } from './print/render.js';
+import { renderTimePrint, renderBoardPrint, renderBookingPrint, renderWorkloadPrint, renderCalendarPrint, renderOverviewPrint, subtitleFor } from './print/render.js';
+import { createOverview, groupWords, dueText } from './views/overview/view.js';
+import { buildOverview, pickBreakdowns, breakdownColumns } from './model/overview.js';
 import { nodeToPng } from './print/png.js';
 import { pageRule } from './print/layout.js';
 import { openPrint } from './ui/printpanel.js';
@@ -80,7 +82,7 @@ const S = {
   find: { active: false, keep: null, shown: 0, total: 0 },   // what this browser's quick filters keep (model/find.js)
   pinned: new Set(),   // rows added here while a filter is on: shown until the filter changes, so a new task does not vanish
   zoom: null, fitNext: false, selectedId: null, firstDraw: true,
-  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, find: emptyFind(), display: cleanDisplay(null) },   // this browser's view of this table
+  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, ovBy0: null, ovBy1: null, find: emptyFind(), display: cleanDisplay(null) },   // this browser's view of this table
   calDay: null,        // a day in the month or week the calendar shows; null = today (not saved: looking around)
   example: 'plan',     // the demo's data: 'plan' (a website relaunch) or 'stores' (pop-up stores × weekends)
   pendingEdit: null,   // {id, note}: open quick edit once Grist sends this new row
@@ -132,7 +134,8 @@ let bookingView = null;
 let workloadView = null;
 let agendaView = null;
 let calendarView = null;
-const current = () => view || boardView || timelineView || bookingView || workloadView || agendaView || calendarView;
+let overviewView = null;
+const current = () => view || boardView || timelineView || bookingView || workloadView || agendaView || calendarView || overviewView;
 /** Take down every view but `keep` ('gantt', 'board', 'timeline', 'booking', 'workload', 'agenda', 'calendar'; null for all). */
 function dropOthers(keep) {
   // the stage is about to be cleared, and a note on it with it
@@ -144,6 +147,7 @@ function dropOthers(keep) {
   if (keep !== 'workload' && workloadView) { workloadView.destroy(); workloadView = null; S.signature = ''; S.firstDraw = true; }
   if (keep !== 'agenda' && agendaView) { agendaView.destroy(); agendaView = null; S.signature = ''; S.firstDraw = true; }
   if (keep !== 'calendar' && calendarView) { calendarView.destroy(); calendarView = null; S.signature = ''; S.firstDraw = true; }
+  if (keep !== 'overview' && overviewView) { overviewView.destroy(); overviewView = null; S.signature = ''; S.firstDraw = true; }
 }
 function ensureView() {
   if (view) return view;
@@ -257,6 +261,17 @@ function ensureAgenda() {
     onAnnounce: (text) => announce(text),
   });
   return agendaView;
+}
+
+function ensureOverview() {
+  if (overviewView) return overviewView;
+  dropOthers('overview');
+  clear(stage);
+  overviewView = createOverview(stage, {
+    onDrill: (d) => drillDown(d),
+    onQuickEdit: (id) => openQuick(id),
+  });
+  return overviewView;
 }
 
 /** A message in place of the view; `actions` are [label, run] buttons, the first one the main one. */
@@ -523,6 +538,7 @@ const narrow = () => typeof window !== 'undefined' && window.innerWidth < PHONE;
 const fitsScreen = (mode) => (mode === 'calendar' && narrow() ? 'agenda' : mode);
 function setMode(mode) {
   if (mode === S.mode) return;
+  if (S.mode !== 'overview') S.lastView = S.mode;   // where a click on a value of the overview goes back to
   S.mode = mode;
   rememberMode(S.tableId, S.opensAs, mode);
   S.signature = '';
@@ -536,9 +552,9 @@ const PERIOD_LABELS = { day: 'Days', week: 'Weeks', month: 'Months' };
 // A search by name and chosen values of a few columns, per browser and per table, saved with a saved view. They decide
 // which rows a view draws and nothing else: nothing is written to the document, a push still looks at every task, a
 // board lane's limit still counts every open card, and a task added here stays on show until the filters change.
-const FIND_MODES = ['gantt', 'timeline', 'board', 'calendar', 'agenda', 'workload'];
+const FIND_MODES = ['gantt', 'timeline', 'board', 'calendar', 'agenda', 'workload', 'overview'];
 /** Views that draw the tree or add a parent up from its tasks decide a parent by its children; the board and the calendar take each row as it is. */
-const findTree = () => S.mode !== 'board' && S.mode !== 'calendar';
+const findTree = () => S.mode !== 'board' && S.mode !== 'calendar' && S.mode !== 'overview';
 let findMemo = null;
 /** What the filters keep: worked out again only when the rows, the filters, the columns or the labels change. */
 function findNow() {
@@ -689,7 +705,7 @@ function drawToolbar(model = null, level = 'full') {
     // A parent without dates of its own still has a bar (its children's span): only tasks with neither count as undated.
     // The timeline draws the children rather than the parent, but counts the same way, so both views give one number.
     counts: {
-      tasks: b ? b.tasks.length + b.unscheduled.length : 0,
+      tasks: S.mode === 'overview' ? S.ovModel?.total || 0 : b ? b.tasks.length + b.unscheduled.length : 0,
       cards: S.mode === 'board' && S.boardModel && b ? S.boardModel.lanes.reduce((n, l) => n + l.cards.length, 0) : b ? b.tasks.length + b.unscheduled.length : 0,
       unscheduled: gantt && model ? model.entries.filter((e) => e.kind === 'task' && e.undated).length
         : S.mode === 'timeline' && b ? arrange([...b.tasks, ...b.unscheduled]).entries.filter((e) => e.undated).length
@@ -698,13 +714,15 @@ function drawToolbar(model = null, level = 'full') {
       bookings: b ? b.tasks.length + b.unscheduled.length : 0, clashes: bm ? bm.clashes.size : 0, outside: bm ? bm.outside : 0,
       overloads: wm ? wm.ahead.length : 0, noHours: wm ? wm.missing : 0,
       open: S.mode === 'agenda' && S.agendaModel ? S.agendaModel.ag.open : 0,
-      late: S.mode === 'agenda' ? S.agendaModel?.ag.groups.find((g) => g.id === 'late')?.items.length || 0 : 0,
+      late: S.mode === 'overview' ? S.ovModel?.late || 0 : S.mode === 'agenda' ? S.agendaModel?.ag.groups.find((g) => g.id === 'late')?.items.length || 0 : 0,
       // logged hours are history: the bar says how many, not whether anyone is over
       logged: wm?.measure === 'logged' ? fmtHours(wm.people.reduce((s, p) => s + p.totals.reduce((a, x) => a + x.load, 0), 0)) : null,
     },
     groupOptions: asOptions(S.columns.filter(groupable)),
     groupBy: groupCol()?.id || null,
     hasLinks: !!(model && gantt && model.links.length), critical: S.view.critical,
+    ovOptions: S.mode === 'overview' ? breakdownColumns(S.columns, S.roles, S.tableId).map((c) => ({ id: c.id, label: c.label })) : [],
+    ovBy: S.mode === 'overview' ? ovPicks().map((c) => c?.id ?? null) : [],
     canBaseline: gantt && canEdit() && ganttReady(S.roles) && !!(S.built && S.built.tasks.length),
     laneOptions: asOptions(S.columns.filter(laneable)), laneBy: laneCol()?.id || null,
     tlLaneOptions: asOptions(S.columns.filter(tlLaneable)), tlLaneBy: tlLaneCol()?.id || null,
@@ -729,6 +747,8 @@ function drawToolbar(model = null, level = 'full') {
     onMode: setMode,
     onZoom: (z) => setZoom(z), onFit: fit, onToday: () => current()?.scrollToToday?.(), onColumns: openColumns,
     onNew: newTask, onUndated: () => view?.scrollToUndated(), onBaseline: setBaseline,
+    onOverBy0: (id) => { S.view.ovBy0 = id || null; saveView(); S.signature = ''; recompute(); },
+    onOverBy1: (id) => { S.view.ovBy1 = id || '-'; saveView(); S.signature = ''; recompute(); },
     onGroup: (id) => { S.view.groupBy = id || null; saveView(); S.signature = ''; recompute(); },
     onCritical: () => { S.view.critical = !S.view.critical; saveView(); S.signature = ''; recompute(); },
     onLanes: (id) => { S.view.laneBy = id || null; saveView(); S.signature = ''; reload('labels'); },
@@ -758,6 +778,7 @@ const saveView = () => rememberView(S.tableId, {
   groupBy: S.view.groupBy, critical: S.view.critical, collapsed: [...S.view.collapsed], laneBy: S.view.laneBy,
   tlLaneBy: S.view.tlLaneBy, bookRows: S.view.bookRows, bookPeriods: S.view.bookPeriods, bookFilter: S.view.bookFilter,
   wlRows: S.view.wlRows, wlUnit: S.view.wlUnit, wlMeasure: S.view.wlMeasure, agendaWho: S.view.agendaWho, calMode: S.view.calMode,
+  ovBy0: S.view.ovBy0, ovBy1: S.view.ovBy1,
   find: cleanFind(S.view.find),
   display: cleanDisplay(S.view.display),
 });
@@ -802,6 +823,7 @@ function recompute() {
   if (S.mode === 'booking') { recomputeBooking(); return; }
   if (S.mode === 'workload') { recomputeWorkload(); return; }
   if (S.mode === 'agenda') { recomputeAgenda(); return; }
+  if (S.mode === 'overview') { recomputeOverview(); return; }
   if (S.mode === 'calendar') { recomputeCalendar(); return; }
   if (!ganttReady(S.roles)) {
     S.built = null;
@@ -1246,6 +1268,35 @@ function fmtDayWd(d) {
   if (!wdFormats.has(loc)) wdFormats.set(loc, new Intl.DateTimeFormat(loc, { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }));
   return wdFormats.get(loc).format(dateFromDay(d));
 }
+// ---- the overview (M19) ---------------------------------------------------------------------------------------
+/** The two columns the bars are made by: this browser's choice where it still exists, else the status, then the person. */
+const ovPicks = () => pickBreakdowns(S.columns, S.roles, S.tableId, [S.view.ovBy0 || undefined, S.view.ovBy1 === '-' ? null : S.view.ovBy1 || undefined]);
+function recomputeOverview() {
+  if (!S.roles.title) {
+    S.built = null;
+    drawToolbar(null, 'switch');
+    emptyState(t('Which column holds the task names?'), t('The overview counts the tasks by name. Pick the column in Settings.'));
+    return;
+  }
+  S.built = buildTasks(viewRows(), { roles: S.roles, columns: S.columns, labels: S.labels, calendar: calendar(), settings: { ...S.gantt, colourBy: null, groupBy: null } });
+  const today = todayDay();
+  S.ovModel = buildOverview(S.built.tasks, S.built.unscheduled, { today, doable: isDoable(), rowOf: rowById, labels: S.labels, by: ovPicks(), valueText });
+  drawToolbar();
+  const v = ensureOverview();
+  showTip();
+  v.update({
+    ov: S.ovModel, today, fmtDay: fmtDayWd, who: (task) => task.people.join(', '),
+    empty: S.ovModel.total ? null : { title: t('No tasks to count'), body: t('The table is empty, or the filters leave nothing to count. Nothing is deleted: clear the filters to see every task again.') },
+  });
+}
+/** A value clicked in the overview: keep only its tasks, in the view the person came from. */
+function drillDown({ colId, token }) {
+  const back = S.lastView && S.lastView !== 'overview' && FIND_MODES.includes(S.lastView) ? S.lastView : ganttReady(S.roles) ? 'gantt' : boardPossible() ? 'board' : 'agenda';
+  const inStrip = ['assignee', 'status', 'project'].some((r) => S.roles[r] === colId);
+  patchFind((f) => { f.sel[colId] = [token]; if (!inStrip && !f.cols.includes(colId)) f.cols.push(colId); });
+  setMode(back);
+}
+
 function recomputeAgenda() {
   if (!S.roles.title) {
     S.built = null;
@@ -2213,7 +2264,7 @@ const showNoTimeHint = (on) => showBanner('noTimeHint', on, t('Nothing logged in
 // ---- print -----------------------------------------------------------------------------------------------
 // The printout is built from the model on screen, for paper (print/render.js), into #ps-print, which
 // only shows when printing. In a Grist iframe, print() prints this widget alone.
-const VIEW_NAMES = { gantt: 'Gantt chart', timeline: 'Timeline', board: 'Board', booking: 'Booking grid', workload: 'Workload', agenda: 'Agenda', calendar: 'Calendar' };
+const VIEW_NAMES = { gantt: 'Gantt chart', timeline: 'Timeline', board: 'Board', booking: 'Booking grid', workload: 'Workload', agenda: 'Agenda', calendar: 'Calendar', overview: 'Overview' };
 let printing = false;
 function startPrint() {
   if (printing || !S.ready) return;
@@ -2250,6 +2301,20 @@ function printNode({ paper, fit }) {
       title: printTitle(), subtitle: subtitleFor(view, count('{n} task', '{n} tasks'), locale, today),
       nameHeader: colById(S.roles.title)?.label || t('Task'), paper, mode: fit, zoomPx: ZOOMS[S.zoom || 'week'].px, weekStart: weekStart(), locale, today,
       span: m.span || { from: today, to: today + 7 }, rows,
+    });
+  }
+  if (S.mode === 'overview' && S.ovModel) {
+    const o = S.ovModel;
+    const kpis = [{ label: t('Open'), value: o.open }, ...(o.doable ? [{ label: t('Late'), value: o.late, late: o.late > 0 }] : []), { label: t('Due in 7 days'), value: o.soon },
+      ...(o.doable ? [{ label: t('Done'), value: o.done }] : []), { label: t('No dates'), value: o.undated }];
+    const lists = [];
+    if (o.doable) lists.push({ heading: t('Needs attention'), none: t('Nothing is late.'), items: o.lateList.map((x) => ({ title: x.task.title || t('(no name)'), who: x.task.people.join(', '), when: tn(x.days, '{n} day late', '{n} days late'), late: true })) });
+    lists.push({ heading: t('Next milestones'), none: t('No milestone ahead.'), items: o.milestones.map((x) => ({ title: x.task.title || t('(no name)'), who: x.task.people.join(', '), when: `${fmtDayWd(x.day)} · ${dueText(x.inDays)}` })) });
+    return renderOverviewPrint({
+      title: printTitle(), subtitle: subtitleFor(view, tn(o.total, '{n} task', '{n} tasks') + (o.share != null && o.doable ? ' · ' + t('{n}% done', { n: Math.round(o.share * 100) }) : ''), locale, today), paper, kpis,
+      blocks: o.breakdowns.map((b) => ({ heading: t('By {col}', { col: b.col.label }), note: b.multi ? t('A task with several values is counted under each of them.') : null,
+        rows: b.groups.map((g) => ({ name: g.label, done: g.done, open: g.open, late: g.late, total: g.total, words: groupWords(g) })) })),
+      lists,
     });
   }
   if (S.mode === 'timeline' && S.tlModel) {

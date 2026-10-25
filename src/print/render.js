@@ -153,6 +153,48 @@ export function renderBoardPrint(s) {
   return root;
 }
 
+// ---- overview (M19) ------------------------------------------------------------------------------------
+
+/**
+ * @param s {title, subtitle, paper, kpis: [{label, value, late}], blocks: [{heading, rows: [{name, done, open, late, total, words}], note}],
+ *           lists: [{heading, items: [{title, who, when, late}], none}]}
+ */
+export function renderOverviewPrint(s) {
+  const page = pageArea(s.paper);
+  const root = el('div', { class: 'pp-root' });
+  const max = (rows) => Math.max(1, ...rows.map((r) => r.total));
+  root.appendChild(el('table', { class: 'pp-sheet pp-ov', style: { width: page.w + 'px' } }, [
+    el('colgroup', {}, [el('col', { style: { width: page.w + 'px' } })]),
+    el('thead', {}, [titleRow(s, 1)]),
+    el('tbody', {}, [el('tr', {}, [el('td', {}, [
+      el('dl', { class: 'pp-ov__kpis' }, s.kpis.map((k) => el('div', { class: 'pp-ov__kpi' + (k.late ? ' is-late' : '') }, [el('dd', { text: String(k.value) }), el('dt', { text: k.label })]))),
+      ...s.blocks.flatMap((b) => [
+        el('h2', { text: b.heading }),
+        ...b.rows.map((r) => {
+          const m = max(b.rows), pct = (n) => (n / m) * 100 + '%';
+          return el('div', { class: 'pp-ov__row' }, [
+            el('span', { class: 'pp-ov__name', text: r.name }),
+            el('span', { class: 'pp-ov__bar' }, [
+              r.done ? el('span', { class: 'pp-ov__seg pp-ov__seg--done', style: { width: pct(r.done) } }) : null,
+              r.open ? el('span', { class: 'pp-ov__seg pp-ov__seg--open', style: { width: pct(r.open) } }) : null,
+              r.late ? el('span', { class: 'pp-ov__seg pp-ov__seg--late', style: { width: pct(r.late) } }) : null,
+            ]),
+            el('span', { class: 'pp-ov__nums', text: r.words }),
+          ]);
+        }),
+        b.note ? el('p', { class: 'pp-ov__none', text: b.note }) : null,
+      ]),
+      ...s.lists.flatMap((l) => [
+        el('h2', { text: l.heading }),
+        ...(l.items.length ? l.items.map((i) => el('div', { class: 'pp-ov__task' }, [
+          el('span', { text: i.title }), i.who ? el('span', { text: i.who }) : null, el('span', { class: i.late ? 'is-late' : '', text: i.when }),
+        ])) : [el('p', { class: 'pp-ov__none', text: l.none })]),
+      ]),
+    ])])]),
+  ]));
+  return root;
+}
+
 // ---- booking grid --------------------------------------------------------------------------------------
 
 /**

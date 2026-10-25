@@ -245,3 +245,48 @@
 .ps-cal__more { align-self: start; height: 18px; padding: 0 8px; border: 0; background: none; color: var(--ps-muted); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
 .ps-cal__more:hover { color: var(--ps-ink); text-decoration: underline; }
 .ps-cal__ghost { position: fixed; z-index: 30; max-width: 320px; padding: 5px 9px; border-radius: 6px; background: var(--ps-tip-bg); color: var(--ps-tip-ink); font-size: 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- the overview (M19) ----
+   Numbers first, then bars. The row of counts sits between hairlines (each cell rules its right and bottom edge, the box clips the outer ones,
+   so it stays ruled however it wraps); late is the only red, and always says "late". A bar is done / open / late with its words beside
+   it, as long as its group is big against the biggest, so size and make-up read together. No shadows, no icons. */
+.ps-ov { position: absolute; inset: 0; overflow-y: auto; background: var(--ps-ground); outline: none; }
+.ps-ov__col { max-width: 920px; margin: 0 auto; padding: 18px 16px 48px; box-sizing: border-box; }
+.ps-ov__kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); margin: 0; background: var(--ps-surface); border: 1px solid var(--ps-line); border-radius: 8px; overflow: hidden; }
+.ps-ov__kpi { display: grid; grid-template-areas: "n" "l" "x"; align-content: start; gap: 2px; padding: 12px 14px; min-width: 0; box-shadow: 1px 1px 0 var(--ps-line); }
+.ps-ov__kpi dd { grid-area: n; margin: 0; font-size: 22px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.ps-ov__kpi dt { grid-area: l; font-size: 12px; color: var(--ps-muted); }
+.ps-ov__note { grid-area: x; font-size: 11px; color: var(--ps-muted); font-variant-numeric: tabular-nums; }
+.ps-ov__kpi.is-late dd, .ps-ov__kpi.is-late dt { color: var(--ps-crit); }
+.ps-ov__block { margin-top: 26px; min-width: 0; }
+.ps-ov__h { margin: 0 0 6px; padding-bottom: 6px; border-bottom: 1px solid var(--ps-line-strong); font-size: 13px; font-weight: 700; }
+.ps-ov__rows, .ps-ov__list { list-style: none; margin: 0; padding: 0; }
+.ps-ov__row { display: grid; grid-template-columns: minmax(96px, 200px) minmax(80px, 1fr) minmax(130px, auto); align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--ps-line); }
+.ps-ov__name { min-width: 0; padding: 3px 0; border: 0; background: none; color: var(--ps-ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-ov__name:hover { text-decoration: underline; }
+.ps-ov__bar { display: flex; height: 10px; border-radius: 5px; background: var(--ps-line); overflow: hidden; }
+.ps-ov__seg { display: block; height: 100%; }
+.ps-ov__seg--done { background: var(--ps-ok); }
+.ps-ov__seg--open { background: var(--ps-bar); }
+.ps-ov__seg--late { background: var(--ps-crit); }
+.ps-ov__nums { font-size: 12px; color: var(--ps-muted); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ps-ov__lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 32px; }
+.ps-ov__task { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; gap: 12px; width: 100%; box-sizing: border-box; padding: 7px 2px; border: 0; border-bottom: 1px solid var(--ps-line); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ps-ov__task:hover { background: var(--ps-hover); }
+.ps-ov__title { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-ov__who { font-size: 12px; color: var(--ps-muted); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-ov__when { font-size: 12px; color: var(--ps-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ps-ov__when.is-late { color: var(--ps-crit); font-weight: 600; }
+.ps-ov__none { margin: 8px 0 0; font-size: 13px; color: var(--ps-muted); }
+.ps-ov__empty { max-width: 420px; padding: 36px 18px; }
+.ps-ov__empty h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+.ps-ov__empty p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ps-muted); }
+@media (max-width: 600px) {
+  .ps-ov__col { padding: 12px 12px 40px; }
+  .ps-ov__kpis { grid-template-columns: repeat(2, 1fr); }
+  .ps-ov__row { grid-template-columns: 1fr auto; grid-template-areas: "name nums" "bar bar"; row-gap: 4px; }
+  .ps-ov__name { grid-area: name; }
+  .ps-ov__nums { grid-area: nums; }
+  .ps-ov__bar { grid-area: bar; }
+  .ps-ov__lists { grid-template-columns: 1fr; }
+}

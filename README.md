@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.10.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.11.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -26,7 +26,7 @@ Opened in a plain browser tab, the widget runs on sample data and saves nothing:
 - **[Pop-up stores over weekends](https://anupress.github.io/grist-plan-studio/?example=stores)**:
   the booking grid, with no dates at all
 
-## The seven views
+## The eight views
 
 | View | Rows are | What you do in it |
 |---|---|---|
@@ -37,6 +37,7 @@ Opened in a plain browser tab, the widget runs on sample data and saves nothing:
 | **Booking grid** | resources × days, weeks, months or your own periods | see free cells counted per period, click one to book it, spot double bookings |
 | **Workload** | people × days, weeks or months, hours against capacity | see who is over and when, list the tasks behind a cell, **Level** the plan |
 | **Agenda** | open tasks under the day they need someone | late first, then today, tomorrow and the weeks ahead; **Mine** or **Everyone**; the first view on a phone |
+| **Overview** | the plan in numbers: counts, and a bar for each value of a column | see how many tasks are open, late or done, by status, person or project; click a value to see only its tasks; print it as a one-page report |
 
 ![The same plan as a board, a lane per status](docs/images/board.png)
 
@@ -223,6 +224,24 @@ uses: a task with only a due date moves its due date, dates that are formulas re
 task is asked about. Alt + arrows move it a day, Alt + up and down a week; PageUp and PageDown step the
 month. A touch drags after half a second's rest, so a swipe still scrolls. The calendar has seven columns to
 fill, so on a phone the Agenda opens instead, and a saved view of the calendar opens as the Agenda there.
+
+## Overview
+
+The plan in numbers, for a lead or a sponsor. A row of counts (**Open**, **Late**, **Due in 7 days**, **Done**, **No dates**),
+then a bar for each value of a column, **By** one column and, if you like, **And by** another (the status and the person
+to begin with; any Choice, Reference or yes/no column, and a Text column that is the person, the status or the project):
+
+![The overview: counts, then a bar for each status and each person, done, open and late](docs/images/overview.png)
+
+- A bar is as long as its group is big against the biggest one, and is split into **done** (green), **open** (blue) and
+  **late** (red), with the same numbers in words beside it: “2 done · 1 late · 3 open”. Late is red and always says so.
+- The tasks that count are the ones that do the work: a parent (its children carry it) is left out, and late is the
+  agenda's: not finished, and its end has passed. A table that cannot say a task is finished has nothing late.
+- Click a value (“Doing”, “Ann”): the view you came from opens with that filter on, and the strip above says “2 of 12 shown”.
+  **Clear filters** brings the rest back. The overview counts what the search and chips leave, like every view.
+- **Needs attention** lists the late tasks, the longest first, and **Next milestones** the ones coming up; click a task to edit it.
+- **Print** (or Save as PNG) makes the one-page report. The columns chosen are kept in this browser and by a saved view.
+  A task with several people counts under each of them, and the page says so.
 
 ## Search and filters
 

@@ -9,11 +9,11 @@ const ALL = 'all';
 /** The views that read each role. A role no view of the moment reads still has a field, in the "other views" part. */
 export const ROLE_VIEWS = {
   title: ALL, start: ALL, end: ALL, due: ALL, duration: ALL, status: ALL, assignee: ALL, project: ALL,
-  progress: ['gantt', 'timeline', 'board', 'calendar', 'agenda'],
-  done: ['gantt', 'timeline', 'board', 'calendar', 'agenda', 'workload'],
-  milestone: ['gantt', 'timeline', 'calendar', 'agenda'],
+  progress: ['gantt', 'timeline', 'board', 'calendar', 'agenda', 'overview'],
+  done: ['gantt', 'timeline', 'board', 'calendar', 'agenda', 'workload', 'overview'],
+  milestone: ['gantt', 'timeline', 'calendar', 'agenda', 'overview'],
   colour: ['gantt', 'timeline', 'board', 'calendar'],
-  parent: ['gantt', 'agenda', 'workload'],
+  parent: ['gantt', 'agenda', 'workload', 'overview'],
   dependsOn: ['gantt', 'workload'],
   order: ['board'],
   resource: ['booking', 'timeline'],
@@ -23,7 +23,7 @@ export const ROLE_VIEWS = {
 };
 
 /** The views that read a role, as a list of view ids ('all' resolved to every view). */
-export const VIEW_IDS = ['gantt', 'timeline', 'board', 'calendar', 'booking', 'workload', 'agenda'];
+export const VIEW_IDS = ['gantt', 'timeline', 'board', 'calendar', 'booking', 'workload', 'agenda', 'overview'];
 export const viewsOfRole = (role) => (ROLE_VIEWS[role] === ALL ? VIEW_IDS : ROLE_VIEWS[role] || []);
 /** True when the view on show reads this role. */
 export const usedBy = (role, mode) => viewsOfRole(role).includes(mode);
@@ -40,6 +40,7 @@ export const VIEW_GROUPS = {
   board: ['board', 'colours'],
   booking: ['booking'],
   workload: ['workload', 'working'],
+  overview: ['browser'],
 };
 /** @returns {{here: string[], more: string[]}} */
 export function groupsFor(mode) {

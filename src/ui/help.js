@@ -6,7 +6,7 @@ import { t } from '../i18n/index.js';
 import { trapFocus } from './dialog.js';
 import { keyRows } from './keys.js';
 
-export const HELP_VIEWS = ['gantt', 'timeline', 'board', 'calendar', 'booking', 'workload', 'agenda'];
+export const HELP_VIEWS = ['gantt', 'timeline', 'board', 'calendar', 'booking', 'workload', 'agenda', 'overview'];
 
 /** What a view is for, and what can be done in it: whole sentences, so they translate. */
 export function helpFor(view) {
@@ -51,6 +51,14 @@ export function helpFor(view) {
         t('With time entries, Planned, Logged and Remaining switch which hours are counted.'),
       ],
     };
+    case 'overview': return {
+      about: t('The plan in numbers: how many tasks are open, late or done, and a bar for each value of a column such as Status or Person.'),
+      can: [
+        t('By and And by, in the toolbar, choose the columns the bars are made by.'),
+        t('Click a value to see only its tasks in the view you came from; Clear filters brings the rest back.'),
+        t('Click a task under Needs attention or Next milestones to edit it. Print makes a one-page report.'),
+      ],
+    };
     case 'agenda': return {
       about: t('What needs doing, grouped by the day it is due, the late ones first.'),
       can: [
@@ -80,6 +88,7 @@ export function tipFor(view) {
     case 'booking': return t('Click a free cell to book it, or drag a booking to move it. Help lists the rest.');
     case 'workload': return t('A cell over capacity names the day; click it to see the tasks behind it. Help lists the rest.');
     case 'agenda': return t('Tasks by the day they need someone, the late ones first. Click one to edit it. Help lists the rest.');
+    case 'overview': return t('Click a value to see only its tasks. By, in the toolbar, picks the column. Help lists the rest.');
     default: return t('Drag a bar to move a task, or its edge to change its length. Help lists the rest.');
   }
 }

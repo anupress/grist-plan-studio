@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.0
+
+An eighth view: the overview. Tested in Grist 1.7.20 (a table of 12 tasks, the counts compared with the table's own).
+
+- **Overview**: a row of counts (open, late, due in 7 days, done, no dates), a bar for each value of a column (done, open and
+  late, with the words beside it), the late tasks and the next milestones. **By** and **And by** in the toolbar pick the
+  columns: the status and the person to begin with; a Text column that is the person, the status or the project counts.
+- A click on a value goes back to the view you came from with that filter on, and the overview then counts only those tasks.
+- It prints and saves as a picture, as a one-page report. It reads on a phone, and in German and French.
+- Parents are left out of the counts; late is the agenda's.
+
 ## 1.10.0
 
 Plan against actual. Tested in Grist 1.7.20 (a table of 12 tasks).

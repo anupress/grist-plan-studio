@@ -10,7 +10,7 @@ import { ANUPRESS_LOGO } from '../core/assets/brand-logo.js';
 import { VERSION } from '../version.js';
 
 const ZOOM_LABELS = { day: 'Days', week: 'Weeks', month: 'Months', quarter: 'Quarters', year: 'Years' };
-const VIEW_LABELS = { gantt: 'Gantt', timeline: 'Timeline', board: 'Board', calendar: 'Calendar', booking: 'Bookings', workload: 'Workload', agenda: 'Agenda' };
+const VIEW_LABELS = { gantt: 'Gantt', timeline: 'Timeline', board: 'Board', calendar: 'Calendar', booking: 'Bookings', workload: 'Workload', agenda: 'Agenda', overview: 'Overview' };
 const WL_UNIT_LABELS = { day: 'Days', week: 'Weeks', month: 'Months' };
 
 const seg = (label, items, current, onPick, extra = '') => el('div', { class: 'ps-seg' + (extra ? ' ' + extra : ''), role: 'group', 'aria-label': label }, items.map(([id, text]) => el('button', {
@@ -46,7 +46,10 @@ export function renderToolbar(host, s, on) {
   // The calendar needs a screen wider than a phone's: seven columns would leave the names unreadable.
   const viewList = Object.entries(VIEW_LABELS).filter(([id]) => id !== 'calendar' || !s.narrow);
   const counts = [];
-  if (view === 'agenda') {
+  if (view === 'overview') {
+    counts.push(el('span', { text: tn(c.tasks, '{n} task', '{n} tasks') }));
+    if (c.late) counts.push(el('span', { class: 'ps-warn', text: tn(c.late, '{n} late', '{n} late') }));
+  } else if (view === 'agenda') {
     // rows that can be finished are tasks; a table without Done, Status or Progress just has items
     counts.push(el('span', { text: s.agendaDoable ? tn(c.open, '{n} open task', '{n} open tasks') : tn(c.open, '{n} item', '{n} items') }));
     if (c.late) counts.push(el('span', { class: 'ps-warn', text: tn(c.late, '{n} late', '{n} late') }));
@@ -112,6 +115,11 @@ export function renderToolbar(host, s, on) {
         s.agendaWho ? seg(t('Show'), [['mine', t('Mine')], ['all', t('Everyone')]], s.agendaWho, on.onAgendaWho) : null,
         s.canCalendar ? button(t('Add to calendar'), t('A calendar file with the dates below and a reminder'), on.onCalendar) : null,
         button(t('Email reminders'), t('Email the tasks that are late or due soon, every morning'), on.onReminders, ' ps-hide-narrow'),
+      ];
+    } else if (view === 'overview') {
+      tools = [
+        s.ovOptions?.length ? picker(t('By'), t('Break the tasks down by'), s.ovOptions, s.ovBy?.[0], on.onOverBy0) : null,
+        s.ovOptions?.length > 1 ? picker(t('And by'), t('A second breakdown, by'), s.ovOptions, s.ovBy?.[1], on.onOverBy1, t('nothing')) : null,
       ];
     } else if (view === 'workload') {
       tools = [

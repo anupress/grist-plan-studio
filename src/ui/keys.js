@@ -44,6 +44,10 @@ const BY_VIEW = {
     ['↑ ↓', 'Move from task to task'],
     ['Enter', 'Edit the task'],
   ],
+  overview: [
+    ['Tab', 'Go from value to value and to the lists'],
+    ['Enter', 'Show only the tasks of a value, or edit a task'],
+  ],
   workload: [
     ['← → ↑ ↓', 'Move from cell to cell'],
     ['Enter', 'List the tasks behind the cell; Enter on one edits it'],
