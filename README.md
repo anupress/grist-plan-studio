@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.1-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -54,7 +54,13 @@ its people, and the view says it assumes so. Capacity is 8 hours on every workin
 Weekends, public holidays and a holidays table count as days off; a row of that table that names a
 person is that person's day off.
 
-**Level** moves tasks later until nobody is over capacity. Only tasks that take part in an overload
+With a time-entries table (see [Time tracking](#time-tracking)), the toolbar switches between
+**Planned**, **Logged** and **Remaining** hours. Logged shows the time entries on their days, against
+each person's capacity. Remaining takes the time logged on each task off its hours and spreads the rest
+over its working days from today on; a task that should have ended puts what is left on the next
+working day, and its cell says it is late.
+
+**Level** moves tasks later until nobody is over capacity, in the plan or, in Remaining, in what is left of it. Only tasks that take part in an overload
 move, each inside its slack: it still ends before anything that waits for it, before its due date and
 by the end of the plan, so no other task has to move. Tasks that have started, are done, are milestones
 or parents, or have dates from formulas stay where they are. You see the moves before anything is
@@ -126,6 +132,7 @@ Hours, Note, named in the interface language).
   the same step; a timer stopped within a minute logs nothing. Each start and stop is one Undo.
 - **Logged against planned**: a card says "36 of 60 h logged", or how many hours over; the quick edit
   and the Gantt bar's tooltip say how many are left.
+- **The workload** shows the hours logged, or what remains of the plan once they are taken off.
 - **The timesheet** shows one person's week, or everyone's: a row per task, the hours of each day and
   the totals, against the hours that person has that week. A click on a day logs time there, and
   **Download CSV** hands the week's entries to a spreadsheet (semicolons and decimal commas where the

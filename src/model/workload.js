@@ -19,12 +19,22 @@
 //   or a share (0.5, or 50 %). A day off of their own (a holidays-table row naming them) has nothing.
 //
 // Over capacity: a person-day with more hours than the person has, by more than a minute or so.
+//
+// Logged and remaining (from the time entries, model/time.js)
+//   measure 'logged': the hours of the time entries, on their day, for the person who logged them. An
+//   entry that names nobody counts for the task's people, split evenly.
+//   measure 'remaining': each task's hours less the time logged on it, spread over its working days from
+//   today on. Time a person logged comes off their own share; time logged by someone else, or by nobody,
+//   comes off every share evenly. A task that should have ended and is not done asks for what is left on
+//   the first working day from today, and says it is late. Without an hours column there is nothing to
+//   take logged time from, so what remains is the plan from today on. Days before today have no capacity.
 
 import { laneKeysOf, lanesOf, NONE } from './lanes.js';
 import { num } from './values.js';
 import { norm } from './roles.js';
 
 export const WL_UNITS = ['day', 'week', 'month'];
+export const WL_MEASURES = ['planned', 'logged', 'remaining'];
 export const EPS = 0.02;          // hours; 7.9999 is not an overload
 const MAX_DAYS = 1500;            // about four years of days per person
 const WEEK_WORKDAYS = 5;
@@ -104,43 +114,101 @@ function demandOf(task, row, ctx) {
   return { keys, total: null, missing: false, perDay: (key) => full(key) };
 }
 
+/** A task's working days from today on; null when it should have ended (or has no working day left). */
+function daysLeft(task, today, isWork) {
+  if (task.start >= today) return workDaysOf(task.start, task.end, isWork);
+  if (task.end < today) return null;
+  const left = workDaysOf(task.start, task.end, isWork).filter((x) => x >= today);
+  return left.length ? left : null;
+}
+const firstWorkDay = (day, isWork) => { let x = day; for (let i = 0; i < 31 && !isWork(x); i++) x++; return x; };
+
+/** Logged hours by task and person: Map(task -> Map(key | null -> hours)). */
+function loggedBy(logs) {
+  const out = new Map();
+  for (const l of logs) {
+    if (!(l.hours > 0)) continue;
+    if (!out.has(l.task)) out.set(l.task, new Map());
+    const m = out.get(l.task), k = l.key ?? null;
+    m.set(k, (m.get(k) || 0) + l.hours);
+  }
+  return out;
+}
+
 /**
- * @param tasks  dated tasks from buildTasks (undated ones ask nothing)
+ * @param tasks  tasks from buildTasks (undated ones ask nothing, but time logged on them counts)
  * @param rows   the task rows
  * @param ctx {personCol, labels, isWork(day), from, to, hoursPerDay, effortCol, effortUnit,
- *             capacity: Map(key -> hours on a working day), daysOff: Map(key -> Set(day)), keep: Set of keys | null}
+ *             capacity: Map(key -> hours on a working day), daysOff: Map(key -> Set(day)), keep: Set of keys | null,
+ *             measure: 'planned' | 'logged' | 'remaining', logs: [{task, key (a row key, null for nobody), day, hours}], today}
  * @returns {{people, from, to, overs: Array<{key, day}>, missing: number}}
  *   person: {key, label, value, colour, none, perDay (hours on a normal working day; null for "no one"),
- *            items: [{task, hours (a day), days}], load: Float64Array, cap: Float64Array | null}
+ *            items: [{task, hours (a day), days, late?}], load: Float64Array, cap: Float64Array | null}
  *   missing: tasks that ask for nothing because their hours are empty
  */
 export function buildWorkload(tasks, rows, ctx) {
-  const { personCol, labels = {}, isWork, hoursPerDay = 8, capacity = new Map(), daysOff = new Map(), keep = null } = ctx;
+  const { personCol, labels = {}, isWork, hoursPerDay = 8, capacity = new Map(), daysOff = new Map(), keep = null, logs = [] } = ctx;
+  const measure = WL_MEASURES.includes(ctx.measure) ? ctx.measure : 'planned';
   const from = ctx.from;
+  const today = ctx.today ?? from;
   const to = Math.min(ctx.to, from + MAX_DAYS - 1);
   const n = Math.max(0, to - from + 1);
   const rowOf = new Map(rows.map((r) => [r.id, r]));
   const parents = new Set(tasks.map((x) => x.parentId).filter((x) => x != null));
-  const people = lanesOf(personCol, rows, labels)
+  const lanes = lanesOf(personCol, rows, labels);
+  if (measure === 'logged') {
+    // someone who logged time but has no task of their own still gets a row
+    const known = new Set(lanes.map((l) => l.key));
+    for (const l of logs) if (l.key && !known.has(l.key)) { known.add(l.key); lanes.push({ key: l.key, label: l.key.slice(2), value: null, colour: null, none: false }); }
+  }
+  const people = lanes
     .filter((l) => l.none || !keep || keep.has(l.key))
     .map((l) => ({ ...l, perDay: l.none ? null : capacity.get(l.key) ?? hoursPerDay, items: [], load: new Float64Array(n), cap: null }));
   const byKey = new Map(people.map((p) => [p.key, p]));
   const c = { ...ctx, hoursPerDay, capacity };
   let missing = 0;
-  for (const task of tasks) {
-    if (task.start == null || task.done || parents.has(task.id)) continue;
-    const row = rowOf.get(task.id);
-    if (!row) continue;
-    const d = demandOf(task, row, c);
-    if (d.missing) { missing++; continue; }
-    const days = workDaysOf(task.start, task.end, isWork);
-    for (const key of d.keys) {
-      const p = byKey.get(key);
-      if (!p) continue;
-      const hours = d.perDay(key, days);
-      if (hours <= 0) continue;
-      p.items.push({ task, hours, days });
-      for (const day of days) if (day >= from && day <= to) p.load[day - from] += hours;
+  if (measure === 'logged') {
+    const taskOf = new Map(tasks.map((x) => [x.id, x]));
+    for (const l of logs) {
+      if (l.day == null || l.day < from || l.day > to || !(l.hours > 0)) continue;
+      const task = taskOf.get(l.task) || { id: l.task, title: null, index: Infinity };
+      const row = rowOf.get(l.task);
+      const keys = l.key ? [l.key] : row ? laneKeysOf(row[personCol.id], personCol) : [NONE];
+      for (const key of keys) {
+        const p = byKey.get(key);
+        if (!p) continue;
+        const hours = l.hours / keys.length;
+        p.items.push({ task, hours, days: [l.day] });
+        p.load[l.day - from] += hours;
+      }
+    }
+  } else {
+    const logged = measure === 'remaining' && c.effortCol ? loggedBy(logs) : null;
+    for (const task of tasks) {
+      if (task.start == null || task.done || parents.has(task.id)) continue;
+      const row = rowOf.get(task.id);
+      if (!row) continue;
+      const d = demandOf(task, row, c);
+      if (d.missing) { missing++; continue; }
+      let days = workDaysOf(task.start, task.end, isWork), late = false;
+      if (measure === 'remaining') {
+        days = daysLeft(task, today, isWork);
+        if (!days) { days = [firstWorkDay(today, isWork)]; late = true; }
+      }
+      // what each of its people logged on it, and each one's share of what others (or nobody) logged
+      const mine = logged?.get(task.id);
+      const real = d.keys.filter((k) => k !== NONE);
+      const shared = mine ? [...mine].reduce((s, [k, h]) => s + (k != null && real.includes(k) ? 0 : h), 0) / Math.max(1, real.length) : 0;
+      for (const key of d.keys) {
+        const p = byKey.get(key);
+        if (!p) continue;
+        const hours = logged && d.total != null
+          ? Math.max(0, d.total - (key !== NONE ? mine?.get(key) || 0 : 0) - shared) / days.length
+          : d.perDay(key, days);
+        if (hours <= EPS / 10) continue;
+        p.items.push(late ? { task, hours, days, late } : { task, hours, days });
+        for (const day of days) if (day >= from && day <= to) p.load[day - from] += hours;
+      }
     }
   }
   const overs = [];
@@ -150,8 +218,10 @@ export function buildWorkload(tasks, rows, ctx) {
     const off = daysOff.get(p.key);
     for (let i = 0; i < n; i++) {
       const day = from + i;
-      p.cap[i] = isWork(day) && !(off && off.has(day)) ? p.perDay : 0;
-      if (p.load[i] > p.cap[i] + EPS) overs.push({ key: p.key, day });
+      // what is still to do can only be done from today on
+      const gone = measure === 'remaining' && day < today;
+      p.cap[i] = !gone && isWork(day) && !(off && off.has(day)) ? p.perDay : 0;
+      if (!gone && p.load[i] > p.cap[i] + EPS) overs.push({ key: p.key, day });
     }
   }
   return { people: people.filter((p) => !p.none || p.items.length), from, to, overs, missing };
@@ -183,14 +253,17 @@ export function teamTotals(people, periods, from) {
   return out;
 }
 
-/** The tasks behind one cell: [{task, hours}] (hours in that period), most hours first. */
+/** The tasks behind one cell: [{task, hours, late?}] (hours in that period, a task once), most hours first. */
 export function tasksIn(person, period) {
-  const out = [];
+  const byTask = new Map();
   for (const it of person.items) {
     const days = it.days.filter((d) => d >= period.start && d <= period.end).length;
-    if (days) out.push({ task: it.task, hours: days * it.hours });
+    if (!days) continue;
+    const x = byTask.get(it.task.id);
+    if (x) x.hours += days * it.hours;
+    else byTask.set(it.task.id, it.late ? { task: it.task, hours: days * it.hours, late: true } : { task: it.task, hours: days * it.hours });
   }
-  return out.sort((a, b) => b.hours - a.hours || a.task.index - b.task.index);
+  return [...byTask.values()].sort((a, b) => b.hours - a.hours || a.task.index - b.task.index);
 }
 
 // ---- levelling --------------------------------------------------------------------------------------

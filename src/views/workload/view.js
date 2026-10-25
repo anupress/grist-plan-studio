@@ -1,7 +1,8 @@
 // The workload: people down the side, days, weeks or months across, and in each cell the hours asked
 // of that person against the hours they have (model/workload.js). A cell is a line of a resource
 // sheet: the numbers, then a thin meter whose track is the capacity; past it the meter turns the
-// warning colour, and the cell says how many hours over in words.
+// warning colour, and the cell says how many hours over in words. The hours are the plan's, the time
+// logged, or what remains of the plan (model.measure); the cells look the same, the words say which.
 //
 //   click a cell            the tasks behind it, with their hours; pick one to select it
 //   arrow keys              move from cell to cell; Enter lists the tasks there
@@ -46,7 +47,8 @@ export function createWorkload(host, on = {}) {
   const root = el('div', { class: 'ps-book ps-wl' }, [scroll, tip]);
   clear(host).appendChild(root);
 
-  // {people: [{key, label, colour, none, perDay, totals: [{load, cap, over, off}], overDays}], periods, unit, team: [{load, cap}],
+  // {people: [{key, label, colour, none, perDay, totals: [{load, cap, over, off}], planned: [hours] | null, overDays}], periods, unit,
+  //  team: [{load, cap}], measure ('planned' | 'logged' | 'remaining'), gone (per period: before today, with nothing to remain),
   //  today, selectedId, rowLabel, noneLabel, locale, workdays (per period: a working day in the calendar; days only),
   //  tasksAt(ri, pi) -> [{task, hours}], locate(id) -> {ri, pi} | null}
   let model = null;
@@ -81,13 +83,17 @@ export function createWorkload(host, on = {}) {
     return F.monthYearShort.format(d);
   }
   const isToday = (p) => model.today >= p.start && model.today <= p.end;
-  /** "46 of 40 hours, 6 over", for a screen reader and the tooltip */
-  function cellWords(p, x) {
-    if (x.cap == null) return t('{h} hours, not assigned to anyone', { h: hours(x.load) });
+  /** "46 of 40 hours, 6 over", "Logged: 32 of 40 hours, 36 planned": for a screen reader and the tooltip */
+  function cellWords(p, x, pi) {
+    const m = model.measure;
+    if (x.cap == null) return t({ planned: '{h} hours, not assigned to anyone', logged: 'Logged: {h} hours, not assigned to anyone', remaining: 'Remaining: {h} hours, not assigned to anyone' }[m], { h: hours(x.load) });
     if (x.off && x.load <= EPS) return t('Day off');
-    const base = t('{load} of {cap} hours', { load: hours(x.load), cap: hours(x.cap) });
-    if (x.load > x.cap + EPS) return base + ', ' + t('{h} over', { h: hours(x.load - x.cap) });
-    if (x.over > 0) return base + ', ' + tn(x.over, 'but {n} day is over capacity', 'but {n} days are over capacity');
+    const base = t({ planned: '{load} of {cap} hours', logged: 'Logged: {load} of {cap} hours', remaining: 'Remaining: {load} of {cap} hours' }[m], { load: hours(x.load), cap: hours(x.cap) });
+    const plan = m === 'logged' && p.planned?.[pi] > EPS ? ', ' + t('{h} planned', { h: hours(p.planned[pi]) }) : '';
+    if (x.load > x.cap + EPS) return base + ', ' + t('{h} over', { h: hours(x.load - x.cap) }) + plan;
+    if (x.over > 0) return base + ', ' + tn(x.over, 'but {n} day is over capacity', 'but {n} days are over capacity') + plan;
+    // hours free in the past are not free: logged hours say what was planned instead
+    if (m === 'logged') return base + plan;
     return base + (x.cap - x.load > EPS ? ', ' + t('{h} free', { h: hours(x.cap - x.load) }) : '');
   }
 
@@ -102,7 +108,7 @@ export function createWorkload(host, on = {}) {
         style: { left: i * colW + 'px', width: colW + 'px' }, title: rangeText(F, p),
       }, [
         el('span', { class: 'ps-book__label', text: periodLabel(p, i) }),
-        el('span', { class: 'ps-wl__team' + (team.load > team.cap + EPS ? ' is-over' : ''), text: model.unit === 'day' ? hours(team.load) : t('{load} of {cap} h', { load: hours(team.load), cap: hours(team.cap) }),
+        model.gone?.[i] ? null : el('span', { class: 'ps-wl__team' + (team.load > team.cap + EPS ? ' is-over' : ''), text: model.unit === 'day' ? hours(team.load) : t('{load} of {cap} h', { load: hours(team.load), cap: hours(team.cap) }),
           title: t('Everyone: {load} of {cap} hours', { load: hours(team.load), cap: hours(team.cap) }) }),
       ]));
     }
@@ -137,15 +143,16 @@ export function createWorkload(host, on = {}) {
     const day = model.unit === 'day';
     // A week can fit in total and still have days that do not: the cell says so.
     const overDays = !over && x.over > 0;
-    // What is past can no longer be levelled: it keeps its words, in quieter ink.
-    const past = model.periods[i].end < model.today;
+    // What is past can no longer be levelled: it keeps its words, in quieter ink. Logged hours are all
+    // past, so they keep full ink.
+    const past = model.measure !== 'logged' && model.periods[i].end < model.today;
     const text = x.cap == null ? hours(x.load) + ' h' : day ? `${hours(x.load)}/${hours(x.cap)}` : t('{load} of {cap} h', { load: hours(x.load), cap: hours(x.cap) });
     // The meter's track is the capacity (100 %); an overload runs past a tick at the end of it, up to half again.
     const fill = Math.min(1, ratio) * (over ? 100 / 1.5 : 100);
     const extra = over ? Math.min(0.5, ratio - 1) * (100 / 1.5) : 0;
     return el('div', {
       ...base, class: 'ps-wl__cell' + (over ? ' is-over' : overDays ? ' has-overdays' : '') + (x.cap == null ? ' is-free' : '') + (x.off ? ' is-offday' : '') + (past ? ' is-past' : ''),
-      role: 'img', 'aria-label': `${name(p)}, ${periodLabel(model.periods[i], i)}: ${cellWords(p, x)}`,
+      role: 'img', 'aria-label': `${name(p)}, ${periodLabel(model.periods[i], i)}: ${cellWords(p, x, i)}`,
     }, [
       el('span', { class: 'ps-wl__num', text }),
       over ? el('span', { class: 'ps-wl__note', text: day ? '+' + hours(x.load - x.cap) : t('{h} h over', { h: hours(x.load - x.cap) }) })
@@ -205,18 +212,22 @@ export function createWorkload(host, on = {}) {
     const p = model.people[ri], x = p.totals[pi];
     const list = model.tasksAt(ri, pi);
     if (!list.length) return;
-    const items = list.map(({ task, hours: h }) => el('button', {
+    const items = list.map(({ task, hours: h, late }) => el('button', {
       type: 'button', class: 'ps-wl__task' + (task.id === model.selectedId ? ' is-selected' : ''), dataset: { id: String(task.id) },
       onclick: () => on.onSelect?.(task.id), ondblclick: () => { closePop(); on.onQuickEdit?.(task.id); },
       onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); closePop(); on.onQuickEdit?.(task.id); } },
     }, [
-      el('span', { class: 'ps-wl__tname', text: task.title || t('(no name)') }),
+      el('span', { class: 'ps-wl__tname' }, [
+        task.title || t('(no name)'),
+        // what remains of a task that should have ended sits on the first working day from today
+        late ? el('span', { class: 'ps-wl__late', text: t('Late: planned to end {date}', { date: F.dayMonth.format(dateFromDay(task.end)) }) }) : null,
+      ]),
       el('span', { class: 'ps-wl__th', text: hours(h) + ' h' }),
     ]));
     const box = el('div', { class: 'ps-wl__pop', role: 'dialog', 'aria-label': `${name(p)}, ${periodLabel(model.periods[pi], pi)}` }, [
       el('div', { class: 'ps-wl__pophead' }, [
         el('strong', { text: `${name(p)} · ${periodLabel(model.periods[pi], pi)}` }),
-        el('span', { class: x.cap != null && x.load > x.cap + EPS ? 'is-over' : '', text: cellWords(p, x) }),
+        el('span', { class: x.cap != null && x.load > x.cap + EPS ? 'is-over' : '', text: cellWords(p, x, pi) }),
       ]),
       el('div', { class: 'ps-wl__tasks' }, items),
       el('p', { class: 'ps-wl__pophint', text: t('Double-click a task, or press Enter, to edit it.') }),
@@ -244,7 +255,7 @@ export function createWorkload(host, on = {}) {
   // ---- tooltip ---------------------------------------------------------------------------------------------
   function showTip(ri, pi, e) {
     const p = model.people[ri], x = p.totals[pi];
-    clear(tip).append(el('strong', { text: `${name(p)} · ${periodLabel(model.periods[pi], pi)}` }), el('div', { text: cellWords(p, x) }));
+    clear(tip).append(el('strong', { text: `${name(p)} · ${periodLabel(model.periods[pi], pi)}` }), el('div', { text: cellWords(p, x, pi) }));
     if (x.load > EPS) tip.append(el('div', { class: 'ps-tip__hint', text: t('Click for the tasks behind it.') }));
     tip.hidden = false;
     const r = root.getBoundingClientRect();
@@ -288,7 +299,7 @@ export function createWorkload(host, on = {}) {
       drawn = '';
       draw(true);
       const p = model.people[cursor.ri];
-      on.onAnnounce?.(`${name(p)}, ${periodLabel(model.periods[cursor.pi], cursor.pi)}: ${cellWords(p, p.totals[cursor.pi])}`);
+      on.onAnnounce?.(`${name(p)}, ${periodLabel(model.periods[cursor.pi], cursor.pi)}: ${cellWords(p, p.totals[cursor.pi], cursor.pi)}`);
     };
     if (e.key === 'ArrowRight') move(0, 1);
     else if (e.key === 'ArrowLeft') move(0, -1);

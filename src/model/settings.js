@@ -126,6 +126,7 @@ export function storedView(tableId) {
     bookFilter: typeof v.bookFilter === 'string' ? v.bookFilter : null,
     wlRows: typeof v.wlRows === 'string' ? v.wlRows : null,
     wlUnit: ['day', 'week', 'month'].includes(v.wlUnit) ? v.wlUnit : null,
+    wlMeasure: ['planned', 'logged', 'remaining'].includes(v.wlMeasure) ? v.wlMeasure : null,
   };
 }
 export function rememberView(tableId, view) { keep(viewKey(tableId), view); }

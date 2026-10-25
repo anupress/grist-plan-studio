@@ -25,7 +25,7 @@ import { buildBoard, planCardMove, newCardFields, cellText, LANE_KINDS, FIELD_KI
 import { LANE_KINDS as TL_KINDS, planLaneChange, lanesOf } from './model/lanes.js';
 import { buildTimeline } from './model/timeline.js';
 import { buildBooking, calendarPeriods, tablePeriods, columnPeriods, bookingRange, suggestUnit, planBookingMove, newBookingFields, PERIOD_UNITS } from './model/booking.js';
-import { buildWorkload, periodTotals, teamTotals, tasksIn, levelPlan, effortUnitOf, detectCapacity, capacityMode, capacityPerDay, WL_UNITS } from './model/workload.js';
+import { buildWorkload, periodTotals, teamTotals, tasksIn, levelPlan, effortUnitOf, detectCapacity, capacityMode, capacityPerDay, WL_UNITS, WL_MEASURES } from './model/workload.js';
 import { detectTimeColumns, findTimeTable, readEntries, loggedByTask, runningOf, planStart, planStop, planLog, toCsv, timeTableSetup, timeTableShowActions } from './model/time.js';
 import { ZOOM_ORDER, ZOOMS, fitZoom, isoWeek, startOfUnit } from './views/gantt/layout.js';
 import { renderTimePrint, renderBoardPrint, renderBookingPrint, renderWorkloadPrint, subtitleFor } from './print/render.js';
@@ -60,7 +60,7 @@ const S = {
   opensAs: 'auto', mode: 'gantt',   // the view the widget opens in (saved), and the one shown now
   rows: [], labels: {}, holidayDays: new Map(), built: null, signature: '',
   zoom: null, fitNext: false, selectedId: null, firstDraw: true,
-  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null },   // this browser's view of this table
+  view: { groupBy: null, critical: false, collapsed: new Set(), laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null },   // this browser's view of this table
   example: 'plan',     // the demo's data: 'plan' (a website relaunch) or 'stores' (pop-up stores × weekends)
   pendingEdit: null,   // {id, note}: open quick edit once Grist sends this new row
 };
@@ -345,6 +345,8 @@ function wlRowCol() {
   return who && wlRowable(who) ? who : null;
 }
 const wlUnit = () => (WL_UNITS.includes(S.view.wlUnit) ? S.view.wlUnit : 'week');
+/** Planned, logged or remaining hours: logged and remaining only with a time-entries table. */
+const wlMeasure = () => (hasTime() && WL_MEASURES.includes(S.view.wlMeasure) ? S.view.wlMeasure : 'planned');
 const effortCol = () => { const c = colById(S.roles.effort); return c && (c.kind === 'Numeric' || c.kind === 'Int') ? c : null; };
 /** The people table's capacity column: the one saved in Columns, else one whose name says so. */
 function capacityCol() {
@@ -363,15 +365,40 @@ function capacityMap(personCol) {
   for (const r of S.peopleTable.rows) out.set('r:' + r.id, capacityPerDay(r[col.id], mode, S.workload.hoursPerDay));
   return out;
 }
-/** What the workload model needs, for these rows. */
-function wlContext(personCol) {
+/** What the workload model needs, for these rows and this measure. */
+function wlContext(personCol, measure = 'planned') {
   const cal = calendar();
   const eff = effortCol();
   return {
     personCol, labels: S.labels, isWork: cal.isWork, hoursPerDay: S.workload.hoursPerDay,
     effortCol: eff, effortUnit: effortUnitOf(eff, S.workload.effortUnit), capacity: capacityMap(personCol),
     daysOff: personCol.refTable && S.daysOff.refTable === personCol.refTable ? S.daysOff.days : new Map(),
+    measure, today: todayDay(), logs: measure === 'planned' ? [] : wlLogs(personCol),
   };
+}
+/**
+ * The time entries with their person as a key of the workload's rows. Rows of the same people table, or
+ * a person found by name, keep their person; rows of something else (a department) can't name one, so
+ * the entry counts for the task's row, as an entry naming nobody does.
+ */
+function wlLogs(personCol) {
+  if (!hasTime()) return [];
+  const isRef = personCol.kind === 'Ref' || personCol.kind === 'RefList';
+  const tcol = S.timeCols.person ? S.timeTable.columns.find((c) => c.id === S.timeCols.person) : null;
+  const sameTable = tcol?.kind === 'Ref' && isRef && tcol.refTable === personCol.refTable;
+  const byName = new Map(lanesOf(personCol, S.rows, S.labels).filter((l) => !l.none).map((l) => [String(l.label ?? ''), l.key]));
+  const people = personCol.id === S.roles.assignee;
+  const keys = new Map();
+  const keyOf = (p) => {
+    if (!p || sameTable) return p || null;
+    if (!keys.has(p)) {
+      const name = p.startsWith('v:') ? p.slice(2) : personName(p);
+      // someone not on any task, in a column of names, still gets a row of their own
+      keys.set(p, byName.get(name) ?? (people && name && !isRef ? 'v:' + name : null));
+    }
+    return keys.get(p);
+  };
+  return S.entries.map((e) => ({ task: e.task, key: keyOf(e.person), day: e.day, hours: e.hours }));
 }
 
 /** Every column whose References need labels: the roles' and those of the view on show. */
@@ -439,6 +466,8 @@ function drawToolbar(model = null, level = 'full') {
       flagged: b ? b.flagged : 0,
       bookings: b ? b.tasks.length + b.unscheduled.length : 0, clashes: bm ? bm.clashes.size : 0, outside: bm ? bm.outside : 0,
       overloads: wm ? wm.ahead.length : 0, noHours: wm ? wm.missing : 0,
+      // logged hours are history: the bar says how many, not whether anyone is over
+      logged: wm?.measure === 'logged' ? fmtHours(wm.people.reduce((s, p) => s + p.totals.reduce((a, x) => a + x.load, 0), 0)) : null,
     },
     groupOptions: asOptions(S.columns.filter(groupable)),
     groupBy: groupCol()?.id || null,
@@ -454,6 +483,7 @@ function drawToolbar(model = null, level = 'full') {
     periodsBy: bookPeriodsBy(),
     filterOptions: bookFilterOptions(), filterBy: S.view.bookFilter,
     wlRowOptions: asOptions(S.columns.filter(wlRowable)), wlRowsBy: wlRowCol()?.id || null, wlUnit: wlUnit(),
+    wlMeasure: hasTime() ? wlMeasure() : null,
     canLevel: !!(wm && wm.ahead.length && (canEdit() || S.demo)),
     timer: (() => { const r = myTimer(); return r ? { title: taskById(r.task)?.title || t('(no name)'), since: r.start, elapsed: elapsedText(r.start) } : null; })(),
     hasTime: hasTime(),
@@ -472,6 +502,7 @@ function drawToolbar(model = null, level = 'full') {
     onClash: () => { const id = [...(S.bookModel?.clashes || [])][0]; if (id != null) select(id, { tellGrist: true }); },
     onWlRows: (id) => { S.view.wlRows = id || null; saveView(); S.signature = ''; reload('tables'); },
     onWlUnit: (u) => { S.view.wlUnit = u; saveView(); S.signature = ''; S.firstDraw = true; recompute(); },
+    onWlMeasure: (m) => { S.view.wlMeasure = m; saveView(); S.signature = ''; recompute(); },
     onLevel: () => levelNow(),
     onOverload: () => { const o = S.wlModel?.ahead[0]; if (o) workloadView?.scrollToCell(S.wlModel.cellOf(o)); },
     onStopTimer: () => stopTimer(),
@@ -484,7 +515,7 @@ function drawToolbar(model = null, level = 'full') {
 const saveView = () => rememberView(S.tableId, {
   groupBy: S.view.groupBy, critical: S.view.critical, collapsed: [...S.view.collapsed], laneBy: S.view.laneBy,
   tlLaneBy: S.view.tlLaneBy, bookRows: S.view.bookRows, bookPeriods: S.view.bookPeriods, bookFilter: S.view.bookFilter,
-  wlRows: S.view.wlRows, wlUnit: S.view.wlUnit,
+  wlRows: S.view.wlRows, wlUnit: S.view.wlUnit, wlMeasure: S.view.wlMeasure,
 });
 
 /** Everything the chart needs, from the rows. */
@@ -514,6 +545,7 @@ function recompute() {
   if (!S.ready) return;
   showDueHint(false);
   showHoursHint(false);
+  showNoTimeHint(false);
   // A new, empty table (Grist's Table1 with A, B, C): offer to set it up.
   if (S.live && canEdit() && !S.rows.length && !S.columns.some((c) => !(c.type === 'Any' && !c.isFormula && /^[A-Z]$/.test(c.id)))) { starterState(); return; }
   if (S.mode === 'board') { recomputeBoard(); return; }
@@ -804,25 +836,40 @@ function recomputeWorkload() {
   const today = todayDay();
   const r = bookingRange(datedTasks(), unit, today);
   const periods = calendarPeriods(unit, r.from, r.to, weekStart());
-  const wl = buildWorkload(S.built.tasks, S.rows, { ...wlContext(person), from: periods[0].start, to: periods[periods.length - 1].end });
+  const measure = wlMeasure();
+  const range = { from: periods[0].start, to: periods[periods.length - 1].end };
+  // time is logged on undated tasks too, so the logged hours look at every task
+  const wl = buildWorkload(measure === 'logged' ? [...S.built.tasks, ...S.built.unscheduled] : S.built.tasks, S.rows, { ...wlContext(person, measure), ...range });
+  const plan = measure === 'logged' ? buildWorkload(S.built.tasks, S.rows, { ...wlContext(person), ...range }) : null;
   const rowOf = new Map(wl.people.map((p, i) => [p.key, i]));
   const periodOf = (day) => periods.findIndex((p) => day >= p.start && day <= p.end);
-  const ahead = wl.overs.filter((o) => o.day >= today);
-  const people = wl.people.map((p) => ({
-    key: p.key, label: p.label, colour: p.colour, none: p.none, perDay: p.perDay, totals: periodTotals(p, periods, wl.from),
-    overDays: ahead.filter((o) => o.key === p.key).length, src: p,
-  }));
-  S.wlModel = { wl, periods, unit, people, ahead, missing: wl.missing, cellOf: (o) => ({ ri: rowOf.get(o.key), pi: periodOf(o.day) }) };
+  // Overloads ahead are what Level acts on: in the plan, or in what remains. Logged hours are history.
+  const ahead = measure === 'logged' ? [] : wl.overs.filter((o) => o.day >= today);
+  const totals = wl.people.map((p) => periodTotals(p, periods, wl.from));
+  // What remains has nothing before today: a period with no working hours left (last week, this week on
+  // a Sunday) is left blank, not marked as days off.
+  const gone = periods.map((p, i) => measure === 'remaining' && p.start < today && totals.every((x) => !x[i].cap && x[i].load <= 0.004));
+  const people = wl.people.map((p, ri) => {
+    const planned = plan?.people.find((x) => x.key === p.key);
+    return {
+      key: p.key, label: p.label, colour: p.colour, none: p.none, perDay: p.perDay,
+      totals: totals[ri].map((x, i) => (gone[i] ? { ...x, off: false } : x)),
+      planned: planned ? periodTotals(planned, periods, plan.from).map((x) => x.load) : null,
+      overDays: ahead.filter((o) => o.key === p.key).length, src: p,
+    };
+  });
+  S.wlModel = { wl, measure, periods, unit, people, ahead, missing: wl.missing, cellOf: (o) => ({ ri: rowOf.get(o.key), pi: periodOf(o.day) }) };
   drawToolbar();
   const v = ensureWorkload();
-  showHoursHint(!effortCol());
-  const sig = ['w', person.id, unit, periods[0].key, periods.length, S.selectedId, S.workload.hoursPerDay, todayDay(), dateLocale(gristCulture()),
+  showHoursHint(measure !== 'logged' && !effortCol());
+  showNoTimeHint(measure === 'logged' && !people.some((p) => p.totals.some((x) => x.load > 0.004)));
+  const sig = ['w', person.id, unit, measure, periods[0].key, periods.length, S.selectedId, S.workload.hoursPerDay, todayDay(), dateLocale(gristCulture()),
     ...people.map((p) => `${p.key}|${p.label}|${p.perDay}|` + p.totals.map((x) => `${Math.round(x.load * 10)}/${x.cap == null ? '-' : Math.round(x.cap * 10)}`).join(','))].join('\n');
   if (sig === S.signature) return;
   S.signature = sig;
   const team = teamTotals(wl.people.filter((p) => !p.none), periods, wl.from);
   v.update({
-    people, periods, unit, team, today, selectedId: S.selectedId, rowLabel: person.label, noneLabel: t('Not assigned'), locale: dateLocale(gristCulture()),
+    people, periods, unit, team, today, measure, gone, selectedId: S.selectedId, rowLabel: person.label, noneLabel: t('Not assigned'), locale: dateLocale(gristCulture()),
     workdays: unit === 'day' ? periods.map((p) => cal.isWork(p.start)) : null,
     tasksAt: (ri, pi) => tasksIn(people[ri].src, periods[pi]),
     locate: (id) => {
@@ -844,7 +891,7 @@ async function levelNow() {
   const c = ctx();
   const dueCol = colById(S.roles.due);
   const r = levelPlan(S.built.tasks, S.rows, {
-    ...wlContext(person), links: linksOf(S.built.tasks), today: todayDay(),
+    ...wlContext(person, S.wlModel.measure === 'remaining' ? 'remaining' : 'planned'), links: linksOf(S.built.tasks), today: todayDay(),
     shiftEnd: (task, start) => (cal.workdays ? cal.endAfter(start, cal.length(task.start, task.end)) : start + (task.end - task.start)),
     beforeDay: (day) => cal.shift(day, -1),
     canMove: (task) => capabilities(task, c).move,
@@ -1502,6 +1549,9 @@ const showDueHint = (on) => showBanner('dueHint', on, t('These tasks have only a
   { label: t('Add a Start column'), run: () => addColumnFor('start') });
 const showHoursHint = (on) => showBanner('hoursHint', on, t('No Hours of work column, so each task counts as a full working day of each of its people.'),
   S.live && canEdit() ? { label: t('Add an Hours column'), run: () => addColumnFor('effort') } : null);
+// Logged hours with nothing logged yet: an empty grid would look broken, so it says where time comes from.
+const showNoTimeHint = (on) => showBanner('noTimeHint', on, t('Nothing logged in these dates yet. Start a timer from a task’s quick edit (Enter), or log time in the timesheet.'),
+  { label: t('Timesheet'), run: () => openTimesheetPanel() });
 
 // ---- print -----------------------------------------------------------------------------------------------
 // The printout is built from the model on screen, for paper (print/render.js), into #ps-print, which
@@ -1615,8 +1665,9 @@ function printNode({ paper, fit }) {
     const busy = w.periods.map((_, i) => w.people.some((p) => p.totals[i].load > 0.01));
     const lo = Math.max(0, busy.indexOf(true) - 1);
     const hi = busy.lastIndexOf(true) < 0 ? w.periods.length - 1 : Math.min(w.periods.length - 1, busy.lastIndexOf(true) + 1);
+    const which = { logged: t('Hours logged'), remaining: t('Hours remaining') }[w.measure];
     return renderWorkloadPrint({
-      title: printTitle(), subtitle: subtitleFor(view, count('{n} task', '{n} tasks'), locale, today), paper,
+      title: printTitle(), subtitle: subtitleFor(which ? view + ' · ' + which : view, count('{n} task', '{n} tasks'), locale, today), paper,
       rowHeader: wlRowCol()?.label || '', locale: locale2,
       periods: w.periods.slice(lo, hi + 1).map(periodText),
       people: w.people.map((p) => ({

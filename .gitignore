@@ -17,7 +17,7 @@ Thumbs.db
 docs/PLAN.md
 docs/M0-FINDINGS.md
 docs/DEVLOG.md
-docs/m[0-9]/
+docs/m[0-9]*/
 tools/
 
 # ---- Secret-bearing files (defensive — this project ships no keys today) ----

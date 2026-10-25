@@ -30,12 +30,12 @@ const button = (text, title, onclick, cls = '') => el('button', { type: 'button'
 /**
  *   level: 'full' (default); 'switch' when the view shows a message instead (only the view switch and Columns);
  *   'bare' before the widget can work at all (the brand and the mode only)
- * @param {{level, mode, zoom, counts: {tasks, unscheduled, flagged, cards, bookings, clashes, outside, overloads, noHours}, demo, editable,
+ * @param {{level, mode, zoom, counts: {tasks, unscheduled, flagged, cards, bookings, clashes, outside, overloads, noHours, logged (text, Logged only)}, demo, editable,
  *          readOnlyWhy, canAdd, groupOptions, groupBy, hasLinks, critical, laneOptions, laneBy, tlLaneOptions, tlLaneBy,
- *          rowOptions, rowsBy, periodOptions, periodsBy, filterOptions, filterBy, wlRowOptions, wlRowsBy, wlUnit, canLevel,
+ *          rowOptions, rowsBy, periodOptions, periodsBy, filterOptions, filterBy, wlRowOptions, wlRowsBy, wlUnit, wlMeasure (null without time entries), canLevel,
  *          timer: {title, since, elapsed} | null, hasTime, examples, example}} s
  * @param {{onMode, onZoom, onFit, onToday, onColumns, onNew, onUndated, onGroup, onCritical, onLanes, onTlLanes,
- *          onRows, onPeriods, onFilter, onClash, onWlRows, onWlUnit, onLevel, onOverload, onStopTimer, onTimesheet, onExample,
+ *          onRows, onPeriods, onFilter, onClash, onWlRows, onWlUnit, onWlMeasure, onLevel, onOverload, onStopTimer, onTimesheet, onExample,
  *          onPrint, onKeys}} on
  */
 export function renderToolbar(host, s, on) {
@@ -50,7 +50,8 @@ export function renderToolbar(host, s, on) {
     if (c.outside) counts.push(el('span', { text: tn(c.outside, '{n} not in these columns', '{n} not in these columns'), title: t('Bookings outside these periods, or with no value in the period column') }));
   } else if (view === 'workload') {
     counts.push(el('span', { text: tn(c.tasks, '{n} task', '{n} tasks') }));
-    counts.push(c.overloads
+    if (c.logged != null) counts.push(el('span', { text: t('{h} h logged', { h: c.logged }), title: t('In the dates shown') }));
+    else counts.push(c.overloads
       ? el('button', { type: 'button', class: 'ps-link ps-warn', text: tn(c.overloads, '{n} day over capacity', '{n} days over capacity'), title: t('From today on. Show the first one.'), onclick: on.onOverload })
       : el('span', { class: 'ps-ok', text: t('nobody over capacity') }));
     if (c.noHours) counts.push(el('span', { text: tn(c.noHours, '{n} without hours', '{n} without hours'), title: t('Tasks whose Hours of work cell is empty count for nothing here.') }));
@@ -99,6 +100,8 @@ export function renderToolbar(host, s, on) {
       tools = [
         s.canLevel ? button(t('Level'), t('Move tasks later, inside their slack, until nobody is over capacity. You see the moves first.'), on.onLevel, ' ps-btn--primary') : null,
         s.wlRowOptions?.length ? picker(t('Rows'), t('A row for each'), s.wlRowOptions, s.wlRowsBy, on.onWlRows) : null,
+        // which hours: the plan, the time entries, or the plan less the time entries from today on
+        s.wlMeasure ? seg(t('Hours'), [['planned', t('Planned')], ['logged', t('Logged')], ['remaining', t('Remaining')]], s.wlMeasure, on.onWlMeasure) : null,
         seg(t('Periods'), Object.entries(WL_UNIT_LABELS).map(([u, label]) => [u, t(label)]), s.wlUnit, on.onWlUnit),
         button(t('Today'), t('Scroll to today'), on.onToday),
       ];

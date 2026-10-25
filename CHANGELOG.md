@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.2.1
+
+The workload shows the time logged and the hours that remain, from the time entries.
+Tested in Grist 1.7.20 on docs.getgrist.com.
+
+- **Planned · Logged · Remaining**, in the workload's toolbar when the document has a time-entries
+  table. Planned is the plan, as before; this browser remembers the choice.
+- **Logged**: the hours of the time entries on their days, for the person who logged them, against
+  their capacity. An entry that names nobody counts for the task's people, and someone with time logged
+  but no task of their own still gets a row. The bar says how many hours were logged in the dates shown,
+  and a cell's tooltip what was planned there.
+- **Remaining**: each task's hours less the time logged on it, spread over its working days from today
+  on. Time a person logged comes off their own share; time logged by someone else, or by nobody, comes
+  off every share evenly. A task that should have ended and is not done puts what is left on the first
+  working day from today, and its cell's list says it is late. Days before today have no capacity, so
+  the weeks gone are left blank. Without an Hours of work column, what remains is the plan from today on.
+- **Level** follows what is on show: in Remaining it levels what is left to do, so a task half done no
+  longer counts in full.
+- The printout says which hours it shows.
+- The light theme's warning red is a shade deeper, so it keeps 4.5:1 on a hovered cell.
+
 ## 1.2.0
 
 Time tracking: timers on tasks, time logged by hand, logged against planned, and a weekly timesheet.

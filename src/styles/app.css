@@ -276,7 +276,8 @@ button, input, select { font: inherit; color: inherit; }
 .ps-tip__hint { margin-top: 3px; opacity: 0.75; font-size: 12px; }
 
 /* ---- structure (M3) ---- */
-:root { --ps-crit: #c42b33; --ps-holiday: rgba(217, 119, 6, 0.10); --ps-link: #64748b; }
+/* #bd2830: 4.5:1 even on a hovered, striped workload cell (#c42b33 was 4.4) */
+:root { --ps-crit: #bd2830; --ps-holiday: rgba(217, 119, 6, 0.10); --ps-link: #64748b; }
 :root[data-grist-appearance="dark"] { --ps-crit: #ff6b6f; --ps-holiday: rgba(251, 191, 36, 0.12); --ps-link: #94a3b8; }
 @media (prefers-color-scheme: dark) { :root:not([data-grist-appearance="light"]) { --ps-crit: #ff6b6f; --ps-holiday: rgba(251, 191, 36, 0.12); --ps-link: #94a3b8; } }
 

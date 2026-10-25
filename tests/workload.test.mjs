@@ -172,6 +172,68 @@ const lv = (rows, extra = {}) => {
   eq('nobody over: no moves', [nothing.moves.length, nothing.before], [0, 0]);
 }
 
+// ---- logged and remaining (from the time entries) ---------------------------------------------------
+{
+  // Today is Wednesday. Ann: Design Mon–Fri, 40 h, 16 logged. Ben: Review Mon–Tue, 8 h, 2 logged, not
+  // done, so late. Ann and Ben: Pair Wed–Thu, 16 h (8 each); Ann logged 4 before it began, Dieter (not
+  // on it) 2, and an entry naming nobody 2. Ben: Future next Monday. A done task with time on it, and
+  // an hour on a task that is not in the plan.
+  const rows = [
+    { id: 1, Task: 'Design', Start: d(0), End: d(4), Who: P(1), Hours: 40 },
+    { id: 2, Task: 'Review', Start: d(0), End: d(1), Who: P(2), Hours: 8 },
+    { id: 3, Task: 'Pair', Start: d(2), End: d(3), Who: ['L', 1, 2], Hours: 16 },
+    { id: 4, Task: 'Future', Start: d(7), End: d(7), Who: P(2), Hours: 8 },
+    { id: 5, Task: 'Shipped', Start: d(1), End: d(1), Who: P(1), Hours: 3, Done: true },
+  ];
+  const logs = [
+    { task: 1, key: 'r:1', day: MON, hours: 10 }, { task: 1, key: 'r:1', day: MON + 1, hours: 6 },
+    { task: 2, key: 'r:2', day: MON, hours: 2 },
+    { task: 3, key: 'r:1', day: MON + 1, hours: 4 }, { task: 3, key: 'r:3', day: MON + 2, hours: 2 }, { task: 3, key: null, day: MON + 2, hours: 2 },
+    { task: 5, key: 'r:1', day: MON + 1, hours: 3 },
+    { task: 99, key: 'r:2', day: MON + 1, hours: 1 },
+  ];
+  const cols = [{ id: 'Task', type: 'Text' }, { id: 'Start', type: 'Date' }, { id: 'End', type: 'Date' }, { id: 'Who', type: 'RefList:People' }, { id: 'Hours', type: 'Numeric' }, { id: 'Done', type: 'Bool' }];
+  const roles = { title: 'Task', start: 'Start', end: 'End', assignee: 'Who', effort: 'Hours', done: 'Done' };
+  const { tasks, col } = plan(cols, rows, roles);
+  const ctx = { personCol: col('Who'), labels: { Who: people }, isWork, from: MON, to: MON + 13, effortCol: col('Hours'), effortUnit: 'hours', logs, today: MON + 2 };
+  const said = (wl) => wl.overs.map((o) => o.key + ' ' + iso(o.day));
+  const week = calendarPeriods('week', MON, MON + 6, 1)[0];
+
+  const left = W.buildWorkload(tasks, rows, { ...ctx, measure: 'remaining' });
+  eq('remaining, Ann: Design’s 24 h left over Wed–Fri, and 1 h a day of Pair (8 − her 4 − her half of 4)', loadOf(left, 'Ann'), [0, 0, 9, 9, 8, 0, 0]);
+  eq('remaining, Ben: late Review’s 6 h today, and 3 h a day of Pair', loadOf(left, 'Ben'), [0, 0, 9, 3, 0, 0, 0]);
+  eq('…and Future on its day', left.people.find((p) => p.label === 'Ben').load[7], 8);
+  eq('no capacity before today', [...left.people.find((p) => p.label === 'Ann').cap].slice(0, 5), [0, 0, 8, 8, 8]);
+  eq('over from today only: Ann Wed and Thu, Ben Wed', said(left), ['r:1 2026-11-04', 'r:1 2026-11-05', 'r:2 2026-11-04']);
+  eq('the late task says so in its cell', W.tasksIn(left.people.find((p) => p.label === 'Ben'), week).map((x) => x.task.title + ' ' + x.hours + (x.late ? ' late' : '')), ['Review 6 late', 'Pair 6']);
+
+  const more = W.buildWorkload(tasks, rows, { ...ctx, measure: 'remaining', logs: [...logs, { task: 1, key: 'r:1', day: MON + 1, hours: 30 }] });
+  eq('more logged than planned: nothing left, never less than nothing', loadOf(more, 'Ann'), [0, 0, 1, 1, 0, 0, 0]);
+
+  const done = W.buildWorkload(tasks, rows, { ...ctx, measure: 'logged' });
+  eq('logged, Ann: her entries on their days, half the entry naming nobody', loadOf(done, 'Ann'), [10, 13, 1, 0, 0, 0, 0]);
+  eq('logged, Ben: an hour on a task outside the plan counts too', loadOf(done, 'Ben'), [2, 1, 1, 0, 0, 0, 0]);
+  eq('logged, Dieter has his 2 h though Pair is not his', loadOf(done, 'Dieter'), [0, 0, 2, 0, 0, 0, 0]);
+  eq('logged over capacity: Ann on Mon and Tue', said(done), ['r:1 2026-11-02', 'r:1 2026-11-03']);
+  eq('logged, Ann’s Tuesday by task (the done one too), a task once', W.tasksIn(done.people.find((p) => p.label === 'Ann'), { start: MON + 1, end: MON + 1 }).map((x) => x.task.title + ' ' + x.hours), ['Design 6', 'Pair 4', 'Shipped 3']);
+  eq('the task outside the plan has no name to show, and comes last of equals', W.tasksIn(done.people.find((p) => p.label === 'Ben'), week).map((x) => x.task.title), ['Review', 'Pair', null]);
+  eq('nothing missing in logged hours', done.missing, 0);
+
+  const noHours = plan(cols, [rows[0]], { ...roles, effort: null });
+  const plain = W.buildWorkload(noHours.tasks, [rows[0]], { ...ctx, effortCol: null, measure: 'remaining' });
+  eq('without hours, what remains is the plan from today on: a full day each day', loadOf(plain, 'Ann'), [0, 0, 8, 8, 8, 0, 0]);
+
+  const level = (extra) => W.levelPlan(tasks, rows, { ...ctx, ...extra, links: [], shiftEnd: (task, st) => st + (task.end - task.start), beforeDay: (x) => x - 1 });
+  eq('levelling counts what remains (3 days over), not the plan (2)', [level({ measure: 'remaining' }).before, level({}).before], [3, 2]);
+
+  // a text column of people: someone who logged time without a task of their own gets a row
+  const textCols = [{ id: 'Task', type: 'Text' }, { id: 'Start', type: 'Date' }, { id: 'End', type: 'Date' }, { id: 'Who', type: 'Text' }, { id: 'Hours', type: 'Numeric' }];
+  const tr = [{ id: 1, Task: 'Design', Start: d(0), End: d(4), Who: 'Ann', Hours: 40 }];
+  const tp = plan(textCols, tr, { title: 'Task', start: 'Start', end: 'End', assignee: 'Who', effort: 'Hours' });
+  const zoe = W.buildWorkload(tp.tasks, tr, { personCol: tp.col('Who'), isWork, from: MON, to: MON + 6, measure: 'logged', logs: [{ task: 1, key: 'v:Zoe', day: MON, hours: 3 }] });
+  eq('a person with only time logged has a row', zoe.people.map((p) => p.label + ' ' + p.load[0]), ['Ann 0', 'Zoe 3']);
+}
+
 // ---- 500 tasks ---------------------------------------------------------------------------------------
 {
   let seed = 7;
