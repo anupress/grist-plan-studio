@@ -29,7 +29,7 @@ export function openViews(host, s, on) {
   } }, [
     el('label', { for: 'ps-vw-name', text: t('Save the current view as') }),
     el('div', { class: 'ps-vw__row' }, [name, save]),
-    el('p', { class: 'ps-hint', text: t('A name that exists is replaced. Everyone who opens this page sees the views; zoom and the choices of the view are saved with it, folded rows are not.') }),
+    el('p', { class: 'ps-hint', text: t('A name that exists is replaced. Everyone who opens this page sees the views; zoom, the choices of the view and the filters are saved with it, folded rows are not.') }),
   ]);
 
   function draw() {

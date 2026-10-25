@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.6.0
+
+A search and quick filters in every view that draws tasks. Tested in Grist 1.7.20 (the Project Management template: 16 tasks).
+
+- **Search by name** and a **chip for who, status and project**, under the toolbar; **+ Filter** adds a chip for any other
+  Choice, Reference, list or yes/no column. A chip opens its values with a count for each, worked out among the tasks the
+  other filters leave. The strip says “5 of 22 shown”, with **Clear filters**; a filter that leaves nothing says so.
+- In the Gantt chart, timeline, workload, agenda, board and calendar. A group stays when a task under it stays; on the
+  board and the calendar each row stands on its own. A search also finds the tasks under a group by the group's name.
+- **Nothing is written to the document.** The filters stay in this browser, per table, and a saved view carries them
+  (the Views panel says so; applying a view that has none clears them).
+- Writes still look at every task: moving a task asks about everything that waits for it, shown or not; a board lane's limit
+  and its “2 of 13” count every open card; a task added while a filter is on stays on show until the filters change.
+- On the workload the loads count only the tasks shown, and the strip says so; Level is off while a filter is on.
+- A printout says “filtered: 5 of 22”.
+- Fixed: the red used for text (a late task, today's date in the scale) was 3.7:1 on the page; it is 5:1 now.
+- German and French for every new word.
+
 ## 1.5.0
 
 A settings panel that fits the person: three questions for a beginner, every option still there for an expert.

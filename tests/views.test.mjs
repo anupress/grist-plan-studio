@@ -20,7 +20,15 @@ eq('…and nothing else: no folded rows, no stray keys', Object.keys(snap.view).
 eq('a choice not made is null', [snap.view.tlLaneBy, snap.view.wlMeasure, snap.view.bookRows], [null, null, null]);
 eq('a view that does not exist falls back to the Gantt chart, a bad zoom to none', [S.snapshotView({ mode: 'nope', zoom: 'hours', view: {} }).mode, S.snapshotView({ mode: 'nope', zoom: 'hours', view: {} }).zoom], ['gantt', null]);
 eq('the calendar is a view', S.snapshotView({ mode: 'calendar', zoom: null, view: { calMode: 'month' } }).mode, 'calendar');
-eq('a bad value for a choice becomes null', S.snapshotView({ mode: 'board', zoom: 'week', view: { wlUnit: 'fortnight', critical: 'yes', groupBy: '' } }).view, { groupBy: null, critical: null, laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null });
+eq('a bad value for a choice becomes null', S.snapshotView({ mode: 'board', zoom: 'week', view: { wlUnit: 'fortnight', critical: 'yes', groupBy: '' } }).view, { groupBy: null, critical: null, laneBy: null, tlLaneBy: null, bookRows: null, bookPeriods: null, bookFilter: null, wlRows: null, wlUnit: null, wlMeasure: null, agendaWho: null, calMode: null, find: null });
+
+// the quick filters travel with a view
+const withFind = S.snapshotView({ mode: 'gantt', zoom: null, view: { find: { q: ' logo ', sel: { Status: ['Doing', 'Doing', 7], Owner: [] }, cols: ['Priority'], junk: 1 } } });
+eq('a view keeps its search, its chosen values and its extra filters, cleaned', withFind.view.find, { q: 'logo ', sel: { Status: ['Doing'] }, cols: ['Priority'] });
+eq('a view with no filter keeps null, not an empty one', [S.snapshotView({ mode: 'gantt', zoom: null, view: { find: { q: '', sel: {}, cols: [] } } }).view.find, S.snapshotView({ mode: 'gantt', zoom: null, view: {} }).view.find], [null, null]);
+eq('a filter column shown with nothing chosen is still kept (the chip comes back)', S.snapshotView({ mode: 'gantt', zoom: null, view: { find: { cols: ['Priority'] } } }).view.find, { q: '', sel: {}, cols: ['Priority'] });
+eq('a junk filter becomes null', S.snapshotView({ mode: 'gantt', zoom: null, view: { find: 'oops' } }).view.find, null);
+eq('a list read from the document cleans the filter too', S.cleanViews([{ id: 'f1', name: 'Stuck', mode: 'gantt', zoom: null, view: { find: { sel: { Status: ['Stuck', 3] } } } }])[0].view.find, { q: '', sel: { Status: ['Stuck'] }, cols: [] });
 
 const good = (id, name, extra = {}) => ({ id, name, mode: 'board', zoom: 'week', view: { laneBy: 'Status' }, ...extra });
 const cleaned = S.cleanViews([

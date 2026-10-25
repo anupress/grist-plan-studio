@@ -134,5 +134,22 @@ const ctx = { laneCol: col('Status'), orderCol: col('Rank'), rows };
   eq('the empty lane writes no status', B.newCardFields(none, 'y', { laneCol: col('Status'), titleCol: col('Task') }).fields, { Task: 'y' });
 }
 
+// ---- the quick filters: a lane's limit and count look at every card ------------------------------------
+{
+  const shown = tasks.filter((x) => x.id !== 1 && x.id !== 6);   // the filters keep four of the six; two open Doing cards are hidden
+  const lanesOf = (o = {}) => B.buildBoard(shown, rows, { laneCol: col('Status'), orderCol: col('Rank'), labels, today: day('2026-10-24'), wip: { 'v:Doing': 2 }, ...o });
+  const withAll = lanesOf({ everyone: tasks });
+  const doing = withAll.lanes.find((l) => l.key === 'v:Doing');
+  eq('the cards are the ones the filters keep', doing.cards.map((c) => c.id), [2]);
+  eq('…the lane counts every open card against its limit', [doing.open, doing.total, doing.hidden, doing.over], [3, 3, 2, 1]);
+  const without = lanesOf().lanes.find((l) => l.key === 'v:Doing');
+  eq('without the full list the lane would have counted only what it shows (the mistake this prevents)', [without.open, without.over], [1, 0]);
+  eq('a lane nothing hides says so: no hidden cards', withAll.lanes.find((l) => l.key === 'v:Done').hidden, 0);
+  eq('"hide empty lanes" goes by every card, so a lane the filters emptied stays', view(lanesOf({ everyone: tasks, hideEmpty: true })), ['∅:5', 'Doing:2', 'Done:4', 'Parked:3']);
+  eq('…and the lane for "no value" is there while a card of it is on show', view(lanesOf({ everyone: tasks, hideEmpty: true })).includes('∅:5'), true);
+  eq('…and gone when the filters hide the only card in it', view(B.buildBoard(shown.filter((x) => x.id !== 5), rows, { laneCol: col('Status'), orderCol: col('Rank'), labels, today: day('2026-10-24'), everyone: tasks })).some((x) => x.startsWith('∅')), false);
+  eq('with no list of everyone, the counts are the cards', [board().lanes.find((l) => l.key === 'v:Doing').total, board().lanes.find((l) => l.key === 'v:Doing').hidden], [3, 0]);
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

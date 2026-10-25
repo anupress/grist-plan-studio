@@ -108,10 +108,11 @@ export function createBoard(host, on) {
 
   function laneNode(lane) {
     const name = lane.none ? t('No {col}', { col: model.laneLabel }) : String(lane.label ?? '');
-    const count = lane.limit != null ? `${lane.open}/${lane.limit}` : String(lane.cards.length);
-    const countTitle = lane.limit != null
+    const count = lane.limit != null ? `${lane.open}/${lane.limit}` : lane.hidden ? t('{n} of {total}', { n: lane.cards.length, total: lane.total }) : String(lane.cards.length);
+    const countTitle = (lane.limit != null
       ? t('{open} open cards, limit {limit}.', { open: lane.open, limit: lane.limit })
-      : tn(lane.cards.length, '{n} card.', '{n} cards.');
+      : tn(lane.cards.length, '{n} card.', '{n} cards.'))
+      + (lane.hidden ? ' ' + tn(lane.hidden, '{n} card is hidden by the filters.', '{n} cards are hidden by the filters.') : '');
     const countNode = model.canLimit && !lane.none
       ? el('button', { type: 'button', class: 'ps-lane__count', text: count, title: countTitle + ' ' + t('Click to set a limit of open cards.'), onclick: () => on.onLimit?.(lane.key) })
       : el('span', { class: 'ps-lane__count', text: count, title: countTitle });
@@ -119,7 +120,7 @@ export function createBoard(host, on) {
     const shown = expanded.has(lane.key) ? lane.cards : lane.cards.slice(0, CAP);
     const list = el('div', { class: 'ps-lane__list', dataset: { lane: lane.key }, role: 'list', 'aria-label': name },
       shown.map((c) => { const n = cardNode(c); n.setAttribute('role', 'listitem'); return n; }));
-    if (!lane.cards.length) list.append(el('p', { class: 'ps-lane__empty', text: t('No cards') }));
+    if (!lane.cards.length) list.append(el('p', { class: 'ps-lane__empty', text: lane.hidden ? tn(lane.hidden, '{n} card is hidden by the filters.', '{n} cards are hidden by the filters.') : t('No cards') }));
     if (shown.length < lane.cards.length) {
       list.append(el('button', { type: 'button', class: 'ps-lane__more', text: t('Show all {n}', { n: lane.cards.length }),
         onclick: () => { expanded.add(lane.key); draw(); } }));

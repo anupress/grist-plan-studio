@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.5.0-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.6.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -212,11 +212,31 @@ task is asked about. Alt + arrows move it a day, Alt + up and down a week; PageU
 month. A touch drags after half a second's rest, so a swipe still scrolls. The calendar has seven columns to
 fill, so on a phone the Agenda opens instead, and a saved view of the calendar opens as the Agenda there.
 
+## Search and filters
+
+A strip under the toolbar, in the Gantt chart, timeline, board, calendar, agenda and workload (the booking grid has its own
+filter for the resources). **Search by name** keeps the tasks whose name, or the name of a group above them, has every word
+you typed at the start of a word (from three letters, anywhere in one); capitals and accents do not matter. Next to it a chip
+for each of **who**, **status** and **project**, and **+ Filter** adds a chip for any other Choice, Reference, list or yes/no
+column. A chip opens a list of its values, each with how many tasks it would show given the other filters, and a value none
+are left of stays in the list at 0.
+
+- **In words**: the strip says “5 of 22 shown” with **Clear filters**; a filter that leaves nothing says so and offers the
+  way back. A printout says it is filtered.
+- **Nothing is written.** The filters decide what a view draws and nothing else: they stay in this browser, per table, and
+  a saved view carries them (applying a view with none clears them).
+- **A task still follows its tasks.** In the Gantt chart, timeline, workload and agenda a group stays when any task under
+  it stays, and a group's bar spans the tasks shown; on the board and the calendar each row stands on its own values.
+  Moving a task still asks about every task that waits for it, shown or not; a board lane's limit still counts every
+  open card (“2 of 13” says how many the filter hides); a task you add stays on show until you change the filters.
+- **The workload counts only what is shown**, and says so; **Level** is off while a filter is on, because a move could
+  run into a task the filter hides.
+
 ## Saved views, and moving over from another widget
 
 **Views** in the toolbar lists the views people saved for this widget: a name, and how the widget was set up
 when it was saved: which view, the zoom, what to group by, the board's lane column, the booking grid's rows
-and periods, the workload's measure, Mine or Everyone, month or week. A click applies one (nothing is written
+and periods, the workload's measure, Mine or Everyone, month or week, and the filters. A click applies one (nothing is written
 to the document); **Update** replaces it with how the widget looks now; the form saves the current view under
 a name, and a name that exists is replaced. They are kept in the widget's options, so everyone who opens the
 page sees them, and only people who can edit the document can save one.
@@ -233,7 +253,7 @@ finished, its `Project_Id` reads as the project's name, and its hours (`Estimate
   opens in, what a card shows, lane limits, the booking grid's periods, the time-entries table and the
   saved views (when someone presses Save in Views).
 - **In this browser**: zoom, grouping, folded rows, the lane column and the last view, the
-  interface language, who you are for timers and for Mine, and Mine or Everyone. Looking around never writes to the document.
+  interface language, who you are for timers and for Mine, Mine or Everyone, and the search and filters. Looking around never writes to the document.
 
 ## Privacy
 

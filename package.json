@@ -1,6 +1,6 @@
 {
   "name": "grist-plan-studio",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Plan Studio — a Grist custom widget by ANUPRESS. Gantt chart, timeline, board and booking grid over the tables you already keep, written straight back to them, with no server anywhere.",
   "type": "module",
   "private": true,

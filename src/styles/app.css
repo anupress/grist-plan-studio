@@ -20,6 +20,7 @@
   --ps-accent-ink: #ffffff;
   --ps-accent-soft: #e6eefa;
   --ps-today: #e5484d;
+  --ps-today-ink: #c4262b;   /* the same red as text: 5:1 on the page, where the line's own red is only for lines and edges */
   --ps-weekend: rgba(20, 32, 43, 0.035);
   --ps-stripe: rgba(20, 32, 43, 0.018);
   --ps-bar: #3d73b8;
@@ -48,7 +49,7 @@
   :root:not([data-grist-appearance="light"]) {
     --ps-surface: #111a22; --ps-surface-2: #18232e; --ps-ink: #e7eef5; --ps-muted: #8fa1b3; --ps-line: #243240;
     --ps-line-strong: #314253; --ps-hover: rgba(255, 255, 255, 0.04); --ps-sel: rgba(107, 165, 240, 0.16); --ps-focus: #6ba5f0;
-    --ps-accent: #6ba5f0; --ps-accent-ink: #0b1219; --ps-accent-soft: #17293f; --ps-today: #ff6b6f;
+    --ps-accent: #6ba5f0; --ps-accent-ink: #0b1219; --ps-accent-soft: #17293f; --ps-today: #ff6b6f; --ps-today-ink: #ff6b6f;
     --ps-weekend: rgba(255, 255, 255, 0.035); --ps-stripe: rgba(255, 255, 255, 0.02); --ps-tip-bg: #e7eef5; --ps-tip-ink: #0e151c;
     --ps-note: #2a2114; --ps-chrome: #15202e; --ps-ground: #0b1117; --ps-card: #16212b; --ps-card-line: #263443;
     --ps-soon: #d5a257; --ps-ok: #62c08d; color-scheme: dark;
@@ -57,7 +58,7 @@
 :root[data-grist-appearance="dark"] {
   --ps-surface: #111a22; --ps-surface-2: #18232e; --ps-ink: #e7eef5; --ps-muted: #8fa1b3; --ps-line: #243240;
   --ps-line-strong: #314253; --ps-hover: rgba(255, 255, 255, 0.04); --ps-sel: rgba(107, 165, 240, 0.16); --ps-focus: #6ba5f0;
-  --ps-accent: #6ba5f0; --ps-accent-ink: #0b1219; --ps-accent-soft: #17293f; --ps-today: #ff6b6f;
+  --ps-accent: #6ba5f0; --ps-accent-ink: #0b1219; --ps-accent-soft: #17293f; --ps-today: #ff6b6f; --ps-today-ink: #ff6b6f;
   --ps-weekend: rgba(255, 255, 255, 0.035); --ps-stripe: rgba(255, 255, 255, 0.02); --ps-tip-bg: #e7eef5; --ps-tip-ink: #0e151c;
   --ps-note: #2a2114; --ps-chrome: #15202e; --ps-ground: #0b1117; --ps-card: #16212b; --ps-card-line: #263443;
   --ps-soon: #d5a257; --ps-ok: #62c08d; color-scheme: dark;
@@ -141,7 +142,7 @@ button, input, select { font: inherit; color: inherit; }
 .ps-scale__row--top .ps-scale__cell span { position: sticky; left: calc(var(--list-w) + 6px); font-weight: 600; color: var(--ps-ink); }
 .ps-scale__row--bottom .ps-scale__cell { justify-content: center; padding: 0 2px; }
 .ps-scale__cell.is-weekend { background: var(--ps-weekend); }
-.ps-scale__cell.is-today { color: var(--ps-today); font-weight: 700; }
+.ps-scale__cell.is-today { color: var(--ps-today-ink); font-weight: 700; }
 
 .ps-gantt__list {
   grid-area: 2 / 1; position: sticky; left: 0; z-index: 5; background: var(--ps-surface);
@@ -156,7 +157,7 @@ button, input, select { font: inherit; color: inherit; }
 .ps-row.is-selected { background: var(--ps-sel); box-shadow: inset 3px 0 0 var(--ps-focus); }
 .ps-row__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ps-row__when { color: var(--ps-muted); font-size: 11.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.ps-row.is-flagged .ps-row__when { color: var(--ps-today); }
+.ps-row.is-flagged .ps-row__when { color: var(--ps-today-ink); }
 
 .ps-gantt__chart {
   grid-area: 2 / 2; position: relative; overflow: clip; z-index: 0; isolation: isolate;
@@ -245,7 +246,7 @@ button, input, select { font: inherit; color: inherit; }
 .ps-tip--drag { font-variant-numeric: tabular-nums; }
 
 .ps-link { border: 0; background: none; padding: 0; color: var(--ps-focus); cursor: pointer; text-decoration: underline; font-size: inherit; }
-.ps-warn { color: var(--ps-today); }
+.ps-warn { color: var(--ps-today-ink); }
 .ps-toast { display: flex; align-items: center; gap: 12px; }
 /* With a drawer open the toast goes to the top, over a title: at the bottom it hid the drawer's buttons. */
 .ps-app:has(> .ps-drawer) > .ps-toast { top: 10px; bottom: auto; }
@@ -558,3 +559,52 @@ button, input, select { font: inherit; color: inherit; }
 .ps-preview__foot .ps-link { padding: 4px 2px; margin: -4px -2px; }
 .ps-viewname { margin: 12px 0 0; font-size: 13px; font-weight: 600; }
 .ps-set.is-searching .ps-viewname { display: none; }
+
+/* ---- the quick filters (M14) ---- */
+/* A quiet strip under the dark toolbar: paper, a hairline below, nothing loud until a filter is on. The accent
+   marks a chip that is filtering, and the count says it in words. */
+.ps-filterbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px 12px; position: relative; z-index: 9;
+  background: var(--ps-surface); border-bottom: 1px solid var(--ps-line);
+}
+.ps-find__box { flex: 0 1 240px; min-width: 150px; }
+.ps-find__input { height: 28px; padding: 4px 8px; }
+.ps-find__chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.ps-find__chip { position: relative; max-width: 100%; }
+.ps-chip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 220px; height: 28px; padding: 0 10px; box-sizing: border-box;
+  border: 1px solid var(--ps-line-strong); border-radius: 6px; background: var(--ps-surface); color: var(--ps-ink); font-size: 13px; cursor: pointer;
+}
+.ps-chip:hover { background: var(--ps-hover); }
+.ps-chip__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-chip::after { content: ''; flex: none; width: 5px; height: 5px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: translateY(-1px) rotate(45deg); opacity: 0.6; }
+.ps-chip.is-on { background: var(--ps-accent-soft); border-color: var(--ps-accent); color: var(--ps-accent); font-weight: 600; }
+.ps-find__addwrap { display: inline-flex; }
+.ps-find__add { height: 28px; padding: 0 6px; color: var(--ps-muted); }
+.ps-find__status { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; margin: 0 0 0 auto; font-size: 12px; color: var(--ps-muted); }
+.ps-find__count { font-variant-numeric: tabular-nums; color: var(--ps-ink); }
+.ps-find__clear { padding: 4px 2px; margin: -4px -2px; }
+.ps-find__note { flex-basis: 100%; }
+.ps-pop {
+  position: absolute; z-index: 1; top: calc(100% + 4px); left: 0; display: flex; flex-direction: column; box-sizing: border-box;
+  width: 264px; max-width: calc(100vw - 16px); max-height: 340px; padding: 8px;
+  background: var(--ps-surface); border: 1px solid var(--ps-line-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.ps-pop__find { margin: 0 0 6px; height: 28px; }
+.ps-pop__list { list-style: none; margin: 0; padding: 0; overflow: auto; max-height: 232px; }
+.ps-pop__item { display: flex; align-items: center; gap: 8px; min-height: 28px; padding: 2px 4px; border-radius: 4px; cursor: pointer; }
+.ps-pop__item:hover { background: var(--ps-hover); }
+.ps-pop__item input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--ps-accent); }
+.ps-pop__item.is-zero .ps-pop__text { color: var(--ps-muted); }
+.ps-pop__text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-pop__count { flex: none; font-size: 12px; color: var(--ps-muted); font-variant-numeric: tabular-nums; }
+.ps-pop__none { margin: 6px 4px; color: var(--ps-muted); font-size: 12px; }
+.ps-pop__foot { display: flex; align-items: center; gap: 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--ps-line); }
+.ps-pop__foot .ps-link { padding: 4px 2px; margin: -4px -2px; }
+.ps-pop__foot .ps-link:disabled { color: var(--ps-muted); text-decoration: none; cursor: default; }
+.ps-pop__foot .ps-btn { margin-left: auto; }
+@media (max-width: 600px) {
+  .ps-filterbar { padding: 6px 10px; }
+  .ps-find__box { flex: 1 1 100%; max-width: none; }
+  .ps-find__status { margin-left: 0; flex: 1 1 100%; }
+}

@@ -12,6 +12,8 @@
 // is shown, which parents and groups are folded, the board's lane column, the workload's rows and
 // periods, and the view last switched to; the interface language; and who is timing ("I am Ann").
 
+import { cleanFind, isActive } from './find.js';
+
 export const SETTINGS_VERSION = 1;
 
 export const GANTT_DEFAULTS = Object.freeze({
@@ -100,7 +102,7 @@ export function writeOptions(previous, { storedRoles, gantt, board, booking, wor
 // ---- saved views -------------------------------------------------------------------------------------
 // A saved view is a name and how the widget was set up when it was saved: which view, the zoom, and the
 // choices this browser otherwise keeps (what to group by, the board's lane column, the booking grid's
-// rows and periods, the workload's measure, Mine or Everyone, month or week). Folded rows are left out:
+// rows and periods, the workload's measure, Mine or Everyone, month or week, and the quick filters). Folded rows are left out:
 // they name rows that come and go. Applying one writes nothing to the document.
 
 export const MAX_VIEWS = 30;
@@ -117,6 +119,9 @@ const ZOOMS = ['day', 'week', 'month', 'quarter', 'year'];
 export function snapshotView({ mode, zoom, view }) {
   const kept = {};
   for (const [k, ok] of Object.entries(SNAPSHOT)) kept[k] = ok(view?.[k]) ? view[k] : null;
+  // the quick filters: what is chosen, or null when nothing is
+  const find = cleanFind(view?.find);
+  kept.find = isActive(find) || find.cols.length ? find : null;
   return { mode: VIEWS.includes(mode) ? mode : 'gantt', zoom: ZOOMS.includes(zoom) ? zoom : null, view: kept };
 }
 
@@ -165,7 +170,8 @@ const viewKey = (tableId) => 'planStudio.view.' + (tableId || 'demo');
 
 /**
  * {groupBy, critical, collapsed, laneBy (board), tlLaneBy (timeline), bookRows, bookPeriods ('day' | 'week' |
- *  'month' | 'col:<colId>' | 'table:<tableId>'), bookFilter ('<colId>=<value>'), wlRows, wlUnit ('day' | 'week' | 'month')};
+ *  'month' | 'col:<colId>' | 'table:<tableId>'), bookFilter ('<colId>=<value>'), wlRows, wlUnit ('day' | 'week' | 'month'),
+ *  find (the quick filters, model/find.js)};
  *  the column ids are null when not chosen
  */
 export function storedView(tableId) {
@@ -184,6 +190,7 @@ export function storedView(tableId) {
     wlMeasure: ['planned', 'logged', 'remaining'].includes(v.wlMeasure) ? v.wlMeasure : null,
     agendaWho: ['mine', 'all'].includes(v.agendaWho) ? v.agendaWho : null,
     calMode: ['month', 'week'].includes(v.calMode) ? v.calMode : null,
+    find: cleanFind(v.find),
   };
 }
 export function rememberView(tableId, view) { keep(viewKey(tableId), view); }

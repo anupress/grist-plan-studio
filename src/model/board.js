@@ -46,11 +46,12 @@ export function laneKeyOf(cell, col) {
  *                start, end, fromDue, endFrom
  * @param rows    the same rows, encoded
  * @param ctx     {laneCol, orderCol, labels, fields: [col], hideEmpty, wip: {laneKey: n}, today, cellText(row, col),
+ *                 everyone (every task, when the quick filters keep only some: a lane's open count and its total then look at all of them),
  *                 timeOf(taskId) -> {logged, planned} | null (time tracking, M10)}
- * @returns {{lanes: Array, byId: Map}}  lane: {key, label, value, colour, cards, open, limit, over, none}
+ * @returns {{lanes: Array, byId: Map}}  lane: {key, label, value, colour, cards, open, total, hidden, limit, over, none}
  */
 export function buildBoard(tasks, rows, ctx) {
-  const { laneCol, orderCol = null, labels = {}, fields = [], hideEmpty = false, wip = {}, today = null, cellText = null, timeOf = null } = ctx;
+  const { laneCol, orderCol = null, labels = {}, fields = [], hideEmpty = false, wip = {}, today = null, cellText = null, timeOf = null, everyone = null } = ctx;
   const rowOf = new Map(rows.map((r) => [r.id, r]));
   const lanes = new Map();
   const add = (key, label, value, colour = null) => {
@@ -90,16 +91,30 @@ export function buildBoard(tasks, rows, ctx) {
     byId.set(card.id, card);
   }
 
+  // With filters on, the cards are the ones they keep, but a lane's limit and its count are about every card in it.
+  const totalOf = new Map(), openOf = new Map();
+  if (everyone) {
+    for (const task of everyone) {
+      const row = rowOf.get(task.id);
+      if (!row) continue;
+      const key = laneKeyOf(row[laneCol.id], laneCol);
+      totalOf.set(key, (totalOf.get(key) || 0) + 1);
+      if (!(!!task.done || (task.progress != null && task.progress >= 1) || isDoneStatus(task.status))) openOf.set(key, (openOf.get(key) || 0) + 1);
+    }
+  }
+
   // Alphabetical lanes for Text, with the choice list or the referenced table deciding otherwise.
   let list = [...lanes.values()];
   if (laneCol.kind === 'Text') list = [list[0], ...list.slice(1).sort((a, b) => String(a.label).localeCompare(String(b.label)))];
   for (const lane of list) {
     lane.cards.sort(byRank);
-    lane.open = lane.cards.filter((c) => !c.done).length;
+    lane.open = everyone ? openOf.get(lane.key) || 0 : lane.cards.filter((c) => !c.done).length;
+    lane.total = everyone ? Math.max(totalOf.get(lane.key) || 0, lane.cards.length) : lane.cards.length;
+    lane.hidden = lane.total - lane.cards.length;
     lane.limit = Number.isInteger(wip[lane.key]) && wip[lane.key] > 0 ? wip[lane.key] : null;
     lane.over = lane.limit != null && lane.open > lane.limit ? lane.open - lane.limit : 0;
   }
-  list = list.filter((l) => (l.none || hideEmpty ? l.cards.length > 0 : true));
+  list = list.filter((l) => (l.none ? l.cards.length > 0 : hideEmpty ? l.total > 0 : true));
   return { lanes: list, byId };
 }
 
