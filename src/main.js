@@ -3232,6 +3232,8 @@ function openMore(btn) {
       narrow() && DISPLAY_SECTIONS[S.mode] ? { label: t('Display'), onClick: () => toggleDisplay() } : null,
       compactBar() ? { label: t('Views'), onClick: () => openViewsPanel() } : null,
       compactBar() ? { separator: true } : null,
+      // the agenda's Add to calendar is not in the toolbar on a phone either
+      narrow() && S.mode === 'agenda' && S.agendaModel?.ag.groups.some((g) => g.id !== 'late' && g.id !== 'undated') ? { label: t('Add to calendar'), onClick: () => exportCalendar(null) } : null,
       // the Group picker is not in the toolbar on a phone: its choices are here
       ...(narrow() && gantt ? [{ label: t('No groups'), checked: !S.view.groupBy, onClick: () => setGroup(null) },
         ...S.columns.filter(groupable).map((c) => ({ label: t('Group by {col}', { col: c.label }), checked: S.view.groupBy === c.id, onClick: () => setGroup(c.id) })), { separator: true }] : []),
