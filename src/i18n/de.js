@@ -1208,4 +1208,8 @@ export const DE = {
   'Moved {count} to {lane}.': 'Verschoben: {count} nach {lane}.',
   'Moved {count} within {lane}.': 'Verschoben: {count} innerhalb von {lane}.',
   'Select several cards with Ctrl or Shift held, then drag one of them: they all go to the lane, one after the other.': 'Wählen Sie mehrere Karten mit gedrückter Strg- oder Umschalttaste aus und ziehen Sie eine davon: Alle wandern in die Spalte, eine nach der anderen.',
+  'Set up this table': 'Diese Tabelle einrichten',
+  'Plan Studio did not find its columns in this table. Choose the ones that hold the names and dates, or let it add its own columns. Your rows stay as they are.': 'Plan Studio hat seine Spalten in dieser Tabelle nicht gefunden. Wählen Sie die Spalten mit den Namen und Terminen aus, oder lassen Sie es eigene Spalten hinzufügen. Ihre Zeilen bleiben, wie sie sind.',
+  'This adds {n} columns to {table} and the tables {list}. Your rows stay as they are. Grist’s Undo takes it back in one step.': 'Das fügt {table} {n} Spalten und die Tabellen {list} hinzu. Ihre Zeilen bleiben, wie sie sind. Mit Rückgängig in Grist nehmen Sie es in einem Schritt zurück.',
+  '“{name}” is set up: its columns are added to your table.': '„{name}“ ist eingerichtet: Die Spalten wurden Ihrer Tabelle hinzugefügt.',
 };

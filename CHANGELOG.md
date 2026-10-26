@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.21.3
+
+First use, as one rule: when Plan Studio finds none of its columns in a table, it asks.
+
+- **Set up this table** (or **Start a plan** on an empty one) is offered whatever the view and whatever the table holds: use your own columns ("Or choose the columns yourself"), or add Plan Studio's (Project plan, Event booking plan, Room booking). A table with rows keeps them and gets the columns only; an empty table, including one with a few blank rows or a Files column, also gets sample rows.
+- A table whose only match is a guessed name column counts as not found.
+
 ## 1.21.2
 
 First use on a new table.

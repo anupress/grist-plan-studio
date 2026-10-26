@@ -922,8 +922,9 @@ function recompute() {
   showDueHint(false);
   showHoursHint(false);
   showNoTimeHint(false);
-  // A new, empty table (Grist's Table1 with A, B, C, and a few blank rows): offer to set it up.
-  if (S.live && canEdit() && blankTable() && !S.columns.some((c) => !(c.type === 'Any' && !c.isFormula && /^[A-Z]$/.test(c.id)))) { starterState(); return; }
+  // A new, empty table (Grist's Table1: a few blank rows, perhaps a Files column) with no date column to draw from: offer to set it up.
+  // …and a table in which Plan Studio finds none of its columns at all (a name column alone is a guess): ask whether to use the table's own or add Plan Studio's.
+  if (S.live && canEdit() && ((blankTable() && !S.columns.some((c) => c.kind === 'Date' || c.kind === 'DateTime')) || !Object.entries(S.roles).some(([role, col]) => col && role !== 'title'))) { starterState(); return; }
   if (S.find.active && S.find.shown === 0 && S.rows.length && FIND_MODES.includes(S.mode)) { noMatch(); return; }
   if (S.mode === 'board') { recomputeBoard(); return; }
   if (S.mode === 'timeline') { recomputeTimeline(); return; }
@@ -2291,7 +2292,7 @@ async function redo() {
 
 // ---- starter templates and the add-column assistant --------------------------------------------------------
 /** No rows, or only rows with nothing in them (a new Grist table comes with a few). */
-const blankTable = () => S.rows.every((r) => S.columns.every((c) => { const v = r[c.id]; return v == null || v === '' || v === false; }));
+const blankTable = () => S.rows.every((r) => S.columns.every((c) => { const v = r[c.id]; return v == null || v === '' || v === false || (Array.isArray(v) && v.length <= 1); }));
 
 function starterState() {
   S.built = null;
@@ -2300,12 +2301,12 @@ function starterState() {
   const list = templates(t);
   const hints = { plan: t('Tasks with dates, owners and dependencies: the Gantt chart.'), events: t('Stores by weekend for a market: the booking grid.'), rooms: t('Rooms by day: the booking grid.') };
   clear(stage).appendChild(el('div', { class: 'ps-empty ps-starter' }, [
-    el('h2', { text: t('Start a plan') }),
-    el('p', { text: t('This table is empty. Plan Studio can set it up as one of these, with a few sample rows you can change or delete.') }),
+    el('h2', { text: blankTable() ? t('Start a plan') : t('Set up this table') }),
+    el('p', { text: blankTable() ? t('This table is empty. Plan Studio can set it up as one of these, with a few sample rows you can change or delete.') : t('Plan Studio did not find its columns in this table. Choose the ones that hold the names and dates, or let it add its own columns. Your rows stay as they are.') }),
     el('div', { class: 'ps-starter__list' }, list.map((tpl) => el('button', { type: 'button', class: 'ps-starter__item', onclick: () => applyTemplate(tpl) }, [
       el('span', { class: 'ps-starter__name', text: tpl.label }), el('span', { class: 'ps-starter__hint', text: hints[tpl.id] }),
     ]))),
-    el('p', { class: 'ps-starter__or' }, [el('button', { type: 'button', class: 'ps-link', text: t('Or choose the columns yourself'), onclick: () => openColumns('columns') })]),
+    el('p', { class: 'ps-starter__or' }, [el('button', { type: 'button', class: 'ps-link', text: t('Or choose the columns yourself'), onclick: () => (S.columns.some((c) => c.kind === 'Date' || c.kind === 'DateTime') ? openGuided() : openColumns('columns')) })]),
   ]));
 }
 
@@ -2314,25 +2315,31 @@ async function applyTemplate(tpl) {
   const tables = await listTables().catch(() => []);
   const { actions, names } = structureActions(tpl, { tableId: S.tableId, columns: S.columns, tables });
   // the blank rows of a new table go in the same step: the sample rows take their place
+  const empty = blankTable();
   const blanks = S.rows.map((r) => r.id);
-  if (blanks.length && blankTable()) actions.unshift(['BulkRemoveRecord', S.tableId, blanks]);
+  if (blanks.length && empty) actions.unshift(['BulkRemoveRecord', S.tableId, blanks]);
   const yes = await confirmBox(shell, {
     title: t('Set up “{name}”?', { name: tpl.label }),
-    body: t('This adds {n} columns to {table} and the tables {list}, with a few sample rows. Grist’s Undo takes it back in two steps.',
-      { n: tpl.columns.length, table: S.tableId, list: Object.values(names).join(', ') }),
+    body: blankTable()
+      ? t('This adds {n} columns to {table} and the tables {list}, with a few sample rows. Grist’s Undo takes it back in two steps.',
+        { n: tpl.columns.length, table: S.tableId, list: Object.values(names).join(', ') })
+      : t('This adds {n} columns to {table} and the tables {list}. Your rows stay as they are. Grist’s Undo takes it back in one step.', { n: tpl.columns.length, table: S.tableId, list: Object.values(names).join(', ') }),
     ok: t('Set it up'),
   });
   if (!yes) return;
   try {
     await apply(actions);
-    const colRef = await columnRefs();
-    const today = todayDay();
-    await apply(dataActions(tpl, { tableId: S.tableId }, names, { colRef }, (n) => (today + n) * 86400));
+    // sample rows only in a table with nothing in it: a table with rows keeps them, and gets the columns
+    if (empty) {
+      const colRef = await columnRefs();
+      const today = todayDay();
+      await apply(dataActions(tpl, { tableId: S.tableId }, names, { colRef }, (n) => (today + n) * 86400));
+    }
     // The view it opens in is remembered in this browser, not saved in the widget: saving would be a
     // third undo step, and the confirmation said two.
     S.mode = tpl.opensAs;
     rememberMode(S.tableId, S.opensAs, tpl.opensAs);
-    toast(t('“{name}” is set up. Change the sample rows or delete them.', { name: tpl.label }));
+    toast(empty ? t('“{name}” is set up. Change the sample rows or delete them.', { name: tpl.label }) : t('“{name}” is set up: its columns are added to your table.', { name: tpl.label }));
     reload('schema');
   } catch (e) { toast(t('Grist did not accept the change: {msg}', { msg: errText(e) })); }
 }
