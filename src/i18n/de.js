@@ -129,7 +129,7 @@ export const DE = {
   'Unfold {name}': '{name} aufklappen',
   'Group': 'Gruppen',
   'Group rows by': 'Zeilen gruppieren nach',
-  'No groups': 'Keine',
+  'No groups': 'Keine Gruppen',
   'Critical path': 'Kritischer Pfad',
   'Show the tasks that decide the end date': 'Die Aufgaben zeigen, die das Enddatum bestimmen',
   'On the critical path: a day late here is a day late at the end': 'Auf dem kritischen Pfad: ein Tag Verzug hier ist ein Tag Verzug am Ende',

@@ -90,10 +90,10 @@ button.ps-lane__count:hover { background: var(--ps-hover); color: var(--ps-ink);
 .ps-card.is-mate { opacity: 0.45; }
 .ps-card.is-lifted[data-more]::after {
   content: attr(data-more); position: absolute; top: -8px; right: -8px; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box;
-  border-radius: 11px; background: var(--ps-ink); color: var(--ps-card); font-size: 12px; font-weight: 600; line-height: 22px; text-align: center; font-variant-numeric: tabular-nums;
+  border-radius: 999px; background: var(--ps-ink); color: var(--ps-card); font-size: 12px; font-weight: 600; line-height: 22px; text-align: center; font-variant-numeric: tabular-nums;
 }
 .ps-av--more { color: var(--ps-muted); font-size: 11px; }
-.ps-card__progress { margin-top: 8px; height: 3px; border-radius: 2px; background: var(--ps-line); overflow: hidden; }
+.ps-card__progress { margin-top: 8px; height: 3px; border-radius: 999px; background: var(--ps-line); overflow: hidden; }
 .ps-card__progress > span { display: block; height: 100%; background: var(--stripe, var(--ps-accent)); }
 
 /* Dragging: the slot left behind is a dashed outline; the card in hand is the only card with a shadow. */
@@ -112,7 +112,7 @@ button.ps-lane__count:hover { background: var(--ps-hover); color: var(--ps-ink);
 }
 .ps-lane__add:hover { background: var(--ps-hover); color: var(--ps-ink); box-shadow: inset 0 0 0 1px var(--ps-line); }
 .ps-lane__plus { position: relative; width: 10px; height: 10px; flex: none; }
-.ps-lane__plus::before, .ps-lane__plus::after { content: ""; position: absolute; background: currentColor; border-radius: 1px; }
+.ps-lane__plus::before, .ps-lane__plus::after { content: ""; position: absolute; background: currentColor; border-radius: 999px; }
 .ps-lane__plus::before { left: 4px; top: 0; width: 2px; height: 10px; }
 .ps-lane__plus::after { top: 4px; left: 0; width: 10px; height: 2px; }
 .ps-lane__input {
@@ -144,7 +144,7 @@ button.ps-lane__count:hover { background: var(--ps-hover); color: var(--ps-ink);
 
 /* What a card says about its sub-tasks: words, with a short bar beside them. */
 .ps-card__sub { margin: 6px 0 0; display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 1.45; color: var(--ps-muted); font-variant-numeric: tabular-nums; }
-.ps-card__subbar { flex: none; width: 28px; height: 3px; border-radius: 2px; background: var(--ps-line); overflow: hidden; }
+.ps-card__subbar { flex: none; width: 28px; height: 3px; border-radius: 999px; background: var(--ps-line); overflow: hidden; }
 .ps-card__subbar > span { display: block; height: 100%; background: var(--ps-muted); }
 .ps-card__sub.is-all .ps-card__subbar > span { background: var(--ps-ok); }
 

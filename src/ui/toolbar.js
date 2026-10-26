@@ -18,7 +18,7 @@ const seg = (label, items, current, onPick, extra = '') => el('div', { class: 'p
   text, onclick: () => { if (id !== current) onPick(id); },
 })));
 
-const picker = (label, aria, options, current, onPick, noneText = null) => el('label', { class: 'ps-group' }, [
+const picker = (label, aria, options, current, onPick, noneText = null, cls = '') => el('label', { class: 'ps-group' + cls }, [
   el('span', { class: 'ps-group__label', text: label }),
   el('select', { class: 'ps-input ps-input--inline', 'aria-label': aria, onchange: (e) => onPick(e.target.value || null) }, [
     noneText ? el('option', { value: '', text: noneText }) : null,
@@ -92,7 +92,7 @@ export function renderToolbar(host, s, on) {
     if (view === 'gantt') {
       tools = [
         s.canAdd ? button(t('+ New task'), null, on.onNew, ' ps-btn--primary') : null,
-        s.groupOptions?.length ? picker(t('Group'), t('Group rows by'), s.groupOptions, s.groupBy, on.onGroup, t('No groups')) : null,
+        s.groupOptions?.length ? picker(t('Group'), t('Group rows by'), s.groupOptions, s.groupBy, on.onGroup, t('No groups'), ' ps-group--self') : null,
         s.groupBy && s.group2Options?.length ? picker(t('then'), t('Then group each group by'), s.group2Options, s.groupBy2, on.onGroup2, t('No second level')) : null,
         ...zoomTools(),
       ];
@@ -165,12 +165,12 @@ export function renderToolbar(host, s, on) {
         el('span', { class: 'ps-timer__time', dataset: { since: String(s.timer.since) }, text: s.timer.elapsed }),
         el('button', { type: 'button', class: 'ps-timer__stop', text: t('Stop'), title: t('Stop the timer and log its time'), onclick: on.onStopTimer }),
       ]) : null,
-      s.hasTime && level === 'full' ? button(t('Timesheet'), t('Hours logged this week, per task and day'), on.onTimesheet) : null,
+      s.hasTime && level === 'full' ? button(t('Timesheet'), t('Hours logged this week, per task and day'), on.onTimesheet, ' ps-hide-medium') : null,
       level === 'full' && s.display?.available ? el('button', {
-        type: 'button', class: 'ps-btn ps-display-btn' + (s.display.changed ? ' is-on' : ''), text: t('Display'), 'aria-haspopup': 'dialog', 'aria-expanded': s.display.open ? 'true' : 'false',
+        type: 'button', class: 'ps-btn ps-display-btn ps-hide-narrow' + (s.display.changed ? ' is-on' : ''), text: t('Display'), 'aria-haspopup': 'dialog', 'aria-expanded': s.display.open ? 'true' : 'false',
         title: s.display.changed ? t('How rows and bars look: changed from the default') : t('How rows and bars look: row height, order, colours, names, columns'), onclick: on.onDisplay,
       }) : null,
-      level === 'full' ? button(t('Views'), t('Saved views: a view as you set it up, under a name'), on.onViews) : null,
+      level === 'full' ? button(t('Views'), t('Saved views: a view as you set it up, under a name'), on.onViews, ' ps-hide-medium') : null,
       level === 'full' ? el('button', { type: 'button', class: 'ps-btn ps-more-btn', text: t('More'), 'aria-haspopup': 'menu', title: t('Add several tasks, set a baseline, fold everything, copy the plan as text, print'), onclick: (e) => on.onMore?.(e.currentTarget) }) : null,
       level === 'bare' ? null : el('button', { type: 'button', class: 'ps-btn ps-btn--key ps-hide-narrow', text: '?', title: t('Help and keyboard shortcuts (?)'), 'aria-label': t('Help'), onclick: on.onHelp }),
       level === 'bare' ? null : button(t('Settings'), t('Columns, how dates are read, and what each view shows'), on.onColumns, ' ps-columns-btn'),

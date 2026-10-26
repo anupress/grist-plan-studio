@@ -85,7 +85,7 @@
 
 .ps-blk {
   position: absolute; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 11px;
-  background: var(--ps-card); border: 1px solid var(--ps-card-line); border-radius: 5px; box-shadow: 0 1px 0 var(--ps-card-line);
+  background: var(--ps-card); border: 1px solid var(--ps-card-line); border-radius: 6px; box-shadow: 0 1px 0 var(--ps-card-line);
   font-size: 12px; line-height: 1.2; overflow: hidden; white-space: nowrap; user-select: none; z-index: 1;
 }
 .ps-blk.has-stripe::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--stripe); }
@@ -118,11 +118,11 @@
 .ps-wl__cell.is-free .ps-wl__num { font-weight: 500; color: var(--ps-muted); }
 .ps-wl__cell.is-over .ps-wl__num { color: var(--ps-crit); font-weight: 600; }
 .ps-wl__note { position: absolute; left: 10px; right: 6px; top: 26px; font-size: 11px; font-weight: 600; color: var(--ps-crit); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ps-wl__meter { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 5px; border-radius: 3px; background: var(--ps-wl-track); }
-.ps-wl__fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--ps-wl-fill); }
-.ps-wl__cell.is-over .ps-wl__fill { background: var(--ps-wl-fill); border-radius: 3px 0 0 3px; }
+.ps-wl__meter { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 5px; border-radius: 999px; background: var(--ps-wl-track); }
+.ps-wl__fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--ps-wl-fill); }
+.ps-wl__cell.is-over .ps-wl__fill { background: var(--ps-wl-fill); border-radius: 999px 0 0 999px; }
 .ps-wl__spill { position: absolute; top: 0; bottom: 0; background: var(--ps-crit); border-radius: 0 3px 3px 0; }
-.ps-wl__meter.has-tick::after { content: ""; position: absolute; left: calc(100% / 1.5); top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ps-ink); border-radius: 1px; }
+.ps-wl__meter.has-tick::after { content: ""; position: absolute; left: calc(100% / 1.5); top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ps-ink); border-radius: 999px; }
 .ps-wl__cell.is-off { cursor: default; background: repeating-linear-gradient(135deg, var(--ps-weekend) 0 5px, transparent 5px 10px); }
 .ps-wl__cell.is-off:hover { background: repeating-linear-gradient(135deg, var(--ps-weekend) 0 5px, transparent 5px 10px); }
 .ps-wl__cell.is-offday { background: var(--ps-clash-soft); }
@@ -133,7 +133,7 @@
 .ps-wl__cell.is-past .ps-wl__spill { background: var(--ps-muted); }
 .ps-wl__pop {
   position: absolute; z-index: 12; width: min(330px, calc(100% - 16px)); box-sizing: border-box; padding: 10px 0 8px;
-  background: var(--ps-surface); border: 1px solid var(--ps-line-strong); border-radius: 8px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  background: var(--ps-surface); border: 1px solid var(--ps-line-strong); border-radius: 10px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
 }
 .ps-wl__pophead { display: flex; flex-direction: column; gap: 2px; padding: 0 12px 8px; border-bottom: 1px solid var(--ps-line); }
 .ps-wl__pophead strong { font-size: 13px; }
@@ -169,7 +169,7 @@
   position: relative; display: flex; align-items: flex-start; gap: 12px; width: 100%; box-sizing: border-box; min-height: 52px;
   padding: 9px 4px 9px 14px; border: 0; background: var(--ps-card); color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
-.ps-ag__row.has-stripe::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: var(--stripe); }
+.ps-ag__row.has-stripe::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 999px; background: var(--stripe); }
 .ps-ag__row:hover { background: var(--ps-surface-2); }
 .ps-ag__row.is-selected, .ps-ag__row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--ps-focus); }
 .ps-ag__main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -210,13 +210,13 @@
 .ps-cal__day.is-off { background: var(--ps-weekend); }
 .ps-cal__day.is-drop { background: var(--ps-sel); box-shadow: inset 0 0 0 2px var(--ps-focus); }
 .ps-cal__num {
-  min-width: 24px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 0; border-radius: 11px; background: none; color: var(--ps-ink);
+  min-width: 24px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 0; border-radius: 999px; background: none; color: var(--ps-ink);
   font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer;
 }
 .ps-cal__num:hover { background: var(--ps-hover); }
 /* A day's own "+": there when the pointer is, or the focus, so an empty month stays quiet. */
 .ps-cal__add {
-  margin-left: auto; min-width: 24px; height: 22px; padding: 0; border: 0; border-radius: 11px; background: none; color: var(--ps-muted);
+  margin-left: auto; min-width: 24px; height: 22px; padding: 0; border: 0; border-radius: 999px; background: none; color: var(--ps-muted);
   font: inherit; font-size: 15px; line-height: 1; cursor: pointer; opacity: 0;
 }
 .ps-cal__day:hover .ps-cal__add, .ps-cal__add:focus-visible { opacity: 1; }
@@ -252,7 +252,7 @@
    it, as long as its group is big against the biggest, so size and make-up read together. No shadows, no icons. */
 .ps-ov { position: absolute; inset: 0; overflow-y: auto; background: var(--ps-ground); outline: none; }
 .ps-ov__col { max-width: 920px; margin: 0 auto; padding: 18px 16px 48px; box-sizing: border-box; }
-.ps-ov__kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); margin: 0; background: var(--ps-surface); border: 1px solid var(--ps-line); border-radius: 8px; overflow: hidden; }
+.ps-ov__kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); margin: 0; background: var(--ps-surface); border: 1px solid var(--ps-line); border-radius: 10px; overflow: hidden; }
 .ps-ov__kpi { display: grid; grid-template-areas: "n" "l" "x"; align-content: start; gap: 2px; padding: 12px 14px; min-width: 0; box-shadow: 1px 1px 0 var(--ps-line); }
 .ps-ov__kpi dd { grid-area: n; margin: 0; font-size: 22px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .ps-ov__kpi dt { grid-area: l; font-size: 12px; color: var(--ps-muted); }
@@ -264,7 +264,7 @@
 .ps-ov__row { display: grid; grid-template-columns: minmax(96px, 200px) minmax(80px, 1fr) minmax(130px, auto); align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--ps-line); }
 .ps-ov__name { min-width: 0; padding: 3px 0; border: 0; background: none; color: var(--ps-ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ps-ov__name:hover { text-decoration: underline; }
-.ps-ov__bar { display: flex; height: 10px; border-radius: 5px; background: var(--ps-line); overflow: hidden; }
+.ps-ov__bar { display: flex; height: 10px; border-radius: 999px; background: var(--ps-line); overflow: hidden; }
 .ps-ov__seg { display: block; height: 100%; }
 .ps-ov__seg--done { background: var(--ps-ok); }
 .ps-ov__seg--open { background: var(--ps-bar); }
@@ -296,5 +296,5 @@
 .ps-cal__h { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; touch-action: none; }
 .ps-cal__h--l { left: -3px; }
 .ps-cal__h--r { right: -3px; }
-.ps-cal__h::after { content: ""; position: absolute; top: 4px; bottom: 4px; left: 3px; width: 2px; border-radius: 1px; background: var(--ps-muted); opacity: 0; }
+.ps-cal__h::after { content: ""; position: absolute; top: 4px; bottom: 4px; left: 3px; width: 2px; border-radius: 999px; background: var(--ps-muted); opacity: 0; }
 .ps-cal__chip:hover .ps-cal__h::after, .ps-cal__chip.is-selected .ps-cal__h::after, .ps-cal__chip:focus-visible .ps-cal__h::after { opacity: 0.8; }

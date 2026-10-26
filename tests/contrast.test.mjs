@@ -46,6 +46,11 @@ const PAIRS = [
   ['ps-soon', 'ps-card', 4.5, '"today"'],
   ['ps-chrome-ink', 'ps-chrome', 4.5, 'the dark bar'],
   ['ps-chrome-mute', 'ps-chrome', 4.5, 'counts on the dark bar'],
+  // the dependency arrows and the link handle: marks that carry meaning, held to the text standard
+  ['ps-link', 'ps-surface', 4.5, 'dependency arrows on the chart'],
+  ['ps-link', 'ps-surface-2', 4.5, 'arrows over group rows'],
+  ['ps-link', 'ps-ground', 4.5, 'arrows on the floor'],
+  ['ps-link', 'ps-card', 4.5, 'arrows over cards'],
   ['ps-today', 'ps-surface', 3, 'the today line (a mark)'],
   ['ps-focus', 'ps-surface', 3, 'the focus ring (a mark)'],
 ];

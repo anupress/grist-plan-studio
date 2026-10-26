@@ -82,7 +82,7 @@ button, input, select { font: inherit; color: inherit; }
 .ps-toolbar {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 7px 12px;
   background: var(--ps-chrome); color: var(--ps-chrome-ink); border-bottom: 1px solid var(--ps-chrome-rule);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); position: relative; z-index: 8;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3); position: relative; z-index: 8;
 }
 .ps-bar-left, .ps-bar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .ps-brand { display: inline-flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
@@ -169,7 +169,7 @@ button, input, select { font: inherit; color: inherit; }
 .ps-chart__selrow { position: absolute; left: 0; right: 0; height: var(--row-h); background: var(--ps-sel); }
 
 .ps-bar {
-  position: absolute; height: var(--bar-h, 20px); border-radius: 5px; background: var(--fill); color: var(--ink);
+  position: absolute; height: var(--bar-h, 20px); border-radius: 6px; background: var(--fill); color: var(--ink);
   font-size: 12px; line-height: var(--bar-h, 20px); overflow: hidden; cursor: pointer; z-index: 2;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.10);
 }
@@ -184,7 +184,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 .ps-ms { position: absolute; width: var(--bar-h, 20px); height: var(--bar-h, 20px); cursor: pointer; z-index: 2; }
 .ps-ms::before {
-  content: ""; position: absolute; inset: 3px; background: var(--fill); transform: rotate(45deg); border-radius: 2px;
+  content: ""; position: absolute; inset: 3px; background: var(--fill); transform: rotate(45deg); border-radius: 4px;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
 }
 .ps-ms--due::before { background: var(--ps-surface); box-shadow: inset 0 0 0 2.5px var(--fill); }
@@ -232,7 +232,7 @@ button, input, select { font: inherit; color: inherit; }
 .is-editable .ps-bar.can-move, .is-editable .ps-ms.can-move { cursor: grab; touch-action: none; }
 .ps-gantt.is-dragging, .ps-gantt.is-dragging * { cursor: grabbing !important; user-select: none; }
 .ps-bar__h { position: absolute; top: 0; bottom: 0; width: 7px; cursor: ew-resize; z-index: 3; touch-action: none; }
-.ps-bar__h--l { left: 0; border-radius: 5px 0 0 5px; }
+.ps-bar__h--l { left: 0; border-radius: 6px 0 0 6px; }
 .ps-bar__h--r { right: 0; border-radius: 0 5px 5px 0; }
 .ps-bar:hover .ps-bar__h, .ps-bar.is-selected .ps-bar__h { background: rgba(255, 255, 255, 0.35); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
 .ps-bar--ghost { opacity: 0.55; pointer-events: none; outline: 1px dashed var(--ps-ink); }
@@ -281,7 +281,7 @@ button, input, select { font: inherit; color: inherit; }
 
 /* ---- structure (M3) ---- */
 /* #bd2830: 4.5:1 even on a hovered, striped workload cell (#c42b33 was 4.4) */
-:root { --ps-crit: #bd2830; --ps-holiday: rgba(217, 119, 6, 0.10); --ps-link: #64748b; --ps-hatch: rgba(20, 32, 43, 0.16); }
+:root { --ps-crit: #bd2830; --ps-holiday: rgba(217, 119, 6, 0.10); --ps-link: #5d6d82; --ps-hatch: rgba(20, 32, 43, 0.16); }
 :root[data-grist-appearance="dark"] { --ps-crit: #ff6b6f; --ps-holiday: rgba(251, 191, 36, 0.12); --ps-link: #94a3b8; --ps-hatch: rgba(180, 196, 214, 0.22); }
 @media (prefers-color-scheme: dark) { :root:not([data-grist-appearance="light"]) { --ps-crit: #ff6b6f; --ps-holiday: rgba(251, 191, 36, 0.12); --ps-link: #94a3b8; --ps-hatch: rgba(180, 196, 214, 0.22); } }
 
@@ -311,7 +311,7 @@ button, input, select { font: inherit; color: inherit; }
 /* Plan against actual (M18). The plan is a thin line under a bar that has moved: quiet, never red (late is the
    words' job, "4 days later than planned"). The ✓ is the day the task was really done: ink on the surface, so it
    reads on any bar colour; it is only a handle when the column can be written. */
-.ps-plan { position: absolute; height: 3px; border-radius: 2px; background: var(--ps-muted); z-index: 1; }
+.ps-plan { position: absolute; height: 3px; border-radius: 999px; background: var(--ps-muted); z-index: 1; }
 .ps-done {
   position: absolute; width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; z-index: 3;
   border: 2px solid var(--ps-ink); background: var(--ps-surface);
@@ -320,7 +320,7 @@ button, input, select { font: inherit; color: inherit; }
 .ps-done.can-move { cursor: grab; }
 .ps-app[data-density="compact"] .ps-plan { height: 2px; }
 .ps-qe-plan { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--ps-ink); }
-.ps-grpbar { position: absolute; height: 4px; margin-top: calc((var(--bar-h, 20px) - 4px) / 2); border-radius: 2px; background: var(--ps-muted); opacity: 0.45; cursor: pointer; }
+.ps-grpbar { position: absolute; height: 4px; margin-top: calc((var(--bar-h, 20px) - 4px) / 2); border-radius: 999px; background: var(--ps-muted); opacity: 0.45; cursor: pointer; }
 
 .ps-bar.is-critical { box-shadow: 0 0 0 2px var(--ps-crit); }
 .ps-ms.is-critical::before { box-shadow: 0 0 0 2px var(--ps-crit); }
@@ -428,8 +428,12 @@ button, input, select { font: inherit; color: inherit; }
 /* The phone's toolbar (M11): one row for where you are (the view, as a menu), one for what you can do
    there; controls a keyboard or a printer needs are left out; every control is at least 40px tall. */
 .ps-viewpick { display: none; }
+/* a small widget: what the toolbar can do without moves into More, so Settings keeps its place on the row */
+@media (max-width: 899px) { .ps-hide-medium { display: none; } }
 @media (max-width: 599px) {
   .ps-seg--views, .ps-hide-narrow { display: none; }
+  /* a picker whose own words say what it is ("No groups") drops its label here, which saves a row */
+  .ps-group--self .ps-group__label { display: none; }
   .ps-viewpick { display: inline-block; flex: 1 1 auto; min-width: 0; max-width: 150px; }
   /* One strip of controls instead of two groups: the view menu and Columns share the first row, the
      view's own controls (Mine, Add to calendar, a timer…) follow. */
@@ -488,6 +492,8 @@ button, input, select { font: inherit; color: inherit; }
 }
 .ps-banner > span { flex: 1; min-width: 0; }
 .ps-banner__close { width: 28px; height: 28px; font-size: 18px; }
+/* on a phone the tip takes less of the screen: a smaller type, a tighter strip */
+@media (max-width: 599px) { .ps-banner { min-height: 0; padding: 3px 4px 3px 10px; gap: 8px; font-size: 12px; line-height: 1.3; } .ps-banner .ps-btn { min-height: 28px; } }
 /* every view is placed over the whole stage: with a note up, below it */
 .ps-stage.has-banner > .ps-gantt, .ps-stage.has-banner > .ps-book, .ps-stage.has-banner > .ps-board,
 .ps-stage.has-banner > .ps-ag, .ps-stage.has-banner > .ps-cal { top: var(--banner-h, 40px); }
@@ -607,7 +613,7 @@ button, input, select { font: inherit; color: inherit; }
 .ps-pop {
   position: absolute; z-index: 1; top: calc(100% + 4px); left: 0; display: flex; flex-direction: column; box-sizing: border-box;
   width: 264px; max-width: calc(100vw - 16px); max-height: 340px; padding: 8px;
-  background: var(--ps-surface); border: 1px solid var(--ps-line-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  background: var(--ps-surface); border: 1px solid var(--ps-line-strong); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
 .ps-pop__find { margin: 0 0 6px; height: 28px; }
 .ps-pop__list { list-style: none; margin: 0; padding: 0; overflow: auto; max-height: 232px; }
@@ -638,7 +644,7 @@ button, input, select { font: inherit; color: inherit; }
 /* The panel sits under the toolbar and leaves the view in sight, so each choice shows at once. */
 .ps-disp {
   position: absolute; right: 12px; z-index: 12; box-sizing: border-box; width: 300px; max-width: calc(100% - 24px); max-height: calc(100% - 70px); overflow: auto;
-  padding: 12px 14px; background: var(--ps-surface); color: var(--ps-ink); border: 1px solid var(--ps-line-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  padding: 12px 14px; background: var(--ps-surface); color: var(--ps-ink); border: 1px solid var(--ps-line-strong); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
 }
 .ps-disp__title { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
 .ps-disp__row { display: block; margin: 0 0 10px; }
@@ -700,7 +706,7 @@ button, input, select { font: inherit; color: inherit; }
 /* Getting around (M21): the splitter on the edge of the names, in the heading, and the hand while the chart is dragged. */
 .ps-split { position: absolute; top: 0; right: 0; bottom: 0; width: 9px; cursor: col-resize; touch-action: none; z-index: 9; outline: none; }
 .ps-split::after { content: ""; position: absolute; left: 4px; top: 22%; bottom: 22%; width: 1px; background: var(--ps-line-strong); }
-.ps-split:hover::after, .ps-split:focus-visible::after, .ps-split.is-dragging::after { width: 3px; left: 3px; border-radius: 2px; background: var(--ps-focus); }
+.ps-split:hover::after, .ps-split:focus-visible::after, .ps-split.is-dragging::after { width: 3px; left: 3px; border-radius: 999px; background: var(--ps-focus); }
 .ps-gantt__chart { cursor: grab; }
 .ps-gantt.is-panning, .ps-gantt.is-panning .ps-gantt__chart { cursor: grabbing; user-select: none; }
 .ps-chip--toggle::after { display: none; }
@@ -710,11 +716,11 @@ button, input, select { font: inherit; color: inherit; }
 /* the menu on a task and the More menu: floating over the chart, so a shadow is right here */
 .ps-menu {
   position: absolute; z-index: 25; min-width: 210px; max-width: min(320px, calc(100% - 8px)); padding: 4px; box-sizing: border-box;
-  background: var(--ps-surface); border: 1px solid var(--ps-line-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  background: var(--ps-surface); border: 1px solid var(--ps-line-strong); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
 }
 .ps-menu__item {
   display: flex; align-items: baseline; justify-content: space-between; gap: 16px; width: 100%; box-sizing: border-box; padding: 6px 10px;
-  border: 0; border-radius: 5px; background: none; color: var(--ps-ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+  border: 0; border-radius: 4px; background: none; color: var(--ps-ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
 }
 .ps-menu__item:hover:not(:disabled) { background: var(--ps-hover); }
 .ps-menu__item:focus-visible { outline: none; background: var(--ps-hover); box-shadow: inset 0 0 0 2px var(--ps-focus); }
@@ -740,7 +746,7 @@ button, input, select { font: inherit; color: inherit; }
 .ps-bulk__count { margin-right: 6px; font-size: 13px; font-weight: 600; }
 .ps-bulk .ps-spacer { flex: 1; }
 /* the box drawn over the chart with Shift held: what it touches is selected */
-.ps-lasso { position: absolute; z-index: 5; pointer-events: none; box-sizing: border-box; border: 1px solid var(--ps-focus); background: rgba(20, 80, 155, 0.12); border-radius: 2px; }
+.ps-lasso { position: absolute; z-index: 5; pointer-events: none; box-sizing: border-box; border: 1px solid var(--ps-focus); background: rgba(20, 80, 155, 0.12); border-radius: 4px; }
 
 /* a group inside a group (M27): indented, a little quieter than the one around it */
 .ps-row--group2 { padding-left: 18px; font-weight: 600; background: var(--ps-surface); }
@@ -753,7 +759,7 @@ button, input, select { font: inherit; color: inherit; }
 .ps-bar.is-blocked { background-image: repeating-linear-gradient(135deg, rgba(20, 32, 43, 0.34) 0 4px, transparent 4px 9px); }
 /* the stripe says "stuck"; the name sits on a plain plate so it stays easy to read */
 .ps-cal__chip.is-blocked { background-image: repeating-linear-gradient(135deg, var(--ps-hatch) 0 4px, transparent 4px 9px); }
-.ps-cal__chip.is-blocked .ps-cal__chip-text { padding: 0 4px; margin-left: -2px; border-radius: 3px; background: var(--ps-card); }
+.ps-cal__chip.is-blocked .ps-cal__chip-text { padding: 0 4px; margin-left: -2px; border-radius: 4px; background: var(--ps-card); }
 .ps-card__blocked { margin: 6px 0 0; font-size: 12px; font-weight: 600; color: var(--ps-crit); }
 
 /* the deadline of a task (M29): a thin flag at the end of its due day, red when the plan ends after it */

@@ -591,6 +591,10 @@ function resolveMode() {
 }
 const PHONE = 600;   // px: under this the widget is a phone's, and the agenda its first view
 const narrow = () => typeof window !== 'undefined' && window.innerWidth < PHONE;
+/** Under this the toolbar leaves Timesheet and Views to the More menu (the stylesheet's .ps-hide-medium). */
+const compactBar = () => typeof window !== 'undefined' && window.innerWidth < 900;
+/** The zoom a chart opens at: the one that fits every task, but on a phone never the quarters or years, where bars are slivers: weeks, and scroll. */
+const firstZoom = (span, w) => { const z = fitZoom(span, w); return narrow() && (z === 'quarter' || z === 'year') ? 'week' : z; };
 /** The calendar has seven columns to fill: on a phone its place is the agenda's. */
 const fitsScreen = (mode) => (mode === 'calendar' && narrow() ? 'agenda' : mode);
 function setMode(mode) {
@@ -960,7 +964,7 @@ function recompute() {
   showDueHint(!!(S.roles.due && !S.roles.start && S.live && canEdit()));
   let fitNow = S.fitNext;
   // No zoom chosen in this browser yet: the one at which the whole plan fits.
-  if (S.zoom == null) { S.zoom = fitZoom(m.span, v.chartWidth() || 800); fitNow = true; }
+  if (S.zoom == null) { S.zoom = firstZoom(m.span, v.chartWidth() || 800); fitNow = true; }
   S.fitNext = false;
   drawToolbar(m);
   const editable = canEdit();
@@ -1068,7 +1072,7 @@ function recomputeTimeline() {
   const v = ensureTimeline();
   showTip();
   let fitNow = S.fitNext;
-  if (S.zoom == null) { S.zoom = fitZoom(span, v.chartWidth() || 800); fitNow = true; }
+  if (S.zoom == null) { S.zoom = firstZoom(span, v.chartWidth() || 800); fitNow = true; }
   S.fitNext = false;
   drawToolbar();
   const editable = canEdit();
@@ -3220,6 +3224,11 @@ function openMore(btn) {
   openMenu(shell, {
     x: r.left, y: r.bottom + 4, label: t('More'), anchor: btn,
     items: [
+      // the toolbar is short of room on a small widget: what it leaves out is here (Timesheet and Views under 900 px, Display on a phone)
+      compactBar() && hasTime() ? { label: t('Timesheet'), onClick: () => openTimesheetPanel() } : null,
+      narrow() && DISPLAY_SECTIONS[S.mode] ? { label: t('Display'), onClick: () => toggleDisplay() } : null,
+      compactBar() ? { label: t('Views'), onClick: () => openViewsPanel() } : null,
+      compactBar() ? { separator: true } : null,
       edit && tasky && S.roles.title ? { label: t('Add several tasks…'), onClick: () => addSeveral(0) } : null,
       gantt && edit && ganttReady(S.roles) && S.built?.tasks.length ? { label: t('Set baseline'), onClick: () => setBaseline() } : null,
       gantt && S.model?.links.length ? { label: t('Critical path'), checked: !!S.view.critical, onClick: () => { S.view.critical = !S.view.critical; saveView(); S.signature = ''; recompute(); } } : null,
