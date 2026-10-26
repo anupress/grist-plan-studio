@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.21.4
+
+A design pass after an audit of the widget at phone and half-page widths. Nothing is removed and nothing is written differently.
+
+- **Shorter toolbar on a phone.** Under 600 px, Timesheet, Display, Views, Group and the agenda's Add to calendar are in the **More** menu instead of the toolbar (Group appears as "Group by …" items). Between 600 and 900 px Timesheet and Views are in More too, so Settings no longer sits alone on its own row. The first-use tip takes less room.
+- **The Gantt chart opens at Weeks on a phone**, not Years, where every bar was a sliver. Fit still fits.
+- **Link arrows and the link handle** are a little darker, to 4.5:1 or better on every surface in both themes; the contrast test now checks them.
+- **Corner radii** are on one scale (4, 6, 10 px and round), and the toolbar's soft shadow is a hairline.
+- German: "No groups" reads "Keine Gruppen".
+
 ## 1.21.3
 
 First use, as one rule: when Plan Studio finds none of its columns in a table, it asks.
