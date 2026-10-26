@@ -432,8 +432,6 @@ button, input, select { font: inherit; color: inherit; }
 @media (max-width: 899px) { .ps-hide-medium { display: none; } }
 @media (max-width: 599px) {
   .ps-seg--views, .ps-hide-narrow { display: none; }
-  /* a picker whose own words say what it is ("No groups") drops its label here, which saves a row */
-  .ps-group--self .ps-group__label { display: none; }
   .ps-viewpick { display: inline-block; flex: 1 1 auto; min-width: 0; max-width: 150px; }
   /* One strip of controls instead of two groups: the view menu and Columns share the first row, the
      view's own controls (Mine, Add to calendar, a timer…) follow. */
@@ -442,7 +440,7 @@ button, input, select { font: inherit; color: inherit; }
   .ps-bar-right > * { order: 2; }
   .ps-bar-right > .ps-columns-btn { order: 1; margin-left: auto; }
   .ps-toolbar .ps-btn, .ps-toolbar .ps-input, .ps-toolbar .ps-seg__btn { min-height: 40px; }
-  .ps-toolbar .ps-btn, .ps-toolbar .ps-seg__btn { padding-left: 12px; padding-right: 12px; }
+  .ps-toolbar .ps-btn, .ps-toolbar .ps-seg__btn { padding-left: 9px; padding-right: 9px; }
   /* tick boxes a thumb can hit: a larger box, and a row as tall as a button */
   .ps-field--check, .ps-check { min-height: 40px; }
   .ps-field--check input[type=checkbox], .ps-check input[type=checkbox] { width: 24px; height: 24px; margin: 0; flex: none; }

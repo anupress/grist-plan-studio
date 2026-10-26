@@ -1212,4 +1212,5 @@ export const DE = {
   'Plan Studio did not find its columns in this table. Choose the ones that hold the names and dates, or let it add its own columns. Your rows stay as they are.': 'Plan Studio hat seine Spalten in dieser Tabelle nicht gefunden. Wählen Sie die Spalten mit den Namen und Terminen aus, oder lassen Sie es eigene Spalten hinzufügen. Ihre Zeilen bleiben, wie sie sind.',
   'This adds {n} columns to {table} and the tables {list}. Your rows stay as they are. Grist’s Undo takes it back in one step.': 'Das fügt {table} {n} Spalten und die Tabellen {list} hinzu. Ihre Zeilen bleiben, wie sie sind. Mit Rückgängig in Grist nehmen Sie es in einem Schritt zurück.',
   '“{name}” is set up: its columns are added to your table.': '„{name}“ ist eingerichtet: Die Spalten wurden Ihrer Tabelle hinzugefügt.',
+  'Group by {col}': 'Gruppieren nach {col}',
 };

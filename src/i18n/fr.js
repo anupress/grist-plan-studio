@@ -1227,4 +1227,5 @@ export const FR = {
   'Plan Studio did not find its columns in this table. Choose the ones that hold the names and dates, or let it add its own columns. Your rows stay as they are.': 'Plan Studio n’a pas trouvé ses colonnes dans cette table. Choisissez celles qui contiennent les noms et les dates, ou laissez-le ajouter ses propres colonnes. Vos lignes restent telles quelles.',
   'This adds {n} columns to {table} and the tables {list}. Your rows stay as they are. Grist’s Undo takes it back in one step.': 'Cela ajoute {n} colonnes à {table} et les tables {list}. Vos lignes restent telles quelles. L’annulation de Grist le défait en une seule étape.',
   '“{name}” is set up: its columns are added to your table.': `${q('{name}')} est configuré${NB}: ses colonnes sont ajoutées à votre table.`,
+  'Group by {col}': 'Grouper par {col}',
 };

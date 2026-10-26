@@ -92,7 +92,7 @@ export function renderToolbar(host, s, on) {
     if (view === 'gantt') {
       tools = [
         s.canAdd ? button(t('+ New task'), null, on.onNew, ' ps-btn--primary') : null,
-        s.groupOptions?.length ? picker(t('Group'), t('Group rows by'), s.groupOptions, s.groupBy, on.onGroup, t('No groups'), ' ps-group--self') : null,
+        s.groupOptions?.length ? picker(t('Group'), t('Group rows by'), s.groupOptions, s.groupBy, on.onGroup, t('No groups'), ' ps-hide-narrow') : null,
         s.groupBy && s.group2Options?.length ? picker(t('then'), t('Then group each group by'), s.group2Options, s.groupBy2, on.onGroup2, t('No second level')) : null,
         ...zoomTools(),
       ];

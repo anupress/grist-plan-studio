@@ -849,7 +849,7 @@ function drawToolbar(model = null, level = 'full') {
     onOverBy0: (id) => { S.view.ovBy0 = id || null; saveView(); S.signature = ''; recompute(); },
     onOverBy1: (id) => { S.view.ovBy1 = id || '-'; saveView(); S.signature = ''; recompute(); },
     onOvMeasure: (id) => { S.view.ovMeasure = id || null; saveView(); S.signature = ''; recompute(); },
-    onGroup: (id) => { S.view.groupBy = id || null; if (!id || S.view.groupBy2 === id) S.view.groupBy2 = null; saveView(); S.signature = ''; recompute(); },
+    onGroup: (id) => setGroup(id),
     onGroup2: (id) => { S.view.groupBy2 = id || null; saveView(); S.signature = ''; recompute(); },
     onCritical: () => { S.view.critical = !S.view.critical; saveView(); S.signature = ''; recompute(); },
     onLanes: (id) => { S.view.laneBy = id || null; if (S.view.swimBy === S.view.laneBy) S.view.swimBy = null; saveView(); S.signature = ''; reload('labels'); },
@@ -3214,6 +3214,9 @@ function downloadPlanCsv() {
   toast(tn(table.rows.length, 'Downloaded {n} task.', 'Downloaded {n} tasks.'));
 }
 
+/** The first level of groups in the Gantt chart (the second level follows it: never the same column, none without a first). */
+function setGroup(id) { S.view.groupBy = id || null; if (!id || S.view.groupBy2 === id) S.view.groupBy2 = null; saveView(); S.signature = ''; recompute(); }
+
 function openMore(btn) {
   const r = btn.getBoundingClientRect();
   const edit = canEdit();
@@ -3229,6 +3232,9 @@ function openMore(btn) {
       narrow() && DISPLAY_SECTIONS[S.mode] ? { label: t('Display'), onClick: () => toggleDisplay() } : null,
       compactBar() ? { label: t('Views'), onClick: () => openViewsPanel() } : null,
       compactBar() ? { separator: true } : null,
+      // the Group picker is not in the toolbar on a phone: its choices are here
+      ...(narrow() && gantt ? [{ label: t('No groups'), checked: !S.view.groupBy, onClick: () => setGroup(null) },
+        ...S.columns.filter(groupable).map((c) => ({ label: t('Group by {col}', { col: c.label }), checked: S.view.groupBy === c.id, onClick: () => setGroup(c.id) })), { separator: true }] : []),
       edit && tasky && S.roles.title ? { label: t('Add several tasks…'), onClick: () => addSeveral(0) } : null,
       gantt && edit && ganttReady(S.roles) && S.built?.tasks.length ? { label: t('Set baseline'), onClick: () => setBaseline() } : null,
       gantt && S.model?.links.length ? { label: t('Critical path'), checked: !!S.view.critical, onClick: () => { S.view.critical = !S.view.critical; saveView(); S.signature = ''; recompute(); } } : null,
