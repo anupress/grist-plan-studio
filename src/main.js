@@ -922,8 +922,8 @@ function recompute() {
   showDueHint(false);
   showHoursHint(false);
   showNoTimeHint(false);
-  // A new, empty table (Grist's Table1 with A, B, C): offer to set it up.
-  if (S.live && canEdit() && !S.rows.length && !S.columns.some((c) => !(c.type === 'Any' && !c.isFormula && /^[A-Z]$/.test(c.id)))) { starterState(); return; }
+  // A new, empty table (Grist's Table1 with A, B, C, and a few blank rows): offer to set it up.
+  if (S.live && canEdit() && blankTable() && !S.columns.some((c) => !(c.type === 'Any' && !c.isFormula && /^[A-Z]$/.test(c.id)))) { starterState(); return; }
   if (S.find.active && S.find.shown === 0 && S.rows.length && FIND_MODES.includes(S.mode)) { noMatch(); return; }
   if (S.mode === 'board') { recomputeBoard(); return; }
   if (S.mode === 'timeline') { recomputeTimeline(); return; }
@@ -941,7 +941,7 @@ function recompute() {
       ? t('Plan Studio draws each task from a name and a date. Three questions are enough to tell it which columns they are in.')
       : t('This table has no Date column yet. Add one (a start date, an end or a due date), or show another table in this widget.')
         + (toBoard.length ? ' ' + t('The board needs no dates.') : ''),
-    hasDates ? [...datesActions(), ...toBoard] : toBoard);
+    hasDates ? [...datesActions(), ...toBoard] : [[t('Settings'), () => openColumns('columns')], ...toBoard]);
     return;
   }
   const m = buildModel();
@@ -2290,6 +2290,9 @@ async function redo() {
 }
 
 // ---- starter templates and the add-column assistant --------------------------------------------------------
+/** No rows, or only rows with nothing in them (a new Grist table comes with a few). */
+const blankTable = () => S.rows.every((r) => S.columns.every((c) => { const v = r[c.id]; return v == null || v === '' || v === false; }));
+
 function starterState() {
   S.built = null;
   drawToolbar(null, 'bare');
@@ -2310,6 +2313,9 @@ async function applyTemplate(tpl) {
   if (!canEdit()) return;
   const tables = await listTables().catch(() => []);
   const { actions, names } = structureActions(tpl, { tableId: S.tableId, columns: S.columns, tables });
+  // the blank rows of a new table go in the same step: the sample rows take their place
+  const blanks = S.rows.map((r) => r.id);
+  if (blanks.length && blankTable()) actions.unshift(['BulkRemoveRecord', S.tableId, blanks]);
   const yes = await confirmBox(shell, {
     title: t('Set up “{name}”?', { name: tpl.label }),
     body: t('This adds {n} columns to {table} and the tables {list}, with a few sample rows. Grist’s Undo takes it back in two steps.',

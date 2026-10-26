@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.21.1-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.21.2-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.21.2
+
+First use on a new table.
+
+- A new Grist table often comes with a few blank rows, and Plan Studio then showed only a message. A table with nothing in it now offers the starter plans, and setting one up replaces the blank rows with the sample rows in the same step.
+- A table with no Date column now has a **Settings** button on its message, instead of text alone.
+
 ## 1.21.1
 
 Small fixes found by checking the published 1.21.0.
