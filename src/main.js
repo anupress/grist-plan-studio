@@ -9,7 +9,7 @@ import { el, clear } from './core/util.js';
 import { VERSION } from './version.js';
 import {
   start, accessLevel, selectedTableId, gristCulture, getOptions, setOptions, moveCursor, apply, linkingInfo, docAddress,
-  openRecordCard, undo as gristUndo, redo as gristRedo,
+  openRecordCard, undo as gristUndo, redo as gristRedo, fetchRows, fileAccess,
 } from './grist/connect.js';
 import { loadColumns, loadForeignMapping, loadLabels, loadOwnSection, loadHolidayDays, loadDaysOff, listDatedTables, loadTable, listTables, columnRefs, forgetMeta, listTablesWithColumns, docTimeZone } from './data/live.js';
 import { templates, structureActions, dataActions, columnForRole } from './model/templates.js';
@@ -19,7 +19,7 @@ import { buildTasks, spanOf } from './model/tasks.js';
 import { arrange } from './model/tree.js';
 import { linksOf, isLate, pushPlan, criticalPath, wouldLoop, tightenPlan } from './model/schedule.js';
 import { makeCalendar, holidaysBetween } from './model/calendar.js';
-import { todayDay, dateFromDay, plain, dayOf, num, isoFromDay, dayFromISO, progressScale } from './model/values.js';
+import { todayDay, dateFromDay, plain, dayOf, num, isoFromDay, dayFromISO, progressScale, listOf } from './model/values.js';
 import { capabilities, planDates, linkValue, newTaskFields, canLink, planLink, planUnlink, baselineFields, doneOnFields, canMoveDoneOn, doneFields, datesFields, encodeInput } from './model/edits.js';
 import { baselineSummary, baselineTargets, drifted } from './model/plan.js';
 import { planDelete, planDeleteMany, planDuplicate, planSeries, planReparent, descendantsOf } from './model/rowops.js';
@@ -34,6 +34,8 @@ import { createBulkBar } from './ui/bulkbar.js';
 import { setBox, daysBox } from './ui/bulkset.js';
 import { quickColumns } from './model/quickfields.js';
 import { slipText, slipShortText, linkText, deadlineText } from './ui/planwords.js';
+import { attachmentMap, previewPlan } from './model/files.js';
+import { filesStrip } from './ui/files.js';
 import { linkTypeOf, latestEnd as latestEndOfLink } from './model/links.js';
 import { linkBox } from './ui/linkbox.js';
 import { readOptions, writeOptions, storedZoom, rememberZoom, storedView, rememberView, storedMode, rememberMode, storedMe, rememberMe, storedTab, rememberTab, GANTT_DEFAULTS, BOARD_DEFAULTS, BOOKING_DEFAULTS, WORKLOAD_DEFAULTS, TIME_DEFAULTS, VIEWS, snapshotView, withView, MAX_VIEWS } from './model/settings.js';
@@ -76,7 +78,7 @@ import { openTimesheet } from './ui/timesheet.js';
 import { openReminders } from './ui/reminders.js';
 import { openViews } from './ui/views.js';
 import { t, tn, setLanguage, storedLanguage, dateLocale, weekStartOf } from './i18n/index.js';
-import { SAMPLE_COLUMNS, SAMPLE_LABELS, SAMPLE_TABLE, SAMPLE_PEOPLE, SAMPLE_TIME_TABLE, SAMPLE_TIME_COLUMNS, sampleRows, sampleDaysOff, sampleTimeRows } from './demo/sample.js';
+import { SAMPLE_COLUMNS, SAMPLE_LABELS, SAMPLE_TABLE, SAMPLE_PEOPLE, SAMPLE_TIME_TABLE, SAMPLE_TIME_COLUMNS, sampleRows, sampleDaysOff, sampleTimeRows, sampleFiles } from './demo/sample.js';
 import { STORES_COLUMNS, STORES_LABELS, STORES_TABLE, STORES_RESOURCES, storesRows } from './demo/stores.js';
 import { SPEED_COLUMNS, SPEED_LABELS, SPEED_TABLE, speedRows } from './demo/speed.js';
 
@@ -89,6 +91,7 @@ const S = {
   daysOff: { refTable: null, days: new Map() },   // people's own days off, from the holidays table
   time: { ...TIME_DEFAULTS },               // the time-entries table picked in Columns (settings)
   timeTableId: null, timeTable: null, timeCols: null, timeZone: 'UTC',   // the one in use, its rows and columns
+  files: new Map(), fileAccess: null,   // the details of the attachments (id -> name, type...), and the address and token to open them with (M31)
   entries: [], logged: new Map(), me: null, // its entries, hours per task, and who this browser's timers are for
   opensAs: 'auto', mode: 'gantt',   // the view the widget opens in (saved), and the one shown now
   savedViews: [],                   // named views saved in the widget's options (settings.js), shared by everyone
@@ -983,7 +986,7 @@ function recompute() {
     linkTitle: (l) => linkText(l, names.get(l.from) || '', names.get(l.to) || ''),
     holidays: m.cal.holidays, length: m.cal.length, workdays: m.cal.workdays,
     caps: (task) => capabilities(task, c), linkable: canLink(c), editable, showCritical: S.view.critical,
-    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), datePattern: activePattern(), selectedId: S.selectedId, multi: S.multi,
+    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), datePattern: activePattern(), filesLine, selectedId: S.selectedId, multi: S.multi,
     titleLabel: titleCol ? titleCol.label : t('Task'),
     timeText: (task) => timeText(task),
     ...displayProps(true),
@@ -1084,7 +1087,7 @@ function recomputeTimeline() {
   v.update({
     lanes: tl.lanes, tracks: tl.tracks, span, holidays: cal.holidays, length: cal.length, workdays: cal.workdays,
     caps: (task) => capabilities(task, c), editable, laneMovable: editable && !lane.isFormula,
-    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), datePattern: activePattern(), selectedId: S.selectedId, multi: S.multi,
+    today: todayDay(), zoom: S.zoom, weekStart: weekStart(), locale: dateLocale(gristCulture()), datePattern: activePattern(), filesLine, selectedId: S.selectedId, multi: S.multi,
     laneLabel: lane.label, noneLabel: t('No {col}', { col: lane.label }),
     ...displayProps(false),
   }, { first: S.firstDraw, fit: fitNow });
@@ -1161,7 +1164,7 @@ function recomputeBooking() {
   v.update({
     resources: g.resources, periods, free: g.free, unit, mode: periodCol ? 'column' : 'dates', today: todayDay(),
     editable: editable && !res.isFormula, canBook: editable && !res.isFormula && (periodCol ? !periodCol.isFormula : true),
-    selectedId: S.selectedId, resourceLabel: res.label, noneLabel: t('No {col}', { col: res.label }), locale: dateLocale(gristCulture()), datePattern: activePattern(), labelOf,
+    selectedId: S.selectedId, resourceLabel: res.label, noneLabel: t('No {col}', { col: res.label }), locale: dateLocale(gristCulture()), datePattern: activePattern(), filesLine, labelOf,
     trackH: gridHeights(disp()).trackH,
   }, { first: S.firstDraw, startAt: startPeriod(g, periods) });
   S.firstDraw = false;
@@ -1982,6 +1985,57 @@ async function tightenNow() {
   writeMany(items.map(({ id, plan }) => ({ id, plan })), tn(items.length, 'Moved {n} task earlier.', 'Moved {n} tasks earlier.'));
 }
 
+// ---- the files of a task (M31) ----------------------------------------------------------------------------
+// A column of Attachments keeps the ids of the files; their names and kinds are in Grist's own attachments table, and a read-only token (which
+// runs out in 15 minutes: asked again after 8) opens them. Hovering a bar, a booking or a card shows the first few as small tiles.
+const hasFiles = () => !!S.roles.attachments;
+const fileLines = new Map();   // task id -> its tiles, kept so a mouse moving over a bar does not draw them again each time
+const FILE_TOKEN_MS = 8 * 60 * 1000;
+async function loadFiles() {
+  if (!hasFiles() || S.demo || !S.live) return;
+  const col = S.roles.attachments;
+  const wanted = new Set();
+  for (const r of S.rows) for (const id of listOf(r[col])) if (typeof id === 'number' && id > 0) wanted.add(id);
+  if (!wanted.size) return;
+  // Grist's table is read only when a file is not known yet: names do not change under a task
+  if ([...wanted].some((id) => !S.files.has(id))) { S.files = attachmentMap(await fetchRows('_grist_Attachments').catch(() => [])); fileLines.clear(); }
+  if (!S.fileAccess || Date.now() - S.fileAccess.at > FILE_TOKEN_MS) {
+    const a = await fileAccess();
+    if (a) { S.fileAccess = { ...a, at: Date.now() }; fileLines.clear(); }
+  }
+}
+/** The address of a file's picture, or null (no token yet, or a demo file with no picture). */
+function fileUrl(id) {
+  if (S.demo) return S.files.get(id)?.url || null;
+  return S.fileAccess ? `${S.fileAccess.base}/attachments/${id}/download?auth=${encodeURIComponent(S.fileAccess.token)}` : null;
+}
+/** The tiles of a task's first files, or null: what a hovered bar, booking or card shows under its words. */
+function filesLine(id) {
+  if (!hasFiles()) return null;
+  const task = taskById(id);
+  const ids = task?.files || [];
+  if (!ids.length) return null;
+  const key = id + '|' + ids.join('.') + '|' + S.files.size;
+  if (fileLines.has(key)) return fileLines.get(key);
+  const node = filesStrip(previewPlan(ids, (x) => S.files.get(x), { max: 3 }), { urlOf: fileUrl });
+  fileLines.set(key, node);
+  // a token that has run out is renewed in the background: the next hover has a fresh one
+  if (!S.demo && S.live && (!S.fileAccess || Date.now() - S.fileAccess.at > FILE_TOKEN_MS)) loadFiles().catch(() => {});
+  return node;
+}
+/** Open a file in a new tab: with a fresh token when the one in hand is old. */
+async function openFile(id) {
+  if (!S.demo && (!S.fileAccess || Date.now() - S.fileAccess.at > FILE_TOKEN_MS)) { const a = await fileAccess(); if (a) S.fileAccess = { ...a, at: Date.now() }; }
+  const url = fileUrl(id);
+  if (url) window.open(url, '_blank', 'noopener');
+}
+/** All of a task's files, larger, each opening the file: the edit window's own section. */
+function filesPanel(id) {
+  if (!hasFiles()) return null;
+  const ids = taskById(id)?.files || [];
+  return filesStrip(previewPlan(ids, (x) => S.files.get(x), { max: 12 }), { urlOf: fileUrl, onOpen: openFile, big: true });
+}
+
 // ---- time tracking (M10) ----------------------------------------------------------------------------------
 // The time-entries table is found by its columns (a Reference to this task table, a day, and hours or a
 // start and an end), or picked in Columns. Its rows are read like the other tables beside the task
@@ -2769,6 +2823,7 @@ function openQuick(id, note = null) {
   openQuickEdit(shell, {
     row, roles: S.roles, columns: S.columns, labels, extra: quickCols(), editable: canEdit(), canOpenCard: S.live, canCopy: canEdit(), canSub: canEdit() && canNest() && S.mode !== 'booking', note, booking: S.mode === 'booking',
     calendar: calendarWords(id),
+    files: filesPanel(id),
     plan: slipText(taskById(id) || {}),
     time: {
       logged: S.logged.get(id) || 0, planned: plannedOf(id), running: myTimer()?.task === id, hours: fmtHours,
@@ -3498,6 +3553,7 @@ async function loadBookingTables() {
     S.daysOff = await loadDaysOff(S.gantt.holidayTable).catch(() => ({ refTable: null, days: new Map() }));
   }
   await loadTime();
+  await loadFiles();
 }
 
 // A column added, removed or renamed shows up as a different set of keys in the rows.
@@ -3656,6 +3712,7 @@ function bootDemo(example = null) {
   S.resourceTable = stores ? STORES_RESOURCES : null;
   // The website plan's people have hours a week (Dieter works part-time) and Ben has a day off.
   S.peopleTable = stores || speed ? null : SAMPLE_PEOPLE;
+  S.files = stores || speed ? new Map() : sampleFiles();
   S.daysOff = stores || speed ? { refTable: null, days: new Map() } : sampleDaysOff();
   S.workload = { ...WORKLOAD_DEFAULTS };
   // The website plan's time entries, kept in memory like everything else in the demo.

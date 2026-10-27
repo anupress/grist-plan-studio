@@ -1,7 +1,7 @@
 # Plan Studio — a custom widget for Grist (by ANUPRESS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.21.4-0F1B2D.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.22.0-0F1B2D.svg)](CHANGELOG.md)
 [![Live demo](https://img.shields.io/badge/live_demo-try_it-16a34a.svg)](https://anupress.github.io/grist-plan-studio/)
 
 Plan Studio shows a table you already keep in Grist as a **Gantt chart**, a **timeline**, a
@@ -348,6 +348,14 @@ with no lag, as before. The demo has three such links.
 - **Deadline**: a task with an end of its own and a different **Due** date has a deadline. The Gantt chart marks it with a thin flag at the end
   of that day, red when the plan ends after it; the tooltip and the screen-reader label say “Due 22 Oct, ends 1 day after it”, and a board
   card says “Ends 1 day after its due date”. A due date that is the end itself, or the only date a task has, is not a deadline.
+
+## The files of a task
+
+If the table has an **Attachments** column (found by its name, Files or Attachments or Anhänge or Pièces jointes, or as the table's only one), Plan Studio shows what is in it:
+
+- **Hover a bar** in the Gantt chart, or a bar in the timeline or a booking in the grid: under the dates it shows the first three files, a small picture for each photo or drawing (PNG, JPEG, GIF, WebP, SVG, AVIF, BMP) and the type for the rest (PDF, Word…), each with its name, and "and 2 more" when there are more.
+- **The edit window** lists up to twelve, larger; a click opens the file in a new tab.
+- Read-only: files are added in Grist or with File Studio. A hover reads the attachments with a read-only link that Grist hands the widget and that runs out after a few minutes; the widget renews it, shows it to nobody, and keeps it only in memory. Nothing is written to the document.
 
 ## Search and filters
 

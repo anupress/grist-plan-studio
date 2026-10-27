@@ -116,6 +116,12 @@ function timeSection(tm, on, close) {
   ]);
 }
 
+/** The task's files (M31): larger tiles, each opening the file. `strip` is built by the caller (ui/files.js). */
+function filesSection(strip) {
+  if (!strip) return null;
+  return el('section', { class: 'ps-qe-time ps-qe-files', 'aria-labelledby': 'ps-qe-files-h' }, [el('h3', { id: 'ps-qe-files-h', text: t('Files') }), strip]);
+}
+
 /** Add to calendar (M11): what the file will hold, in words, and the button. Null for a task without a date. */
 function calendarSection(c, on, close) {
   if (!c) return null;
@@ -190,6 +196,7 @@ export function openQuickEdit(host, s, on) {
       ...extraRows,
       el('button', { type: 'submit', hidden: true }),
     ]),
+    filesSection(s.files),
     timeSection(s.time, on, () => close()),
     calendarSection(s.calendar, on, () => close()),
     s.canOpenCard || s.canCopy || s.canSub ? el('div', { class: 'ps-drawer__tools' }, [

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.22.0
+
+The files of a task. Tested in Grist 1.7.20 with real uploaded files.
+
+- **Hover a bar or a booking and see its files**: small pictures for photos and drawings, the type for the rest, each with its name. The Gantt chart, the timeline and the booking grid.
+- **The edit window lists all the files**, larger, and a click opens one in a new tab.
+- The Attachments column is found by its name (Files, Attachments, Anhänge, Pièces jointes…) or as the table's only one, and can be chosen in Settings.
+- The demo's tasks carry a few files.
+- German and French for every new word.
+
 ## 1.21.4
 
 A design pass after an audit of the widget at phone and half-page widths. Nothing is removed and nothing is written differently.

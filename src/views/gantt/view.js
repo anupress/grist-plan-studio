@@ -369,6 +369,8 @@ export function createGantt(host, on = {}) {
     const timeText = model.timeText?.(task);
     if (timeText) lines.push(el('div', { text: timeText }));
     if (model.showCritical && model.critical?.has(task.id)) lines.push(el('div', { class: 'ps-tip__crit', text: t('On the critical path: a day late here is a day late at the end') }));
+    const filesNode = !e.summary ? model.filesLine?.(task.id) : null;
+    if (filesNode) lines.push(filesNode);
     if (task.checks) lines.push(el('div', { text: t('{done} of {total} checked', { done: task.checks.done, total: task.checks.total }) }));
     if (task.blocked) lines.push(el('div', { class: 'ps-tip__warn', text: t('Blocked: it cannot go on until something else happens.') }));
     if (task.flag === 'endBeforeStart') lines.push(el('div', { class: 'ps-tip__warn', text: t('The end date is before the start date. Drawn as one day.') }));

@@ -117,6 +117,17 @@ export async function docAddress() {
   return token?.baseUrl ? String(token.baseUrl).replace(/\/$/, '') : null;
 }
 
+/**
+ * Where attachments can be downloaded from, and a read-only token that lasts a few minutes (the caller asks again before it runs out):
+ * the address and the token go into the src of a picture, nowhere else, and are never shown or kept.
+ * @returns {Promise<{base: string, token: string} | null>}
+ */
+export async function fileAccess() {
+  if (!live) return null;
+  const a = await g().docApi.getAccessToken({ readOnly: true }).catch(() => null);
+  return a?.token && a?.baseUrl ? { base: String(a.baseUrl).replace(/\/$/, ''), token: String(a.token) } : null;
+}
+
 // ---- writing -------------------------------------------------------------------------------------
 
 /** One action bundle = one undo step. Throws Grist's own error (access rules, bad value) to the caller. */

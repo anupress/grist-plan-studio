@@ -40,6 +40,8 @@ export const SAMPLE_COLUMNS = [
   col(18, 'Link_type', 'Choice', { choices: ['Finish to start', 'Start to start', 'Finish to finish', 'Start to finish'] }),
   // a checklist in a text cell, one item to a line
   col(19, 'Checklist', 'Text'),
+  // files kept in an Attachments column: a hover shows the first few
+  col(20, 'Files', 'Attachments'),
 ];
 
 /** The people, with their hours a week (Dieter works part-time): the workload reads their capacity here. */
@@ -102,6 +104,8 @@ export function sampleRows(today = todayDay()) {
 
   // Deadlines apart from the plan's end: Visual design ends a day after its, Front-end build two days before its, Testing has a day to spare.
   const DEADLINE = { 9: 24, 13: 41, 18: 47 };
+  // The files of a few tasks: ids into sampleFiles() below.
+  const FILES = { 8: [1, 2], 9: [3, 6, 5], 7: [4], 10: [5, 4] };
   // Checklists, one item to a line: the cards say how many are ticked.
   const CHECKS = {
     9: ['x Home page', 'x Product page', '  Checkout', '  Mobile layouts'],
@@ -122,7 +126,23 @@ export function sampleRows(today = todayDay()) {
     Done_on: DONE[id] != null ? d(DONE[id]) : null,
     Lag_days: LINKS[id] ? LINKS[id][1] : 0, Link_type: LINKS[id] ? LINKS[id][0] : '',
     Checklist: checklist(Number(id)),
+    Files: FILES[id] ? ['L', ...FILES[id]] : null,
   }));
+}
+
+/** A small picture for the demo's files: a drawing in a few shapes, as an address the browser can show. */
+const picture = (bg, shapes) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="144" height="108" viewBox="0 0 144 108"><rect width="144" height="108" fill="${bg}"/>${shapes}</svg>`);
+
+/** The attachments the demo's tasks point at (id -> what Grist keeps about a file, and a picture where it is one). */
+export function sampleFiles() {
+  return new Map([
+    [1, { name: 'sitemap.png', type: 'image/png', ext: '.png', size: 84000, url: picture('#eef2f6', '<rect x="52" y="10" width="40" height="18" rx="3" fill="#14509b"/><path d="M72 28v14M26 42h92M26 42v10M72 42v10M118 42v10" stroke="#64748b" stroke-width="2" fill="none"/><rect x="8" y="52" width="36" height="16" rx="3" fill="#94a3b8"/><rect x="54" y="52" width="36" height="16" rx="3" fill="#94a3b8"/><rect x="100" y="52" width="36" height="16" rx="3" fill="#94a3b8"/><rect x="8" y="82" width="36" height="16" rx="3" fill="#cbd5e1"/><rect x="100" y="82" width="36" height="16" rx="3" fill="#cbd5e1"/>') }],
+    [2, { name: 'homepage-wireframe.png', type: 'image/png', ext: '.png', size: 132000, url: picture('#ffffff', '<rect x="6" y="6" width="132" height="14" fill="#cbd5e1"/><rect x="6" y="26" width="132" height="34" fill="#94a3b8"/><rect x="6" y="66" width="40" height="36" fill="#e2e8f0"/><rect x="52" y="66" width="40" height="36" fill="#e2e8f0"/><rect x="98" y="66" width="40" height="36" fill="#e2e8f0"/>') }],
+    [3, { name: 'brand-colours.png', type: 'image/png', ext: '.png', size: 21000, url: picture('#ffffff', '<rect x="8" y="14" width="30" height="80" fill="#14509b"/><rect x="42" y="14" width="30" height="80" fill="#22c55e"/><rect x="76" y="14" width="30" height="80" fill="#f59e0b"/><rect x="110" y="14" width="26" height="80" fill="#14202b"/>') }],
+    [4, { name: 'content-audit.pdf', type: 'application/pdf', ext: '.pdf', size: 612000, url: null }],
+    [5, { name: 'copy-draft.docx', type: '', ext: '.docx', size: 48000, url: null }],
+    [6, { name: 'visual-design-v2.png', type: 'image/png', ext: '.png', size: 240000, url: picture('#0b1117', '<rect x="10" y="10" width="124" height="88" rx="6" fill="#16212b"/><circle cx="36" cy="36" r="14" fill="#3b82f6"/><rect x="58" y="26" width="64" height="8" rx="3" fill="#8fa1b3"/><rect x="58" y="42" width="48" height="8" rx="3" fill="#566679"/><rect x="20" y="66" width="104" height="22" rx="4" fill="#22c55e"/>') }],
+  ]);
 }
 
 /**

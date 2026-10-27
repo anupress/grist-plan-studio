@@ -110,6 +110,7 @@ const general = () => [
   t('Search and the chips under the toolbar leave tasks out of the view; they never change your table.'),
   t('Display sets how rows and bars look in this browser. Settings says which column means what.'),
   t('Display, Dates, writes the days the way the table’s Start column writes them.'),
+  t('A task with an Attachments column shows its first pictures and file names when you hover its bar or booking, and all of them in its edit window, where a click opens the file.'),
   t('Display can sort the rows or cards by up to three things: sort by, then by, and then by.'),
   t('A task can be marked Blocked, or hold a checklist with a box for each item. A blocked task is striped and says so in words; cards, bars and the agenda say how many items are ticked.'),
   t('Each change you make is one step in Grist’s Undo (Ctrl+Z).'),

@@ -205,6 +205,8 @@ export function createBooking(host, on = {}) {
     if (model.mode === 'column') lines.push(el('div', { text: model.periods[f.it.first].label }));
     if (task.status) lines.push(el('div', { text: task.status }));
     if (f.it.clash) lines.push(el('div', { class: 'ps-tip__warn', text: t('Double booked: another booking of {res} overlaps it.', { res: resName(f.r) }) }));
+    const filesNode = model.filesLine?.(task.id);
+    if (filesNode) lines.push(filesNode);
     tip.classList.remove('ps-tip--drag');
     clear(tip).append(...lines);
     tip.hidden = false;

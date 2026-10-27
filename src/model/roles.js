@@ -90,6 +90,10 @@ export const ROLES = [
     strong: ['done', 'is done', 'completed', 'complete', 'finished', 'closed', 'erledigt', 'fertig', 'abgeschlossen',
       'fait', 'termine', 'cloture'], weak: [] },
   { id: 'milestone', kinds: ['Bool'], panel: true, strong: ['milestone', 'is milestone', 'meilenstein', 'jalon'], weak: [] },
+  // the files of a task, kept in an Attachments column: shown when a bar, a booking or a card is hovered, and in the edit window (M31)
+  { id: 'attachments', kinds: ['Attachments'], panel: true,
+    strong: ['files', 'file', 'attachments', 'attachment', 'documents', 'document', 'docs', 'photos', 'photo', 'images', 'pictures', 'anhang', 'anhange', 'anhaenge', 'dateien', 'datei', 'dokumente', 'fotos', 'bilder',
+      'fichiers', 'fichier', 'pieces jointes', 'piece jointe', 'photos jointes'], weak: [] },
   // a checklist kept in one text cell, a line to an item: "[ ] book the room" (M28)
   { id: 'checklist', kinds: ['Text'], panel: true,
     strong: ['checklist', 'check list', 'checklist items', 'to do list', 'todo list', 'task list', 'checkliste', 'pruefliste', 'prufliste', 'aufgabenliste', 'liste de controle', 'liste de verification', 'liste de taches', 'liste de tâches'], weak: [] },
@@ -238,6 +242,8 @@ function typeOnlyScore(roleId, col, tableId) {
   if (roleId === 'parent' && col.kind === 'Ref' && col.refTable === tableId) return 0.5;
   if (roleId === 'dependsOn' && col.kind === 'RefList' && col.refTable === tableId) return 0.5;
   if (roleId === 'assignee' && col.refTable && PEOPLE_TABLES.includes(norm(col.refTable))) return 1;
+  // the only way to keep files in a table: the first such column is the task's files
+  if (roleId === 'attachments' && col.kind === 'Attachments') return 0.5;
   return 0;
 }
 
@@ -333,7 +339,7 @@ export function fromStored(stored, columns, tableId) {
 // ---- columns added after the mapping was saved --------------------------------------------------------------
 
 /** The roles of the plan against actual: columns a person adds later, by their names, without a visit to Settings. */
-export const PLAN_ROLES = ['baselineStart', 'baselineEnd', 'doneOn', 'lag', 'linkType'];
+export const PLAN_ROLES = ['baselineStart', 'baselineEnd', 'doneOn', 'lag', 'linkType', 'attachments'];
 
 /**
  * A saved mapping, plus the plan roles it does not name, found by column name among the columns it does not use.

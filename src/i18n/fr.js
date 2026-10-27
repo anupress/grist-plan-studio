@@ -1228,4 +1228,10 @@ export const FR = {
   'This adds {n} columns to {table} and the tables {list}. Your rows stay as they are. Grist’s Undo takes it back in one step.': 'Cela ajoute {n} colonnes à {table} et les tables {list}. Vos lignes restent telles quelles. L’annulation de Grist le défait en une seule étape.',
   '“{name}” is set up: its columns are added to your table.': `${q('{name}')} est configuré${NB}: ses colonnes sont ajoutées à votre table.`,
   'Group by {col}': 'Grouper par {col}',
+  'Files': 'Fichiers',
+  'File': 'Fichier',
+  'Open {name}': `Ouvrir ${q('{name}')}`,
+  'and {n} more': 'et {n} de plus',
+  'An Attachments column: hover a bar or a booking to see its pictures and file names, and open them from the edit window.': 'Une colonne de pièces jointes : survolez une barre ou une réservation pour voir ses images et les noms des fichiers, et ouvrez-les depuis la fenêtre de modification.'.replace(' :', ' :'),
+  'A task with an Attachments column shows its first pictures and file names when you hover its bar or booking, and all of them in its edit window, where a click opens the file.': 'Une tâche avec une colonne de pièces jointes montre ses premières images et les noms de fichiers quand vous survolez sa barre ou sa réservation, et toutes dans sa fenêtre de modification, où un clic ouvre le fichier.',
 };

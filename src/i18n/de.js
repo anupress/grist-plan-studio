@@ -1213,4 +1213,10 @@ export const DE = {
   'This adds {n} columns to {table} and the tables {list}. Your rows stay as they are. Grist’s Undo takes it back in one step.': 'Das fügt {table} {n} Spalten und die Tabellen {list} hinzu. Ihre Zeilen bleiben, wie sie sind. Mit Rückgängig in Grist nehmen Sie es in einem Schritt zurück.',
   '“{name}” is set up: its columns are added to your table.': '„{name}“ ist eingerichtet: Die Spalten wurden Ihrer Tabelle hinzugefügt.',
   'Group by {col}': 'Gruppieren nach {col}',
+  'Files': 'Dateien',
+  'File': 'Datei',
+  'Open {name}': '{name} öffnen',
+  'and {n} more': 'und {n} weitere',
+  'An Attachments column: hover a bar or a booking to see its pictures and file names, and open them from the edit window.': 'Eine Anhangsspalte: Fahren Sie über einen Balken oder eine Buchung, um Bilder und Dateinamen zu sehen, und öffnen Sie sie im Bearbeitungsfenster.',
+  'A task with an Attachments column shows its first pictures and file names when you hover its bar or booking, and all of them in its edit window, where a click opens the file.': 'Eine Aufgabe mit einer Anhangsspalte zeigt die ersten Bilder und Dateinamen, wenn Sie über ihren Balken oder ihre Buchung fahren, und alle im Bearbeitungsfenster, wo ein Klick die Datei öffnet.',
 };

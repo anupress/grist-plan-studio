@@ -60,7 +60,7 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
   const byId = (id) => (id ? columns.find((c) => c.id === id) || null : null);
   const col = (role) => byId(roles[role]);
   const C = Object.fromEntries(['title', 'start', 'end', 'due', 'duration', 'status', 'progress', 'done', 'milestone',
-    'assignee', 'project', 'colour', 'parent', 'dependsOn', 'lag', 'linkType', 'blocked', 'checklist', 'baselineStart', 'baselineEnd', 'doneOn'].map((r) => [r, col(r)]));
+    'assignee', 'project', 'colour', 'parent', 'dependsOn', 'lag', 'linkType', 'blocked', 'checklist', 'attachments', 'baselineStart', 'baselineEnd', 'doneOn'].map((r) => [r, col(r)]));
   const colourBy = byId(S.colourBy);
   const groupBy = byId(S.groupBy);
   const groupBy2 = byId(S.groupBy2);
@@ -157,6 +157,8 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
     // stuck: the yes/no column, or a status that says so; a finished task is not blocked
     // the checklist's counts: {done, total}, or null when the task has none
     if (C.checklist) { const r = parseChecklist(plain(cell(row, 'checklist'))); t.checks = r.total ? { done: r.done, total: r.total } : null; } else t.checks = null;
+    // the ids of its files (an Attachments cell is a list of them)
+    t.files = C.attachments ? listOf(cell(row, 'attachments')).filter((x) => typeof x === 'number' && x > 0) : [];
     t.blocked = !t.finished && ((C.blocked ? plain(cell(row, 'blocked')) === true : false) || isBlockedStatus(statusKey));
 
     if (start != null) {
@@ -189,7 +191,7 @@ export function buildTasks(rows, { roles, columns, labels = {}, settings = {}, c
     }
     // What a redraw compares: the drawn facts of this task, nothing else.
     t.hash = [t.title, t.start, t.end, t.kind, t.flag, t.status, t.project, t.colour, t.progress, t.people.join('|'),
-      t.parentId, t.deps.join(','), t.lag, t.linkType, t.blocked, t.checks ? t.checks.done + '/' + t.checks.total : '', t.deadline, t.group, t.group2, t.baseStart, t.baseEnd, t.doneOn].join('\u0001');
+      t.parentId, t.deps.join(','), t.lag, t.linkType, t.blocked, t.checks ? t.checks.done + '/' + t.checks.total : '', t.files.join('.'), t.deadline, t.group, t.group2, t.baseStart, t.baseEnd, t.doneOn].join('\u0001');
     tasks.push(t);
   }
   return { tasks, unscheduled, flagged };

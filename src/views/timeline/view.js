@@ -187,6 +187,8 @@ export function createTimeline(host, on = {}) {
     ];
     if (task.status) lines.push(el('div', { text: task.status }));
     if (bar.clash) lines.push(el('div', { class: 'ps-tip__warn', text: t('Overlaps another booking of {lane}.', { lane: laneName(lane) }) }));
+    const filesNode = model.filesLine?.(task.id);
+    if (filesNode) lines.push(filesNode);
     tip.classList.remove('ps-tip--drag');
     clear(tip).append(...lines);
     tip.hidden = false;
